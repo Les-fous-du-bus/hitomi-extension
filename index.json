@@ -1,0 +1,101 @@
+{
+  "name": "Hitomi Extensions",
+  "description": "Extensions officielles pour Hitomi Reader",
+  "website": "https://github.com/Les-fous-du-bus/hitomi-extension",
+  "extensions": [
+    {
+      "id": "mangadex",
+      "name": "MangaDex",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/mangadex.js",
+      "iconUrl": "https://mangadex.org/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "818cbe1dde72b9a3175c90ba84fb2adb901f9fa019a24fc14828d7bd7a2e3b0d"
+    },
+    {
+      "id": "scan_vf",
+      "name": "ScanVF",
+      "lang": "fr",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": true,
+      "jsUrl": "src/manga/scan_vf.js",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "6a4adae90332091b36582eef46d3f9a6b1306c5ac500f4ade04f07efbedda05c"
+    },
+    {
+      "id": "bato",
+      "name": "Bato.to",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": true,
+      "cloudflare": true,
+      "jsUrl": "src/manga/bato.js",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "9b45cb0195a661a17a5ac35af5df82c2cc380933392fb2e74e64fbd1aadee292"
+    },
+    {
+      "id": "manga_plus",
+      "name": "MangaPlus",
+      "lang": "fr",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/manga_plus.js",
+      "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "20a718ff42d30c3e278d63b8b6f4d33b844843566e6df5f0ea9c072aed639ca4"
+    },
+    {
+      "id": "royal_road",
+      "name": "Royal Road",
+      "lang": "en",
+      "space": "light_novel",
+      "version": 1,
+      "mature": true,
+      "cloudflare": false,
+      "jsUrl": "src/novel/royal_road.js",
+      "iconUrl": "https://www.royalroad.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "70b33d3416800c9c40bf0116ee25056ff9dc1aa5b0f689a111ee5eca808d04d5"
+    },
+    {
+      "id": "light_novel_fr",
+      "name": "LightNovelFR",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/light_novel_fr.js",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "586d7de225013d8ce9fa24b14faee048018172a25b0c6c6304fb2ce78696f15f"
+    },
+    {
+      "id": "novel_index",
+      "name": "NovelIndex",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/novel_index.js",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "66b2a982d3d5ca2d785f8323deafc79de323a70d0ddb395fffaf6696e04fab40"
+    }
+  ]
+}
