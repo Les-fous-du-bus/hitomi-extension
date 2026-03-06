@@ -69,7 +69,7 @@
       "iconUrl": "https://www.royalroad.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "70b33d3416800c9c40bf0116ee25056ff9dc1aa5b0f689a111ee5eca808d04d5"
+      "sha256": "916a4622d2180fb1adfed00e9d8b4b06ff6d219fbe043b726e24233ff0b4a17a"
     },
     {
       "id": "light_novel_fr",
@@ -82,7 +82,7 @@
       "jsUrl": "src/novel/light_novel_fr.js",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "586d7de225013d8ce9fa24b14faee048018172a25b0c6c6304fb2ce78696f15f"
+      "sha256": "1305c2be676f645d6185f3659064235de13a926277f90009e92a44d536d9d2d8"
     },
     {
       "id": "novel_index",
@@ -95,7 +95,7 @@
       "jsUrl": "src/novel/novel_index.js",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "66b2a982d3d5ca2d785f8323deafc79de323a70d0ddb395fffaf6696e04fab40"
+      "sha256": "b059f1d1bcd8dbc0ad61a708ffed302a341ef93a93377aab51ebb42e24fea484"
     }
   ]
 }
