@@ -12,11 +12,11 @@
  *   - Recherche        : /recherche?query=...
  *   - Détail           : page roman /roman/{slug}
  *   - Chapitres        : inclus dans page roman (accordion)
- *   - Pages/Contenu    : page chapitre → HTML brut du texte
+ *   - Contenu          : page chapitre → HTML brut du texte
  *
- * Sélecteurs CSS documentés :
- *   - Grille liste   : div.row div.manga-item, div.listing article
- *   - Titre item     : h3 a.manga-name, a.novel-title
+ * Sélecteurs CSS / regex documentés :
+ *   - Grille liste   : div.manga-item, article.novel-item
+ *   - Titre item     : h3 a, a.manga-name, a.novel-title
  *   - Cover item     : img.img-thumbnail, img.img-responsive
  *   - Détail titre   : h1.novel-title, h1.entry-title
  *   - Détail cover   : div.novel-cover img
@@ -27,7 +27,7 @@
  *   - Contenu chap   : div#chapter-content, div.reading-content
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 const BASE_URL = "https://www.lightnovelfr.com";
@@ -47,297 +47,231 @@ function absoluteUrl(href) {
   return BASE_URL + "/" + href;
 }
 
-function extractImgSrc(el) {
-  if (!el) return "";
-  const src =
-    el.getAttribute("data-src") ||
-    el.getAttribute("data-lazy-src") ||
-    el.getAttribute("src") ||
-    "";
-  if (!src || src.includes("data:image")) return "";
-  if (src.startsWith("//")) return "https:" + src;
-  if (src.startsWith("/")) return BASE_URL + src;
-  return src;
+/**
+ * Extrait l'URL d'image depuis un fragment HTML de balise <img>.
+ * Priorité : data-src → data-lazy-src → src.
+ */
+function extractImgSrcFromHtml(html) {
+  if (!html) return "";
+  for (const attr of ["data-src", "data-lazy-src", "src"]) {
+    const m = html.match(new RegExp(attr + '=["\'](([^"\']+))["\']', "i"));
+    if (m && !m[1].includes("data:image")) {
+      const s = m[1];
+      if (s.startsWith("//")) return "https:" + s;
+      if (s.startsWith("/")) return BASE_URL + s;
+      return s;
+    }
+  }
+  return "";
 }
 
 /**
- * Détecte si un LN est mature via genres/tags
+ * Parse une liste de romans depuis le HTML brut de la page.
+ * Regex-based — fiable avec QuickJS/polyfill limité.
  */
-function isMatureContent(doc) {
-  const badges = doc.querySelectorAll(
-    ".label-info, .badge, .genre-item, .tag-item"
-  );
-  for (const b of badges) {
-    const text = (b.textContent || "").toLowerCase();
-    if (
-      text.includes("adult") ||
-      text.includes("mature") ||
-      text.includes("+18") ||
-      text.includes("harem") ||
-      text.includes("ecchi")
-    ) {
-      return true;
+function parseList(html) {
+  const list = [];
+
+  // Plusieurs layouts possibles — chercher des blocs manga-item / novel-item
+  const blockRegex =
+    /<(?:div|article)[^>]+class="[^"]*(?:manga-item|novel-item|list-truyen-item-wrap)[^"]*"[^>]*>([\s\S]*?)<\/(?:div|article)>/gi;
+
+  let m;
+  while ((m = blockRegex.exec(html)) !== null) {
+    const block = m[0];
+
+    // Titre + URL : chercher <a> avec titre ou texte
+    const linkMatch =
+      block.match(/<a[^>]+href=["']([^"']+)["'][^>]*title=["']([^"']+)["'][^>]*>/i) ||
+      block.match(/<a[^>]+title=["']([^"']+)["'][^>]+href=["']([^"']+)["'][^>]*>/i) ||
+      block.match(/<(?:h3|h4)[^>]*>[\s\S]*?<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
+
+    if (!linkMatch) continue;
+
+    let url, title;
+    if (linkMatch[0].includes("title=")) {
+      // Pattern avec attribut title
+      const hrefM = linkMatch[0].match(/href=["']([^"']+)["']/i);
+      const titleM = linkMatch[0].match(/title=["']([^"']+)["']/i);
+      url = hrefM ? absoluteUrl(hrefM[1]) : "";
+      title = titleM ? titleM[1].trim() : "";
+    } else {
+      url = absoluteUrl(linkMatch[1]);
+      title = linkMatch[2].replace(/<[^>]+>/g, "").trim();
     }
+
+    if (!title || !url) continue;
+
+    // Cover : première img du bloc
+    const imgMatch = block.match(/<img[^>]+>/i);
+    const cover = extractImgSrcFromHtml(imgMatch ? imgMatch[0] : "");
+
+    list.push({ title, url, cover });
   }
-  return false;
+
+  // hasNextPage
+  const hasNextPage =
+    /rel=["']next["']/i.test(html) ||
+    /class="[^"]*btn-next[^"]*"/i.test(html) ||
+    /class="[^"]*active[^"]*"[^>]*>[\s\S]{0,300}?<li[^>]*>[\s\S]*?<a/i.test(html);
+
+  return { list, hasNextPage };
 }
 
-class DefaultExtension extends MProvider {
-  get name() {
-    return "LightNovelFR";
-  }
-  get lang() {
-    return "fr";
-  }
-  get baseUrl() {
-    return BASE_URL;
-  }
-  get supportsLatest() {
-    return true;
-  }
-  get isMature() {
-    return false; // Défaut — détection item par item
-  }
-  get contentType() {
-    return "ln"; // Light Novel
-  }
+class DefaultExtension extends LNProvider {
+  get id()      { return "light_novel_fr"; }
+  get name()    { return "LightNovelFR"; }
+  get lang()    { return "fr"; }
+  get baseUrl() { return BASE_URL; }
+  get iconUrl() { return ""; }
 
   // ─────────────────────────────────────────────
   // CATALOGUE
   // ─────────────────────────────────────────────
 
-  async getPopular(page) {
+  async popularNovels(page) {
     const url = `${BASE_URL}/roman-list?sort=views&page=${page}`;
     const html = await fetchv2(url, { headers: HEADERS });
-    return this._parseList(html);
+    return parseList(html);
   }
 
-  async getLatestUpdates(page) {
-    const url = `${BASE_URL}/roman-list?sort=last_update&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
-    return this._parseList(html);
-  }
-
-  async search(query, page, filters) {
+  async searchNovels(searchTerm, page) {
     const url =
-      `${BASE_URL}/recherche?q=${encodeURIComponent(query || "")}` +
+      `${BASE_URL}/recherche?q=${encodeURIComponent(searchTerm || "")}` +
       `&page=${page}`;
     const html = await fetchv2(url, { headers: HEADERS });
-    return this._parseList(html);
+    return parseList(html);
   }
 
-  _parseList(html) {
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const list = [];
+  // ─────────────────────────────────────────────
+  // DÉTAIL + CHAPITRES
+  // ─────────────────────────────────────────────
 
-    // Sélecteurs pour lightnovelfr.com
-    const cards = doc.querySelectorAll(
-      "div.manga-item, article.novel-item, div.truyen-list > div.row > div, div.list-truyen-item-wrap"
+  async parseNovelAndChapters(novelUrl) {
+    const html = await fetchv2(novelUrl, { headers: HEADERS });
+
+    // Titre
+    const titleMatch =
+      html.match(/<h1[^>]*class="[^"]*novel-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) ||
+      html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) ||
+      html.match(/<h3[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/h3>/i);
+    const title = titleMatch
+      ? titleMatch[1].replace(/<[^>]+>/g, "").trim()
+      : "LightNovelFR";
+
+    // Cover
+    const coverContainerMatch = html.match(
+      /<div[^>]*class="[^"]*(?:novel-cover|book-img|manga-info-pic)[^"]*"[^>]*>([\s\S]*?)<\/div>/i
     );
+    const coverBlock = coverContainerMatch ? coverContainerMatch[0] : "";
+    const coverImgMatch = coverBlock.match(/<img[^>]+>/i);
+    const cover = extractImgSrcFromHtml(coverImgMatch ? coverImgMatch[0] : "");
 
-    cards.forEach((card) => {
-      const titleEl =
-        card.querySelector("h3 a") ||
-        card.querySelector("a.manga-name") ||
-        card.querySelector("a.novel-title") ||
-        card.querySelector("a[title]");
-      if (!titleEl) return;
-
-      const title = (
-        titleEl.getAttribute("title") ||
-        titleEl.textContent ||
-        ""
-      ).trim();
-      const href = absoluteUrl(titleEl.getAttribute("href") || "");
-      if (!title || !href) return;
-
-      const imgEl =
-        card.querySelector("img.img-thumbnail") ||
-        card.querySelector("img.img-responsive") ||
-        card.querySelector("img.lazyload") ||
-        card.querySelector("img");
-      const imageUrl = extractImgSrc(imgEl);
-
-      list.push({ title, url: href, imageUrl, isMature: false });
-    });
-
-    // Pagination
-    const nextPage =
-      doc.querySelector("ul.pagination li.active + li:not(.disabled) a") ||
-      doc.querySelector("a[rel='next']") ||
-      doc.querySelector(".btn-next");
-
-    return { list, hasNextPage: !!nextPage };
-  }
-
-  // ─────────────────────────────────────────────
-  // DÉTAIL
-  // ─────────────────────────────────────────────
-
-  async getMangaDetail(url) {
-    const html = await fetchv2(url, { headers: HEADERS });
-    const doc = new DOMParser().parseFromString(html, "text/html");
-
-    const titleEl =
-      doc.querySelector("h1.novel-title") ||
-      doc.querySelector("h1.entry-title") ||
-      doc.querySelector("h3.title");
-    const title = (titleEl?.textContent || "").trim();
-
-    const coverEl =
-      doc.querySelector("div.novel-cover img") ||
-      doc.querySelector(".book-img img") ||
-      doc.querySelector(".manga-info-pic img");
-    const imageUrl = extractImgSrc(coverEl);
-
-    const descEl =
-      doc.querySelector("div.summary-content p") ||
-      doc.querySelector("div.novel-synopsis") ||
-      doc.querySelector("div.description-summary");
-    const description = (descEl?.textContent || "").trim();
-
-    // Auteurs
-    // Note : li:contains() est non-standard et non supporté par le polyfill DOMParser.
-    // On utilise uniquement les sélecteurs compatibles regex-based.
+    // Auteur — chercher les liens vers /auteur/
+    const authorMatches = html.match(/href=["'][^"']*auteur[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi) || [];
     const authors = [];
-    const authorEls = doc.querySelectorAll(
-      "a[href*='auteur'], .novel-author a, .author-name a"
-    );
-    authorEls.forEach((el) => {
-      const a = el.textContent.trim();
-      if (a && !authors.includes(a)) authors.push(a);
+    authorMatches.forEach((a) => {
+      const t = a.replace(/<[^>]+>/g, "").trim();
+      if (t && !authors.includes(t)) authors.push(t);
     });
+    const author = authors.join(", ");
 
-    // Genres
-    const genres = [];
-    const genreEls = doc.querySelectorAll(
-      "a.label-info, span.badge a, a.genre-item, div.genres a"
-    );
-    genreEls.forEach((el) => {
-      const g = el.textContent.trim();
-      if (g && !genres.includes(g)) genres.push(g);
-    });
+    // Description
+    const descMatch =
+      html.match(/<div[^>]*class="[^"]*summary-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+      html.match(/<div[^>]*class="[^"]*novel-synopsis[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+      html.match(/<div[^>]*class="[^"]*description-summary[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+    const description = descMatch
+      ? descMatch[1].replace(/<[^>]+>/g, "").trim()
+      : "";
 
-    // Statut
+    // Statut — chercher dans les li info
     let status = "unknown";
-    const infoEls = doc.querySelectorAll(
-      "ul.manga-info-text li, div.manga-info-text li"
+    const infoListMatch = html.match(
+      /<ul[^>]*class="[^"]*manga-info-text[^"]*"[^>]*>([\s\S]*?)<\/ul>/i
     );
-    infoEls.forEach((li) => {
-      const text = (li.textContent || "").toLowerCase();
-      if (text.includes("statut") || text.includes("status")) {
-        if (text.includes("en cours")) status = "ongoing";
-        else if (text.includes("terminé") || text.includes("complet")) status = "completed";
-        else if (text.includes("pause") || text.includes("hiatus")) status = "hiatus";
-      }
-    });
-
-    const isMature = isMatureContent(doc);
-
-    return {
-      title: title || "LightNovelFR",
-      url,
-      imageUrl,
-      description,
-      status,
-      genres,
-      authors,
-      isMature,
-    };
-  }
-
-  async getChapterList(url) {
-    const html = await fetchv2(url, { headers: HEADERS });
-    const doc = new DOMParser().parseFromString(html, "text/html");
-    const chapters = [];
-
-    const chapterLinks = doc.querySelectorAll(
-      "ul.chapter-list li a, div#chapter-list a, " +
-        "ul.row-content-chapter li a, div.list-chapter a"
-    );
-
-    chapterLinks.forEach((link, idx) => {
-      const href = absoluteUrl(link.getAttribute("href") || "");
-      if (!href) return;
-
-      const rawTitle = (link.textContent || "").trim();
-      const numMatch =
-        rawTitle.match(/chapitre\s*([\d.]+)/i) ||
-        rawTitle.match(/ch(?:ap)?\.?\s*([\d.]+)/i) ||
-        rawTitle.match(/([\d.]+)/);
-      const number = numMatch ? parseFloat(numMatch[1]) : idx + 1;
-
-      // Date
-      const dateEl = link
-        .closest("li, tr")
-        ?.querySelector(".chapter-time, span.date, time");
-      let dateUpload = Date.now();
-      if (dateEl) {
-        const d = new Date(
-          dateEl.getAttribute("datetime") || dateEl.textContent.trim()
-        );
-        if (!isNaN(d.getTime())) dateUpload = d.getTime();
-      }
-
-      chapters.push({
-        title: rawTitle || `Chapitre ${number}`,
-        url: href,
-        number,
-        dateUpload,
+    if (infoListMatch) {
+      const liMatches = infoListMatch[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
+      liMatches.forEach((li) => {
+        const text = li.replace(/<[^>]+>/g, "").toLowerCase();
+        if (text.includes("statut") || text.includes("status")) {
+          if (text.includes("en cours")) status = "ongoing";
+          else if (text.includes("terminé") || text.includes("complet")) status = "completed";
+          else if (text.includes("pause") || text.includes("hiatus")) status = "hiatus";
+        }
       });
-    });
-
-    chapters.sort((a, b) => b.number - a.number);
-    return chapters;
-  }
-
-  // ─────────────────────────────────────────────
-  // LECTURE — Light Novel retourne du HTML (pas des images)
-  // ─────────────────────────────────────────────
-
-  async getPageList(url) {
-    // Pour un LN, on retourne UNE seule "page" contenant le HTML du chapitre
-    // Le renderer Flutter (flutter_html) s'occupe de l'affichage
-    const html = await fetchv2(url, { headers: HEADERS });
-    const doc = new DOMParser().parseFromString(html, "text/html");
-
-    // Contenu principal du chapitre
-    const contentEl =
-      doc.querySelector("div#chapter-content") ||
-      doc.querySelector("div.reading-content") ||
-      doc.querySelector("div.entry-content") ||
-      doc.querySelector("article.chapter-content");
-
-    if (!contentEl) {
-      return [{ index: 0, htmlContent: "<p>Contenu non disponible</p>", isText: true }];
     }
 
-    // Nettoyage des éléments parasites (pubs, navigation)
-    contentEl.querySelectorAll(
-      "script, style, .ads, .adsense, .navigation, nav, .chapter-nav"
-    ).forEach((el) => el.remove());
+    // Genres — liens label-info, badge, genre
+    const genres = [];
+    const genreRegex = /<a[^>]*class="[^"]*(?:label-info|genre-item)[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
+    let gMatch;
+    while ((gMatch = genreRegex.exec(html)) !== null) {
+      const g = gMatch[1].replace(/<[^>]+>/g, "").trim();
+      if (g && !genres.includes(g)) genres.push(g);
+    }
 
-    const htmlContent = contentEl.innerHTML || contentEl.textContent || "";
+    // Chapitres — liens dans ul.chapter-list ou div#chapter-list
+    const chapters = [];
+    const chListMatch =
+      html.match(/<ul[^>]*class="[^"]*chapter-list[^"]*"[^>]*>([\s\S]*?)<\/ul>/i) ||
+      html.match(/<div[^>]*id="chapter-list"[^>]*>([\s\S]*?)<\/div>/i) ||
+      html.match(/<ul[^>]*class="[^"]*row-content-chapter[^"]*"[^>]*>([\s\S]*?)<\/ul>/i);
 
-    return [
-      {
-        index: 0,
-        htmlContent,
-        isText: true, // Signal au renderer d'utiliser flutter_html
-        headers: {},
-      },
-    ];
+    if (chListMatch) {
+      const chLinkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+      let cMatch;
+      let idx = 0;
+      while ((cMatch = chLinkRegex.exec(chListMatch[1])) !== null) {
+        const chUrl = absoluteUrl(cMatch[1]);
+        if (!chUrl) continue;
+        const rawName = cMatch[2].replace(/<[^>]+>/g, "").trim();
+        const numMatch =
+          rawName.match(/chapitre\s*([\d.]+)/i) ||
+          rawName.match(/ch(?:ap)?\.?\s*([\d.]+)/i) ||
+          rawName.match(/([\d.]+)/);
+        const chapterNumber = numMatch ? parseFloat(numMatch[1]) : idx + 1;
+        chapters.push({
+          name: rawName || `Chapitre ${chapterNumber}`,
+          url: chUrl,
+          chapterNumber,
+          releaseTime: "",
+        });
+        idx++;
+      }
+    }
+
+    // Trier du plus récent au plus ancien
+    chapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
+
+    return { title, url: novelUrl, cover, author, description, status, genres, chapters };
   }
 
-  /**
-   * Retourne le HTML brut du contenu — appelé par le LN reader
-   */
-  async getHtmlContent(name, url) {
-    const pages = await this.getPageList(url);
-    return pages[0]?.htmlContent || "";
-  }
+  // ─────────────────────────────────────────────
+  // LECTURE — HTML brut du chapitre
+  // ─────────────────────────────────────────────
 
-  getFilterList() {
-    return [];
+  async parseChapter(chapterUrl) {
+    const html = await fetchv2(chapterUrl, { headers: HEADERS });
+
+    // Contenu principal du chapitre
+    const contentMatch =
+      html.match(/<div[^>]*id="chapter-content"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
+      html.match(/<div[^>]*class="[^"]*reading-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
+      html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
+      html.match(/<article[^>]*class="[^"]*chapter-content[^"]*"[^>]*>([\s\S]*?)<\/article>/i);
+
+    if (!contentMatch) {
+      return "<p>Contenu non disponible</p>";
+    }
+
+    let content = contentMatch[1];
+
+    // Nettoyage des éléments parasites (scripts, styles, pub, nav)
+    content = content.replace(/<script[\s\S]*?<\/script>/gi, "");
+    content = content.replace(/<style[\s\S]*?<\/style>/gi, "");
+    content = content.replace(/<[^>]*class="[^"]*(?:ads|adsense|navigation|chapter-nav)[^"]*"[^>]*>[\s\S]*?<\/[^>]+>/gi, "");
+
+    return content.trim();
   }
 }

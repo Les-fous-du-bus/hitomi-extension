@@ -157,12 +157,14 @@ class DefaultExtension extends MProvider {
     if (filters && filters.length > 0) {
       for (const filter of filters) {
         if (filter.type === "SelectFilter" && filter.name === "Langue") {
-          url += `&availableTranslatedLanguage[]=${filter.value || LANG}`;
+          const langVal = filter.values && filter.values[filter.state || 0];
+          url += `&availableTranslatedLanguage[]=${langVal ? langVal.value : LANG}`;
         } else if (filter.type === "SelectFilter" && filter.name === "Statut") {
-          if (filter.value) url += `&status[]=${filter.value}`;
-        } else if (filter.type === "CheckBoxFilter" && filter.checked) {
-          // Genre UUID MangaDex
-          if (filter.value) url += `&includedTags[]=${filter.value}`;
+          const statusVal = filter.values && filter.values[filter.state || 0];
+          if (statusVal && statusVal.value) url += `&status[]=${statusVal.value}`;
+        } else if (filter.type === "CheckBoxFilter" && filter.value === true) {
+          // Genre UUID MangaDex — filter.id contient le UUID du tag
+          if (filter.id) url += `&includedTags[]=${filter.id}`;
         }
       }
     }

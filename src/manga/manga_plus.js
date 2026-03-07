@@ -40,6 +40,53 @@ const STATUS_MAP = {
 };
 
 /**
+ * Déchiffre une image MangaPlus chiffrée XOR.
+ *
+ * Algorithme (documenté Mihon/Tachiyomi) :
+ *   1. Extraire encryptionKey depuis l'URL (hex string)
+ *   2. Convertir la clé hex en tableau d'octets
+ *   3. Fetch l'image en binaire via fetchBinary (base64)
+ *   4. Decoder le base64 en string d'octets
+ *   5. XOR chaque octet avec key[i % key.length]
+ *   6. Re-encoder en base64 → data:image/jpeg;base64,...
+ *
+ * @param {string} imageUrl - URL complète avec ?encryptionKey=XXXX
+ * @param {string} hexKey   - Clé hex extraite de l'URL
+ * @returns {Promise<string>} data URI de l'image déchiffrée
+ */
+async function _decryptMangaPlusImage(imageUrl, hexKey) {
+  // 1. Construire la clé XOR depuis la représentation hex
+  if (!hexKey || hexKey.length % 2 !== 0) {
+    throw new Error("MangaPlus: encryptionKey invalide — longueur impaire: " + hexKey);
+  }
+  const key = [];
+  for (let i = 0; i < hexKey.length; i += 2) {
+    key.push(parseInt(hexKey.substring(i, i + 2), 16));
+  }
+  if (key.length === 0) throw new Error("MangaPlus: encryptionKey vide");
+
+  // 2. Fetch l'image en binaire (base64)
+  // Supprimer le paramètre encryptionKey de l'URL pour le fetch CDN
+  const cleanUrl = imageUrl.replace(/[?&]encryptionKey=[0-9a-fA-F]+/, "").replace(/\?$/, "").replace(/&$/, "");
+  const b64 = await fetchBinary(cleanUrl, {
+    headers: { Referer: "https://mangaplus.shueisha.co.jp/" },
+  });
+  if (!b64) throw new Error("MangaPlus: fetchBinary returned empty for " + cleanUrl);
+
+  // 3. Décoder base64 → string d'octets (latin1)
+  const raw = atob(b64);
+
+  // 4. XOR chaque octet
+  let xored = "";
+  for (let i = 0; i < raw.length; i++) {
+    xored += String.fromCharCode(raw.charCodeAt(i) ^ key[i % key.length]);
+  }
+
+  // 5. Re-encoder en base64 et retourner data URI
+  return "data:image/jpeg;base64," + btoa(xored);
+}
+
+/**
  * Construit l'URL de couverture MangaPlus depuis le portableImageUrl
  * Le CDN MangaPlus retourne des URL avec token d'accès
  */
@@ -288,22 +335,43 @@ class DefaultExtension extends MProvider {
     const pages = [];
     const pageList = viewer.pages || [];
 
-    pageList.forEach((p, index) => {
-      // Les pages peuvent être { mangaPage: { imageUrl, width, height } } ou { BrankPage }
-      const page = p.mangaPage || p.manga_page;
-      if (!page?.image_url && !page?.imageUrl) return;
+    const decryptedPages = await Promise.all(
+      pageList.map(async (p, index) => {
+        // Les pages peuvent être { mangaPage: { imageUrl, width, height } } ou { BrankPage }
+        const page = p.mangaPage || p.manga_page;
+        if (!page?.image_url && !page?.imageUrl) return null;
 
-      const imageUrl = page.image_url || page.imageUrl;
+        const rawImageUrl = page.image_url || page.imageUrl;
 
-      // MangaPlus utilise des images chiffrées avec clé XOR
-      // L'URL contient ?encryptionKey= pour les images premium
-      // Pour les images gratuites, pas de chiffrement
-      pages.push({
-        index,
-        imageUrl,
-        headers: { Referer: "https://mangaplus.shueisha.co.jp/" },
-      });
-    });
+        // Détection chiffrement XOR : présence du paramètre encryptionKey dans l'URL
+        const encKeyMatch = rawImageUrl.match(/[?&]encryptionKey=([0-9a-fA-F]+)/);
+        if (!encKeyMatch) {
+          // Image en clair — retour direct
+          return {
+            index,
+            imageUrl: rawImageUrl,
+            headers: { Referer: "https://mangaplus.shueisha.co.jp/" },
+          };
+        }
+
+        // Image chiffrée XOR : décryptage en JS
+        try {
+          const imageUrl = await _decryptMangaPlusImage(rawImageUrl, encKeyMatch[1]);
+          return { index, imageUrl, headers: {} };
+        } catch (e) {
+          // Fallback : retourner l'URL brute plutôt que de crasher
+          return {
+            index,
+            imageUrl: rawImageUrl,
+            headers: { Referer: "https://mangaplus.shueisha.co.jp/" },
+          };
+        }
+      })
+    );
+
+    for (const p of decryptedPages) {
+      if (p !== null) pages.push(p);
+    }
 
     return pages;
   }

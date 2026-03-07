@@ -15,33 +15,7 @@
       "iconUrl": "https://mangadex.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "818cbe1dde72b9a3175c90ba84fb2adb901f9fa019a24fc14828d7bd7a2e3b0d"
-    },
-    {
-      "id": "scan_vf",
-      "name": "ScanVF",
-      "lang": "fr",
-      "space": "manga",
-      "version": 1,
-      "mature": false,
-      "cloudflare": true,
-      "jsUrl": "src/manga/scan_vf.js",
-      "status": "active",
-      "obsolescenceRisk": "medium",
-      "sha256": "6a4adae90332091b36582eef46d3f9a6b1306c5ac500f4ade04f07efbedda05c"
-    },
-    {
-      "id": "bato",
-      "name": "Bato.to",
-      "lang": "multi",
-      "space": "manga",
-      "version": 1,
-      "mature": true,
-      "cloudflare": true,
-      "jsUrl": "src/manga/bato.js",
-      "status": "active",
-      "obsolescenceRisk": "medium",
-      "sha256": "9b45cb0195a661a17a5ac35af5df82c2cc380933392fb2e74e64fbd1aadee292"
+      "sha256": "5846c96d89c7e5a44572c4261c3fd0c4a97aa7053b2c2ccd5cd02b1cf3ec2545"
     },
     {
       "id": "manga_plus",
@@ -55,7 +29,77 @@
       "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "20a718ff42d30c3e278d63b8b6f4d33b844843566e6df5f0ea9c072aed639ca4"
+      "sha256": "15c6c5f72afea7eb0e42949fe46588dd0d26e164228fb2e9a791e63f96d519f0"
+    },
+    {
+      "id": "comick",
+      "name": "ComicK",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/comick.js",
+      "iconUrl": "https://comick.io/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "970dea20debf5cd1fb735bfd395bef0af25a79d615f0d71cc32999d82797534c"
+    },
+    {
+      "id": "mangafire",
+      "name": "MangaFire",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/mangafire.js",
+      "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "cbc30a5e3008480a89f27a06b1f40f01bc7ac9b54ef55fdf9fb2827824f014ff"
+    },
+    {
+      "id": "webtoons",
+      "name": "Webtoons",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/webtoons.js",
+      "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "aca85b5451c657364f80ce6d7f23971962b3d20f2478f6eb4d39b963b1a80287"
+    },
+    {
+      "id": "asurascans",
+      "name": "Asura Scans",
+      "lang": "en",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/asurascans.js",
+      "iconUrl": "https://asuracomic.net/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "bffb1c6dd7089a74893536c0fc8e23f30fa1918820b605c8130cd6fed11ed135"
+    },
+    {
+      "id": "mangas_origines",
+      "name": "Mangas Origines",
+      "lang": "fr",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/mangas_origines.js",
+      "iconUrl": "https://mangas-origines.fr/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "5d2af65ab4e9f35a2299374719920b66f73703a6fe0622b0008df5d1ac9c782f"
     },
     {
       "id": "royal_road",
@@ -69,7 +113,7 @@
       "iconUrl": "https://www.royalroad.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "70b33d3416800c9c40bf0116ee25056ff9dc1aa5b0f689a111ee5eca808d04d5"
+      "sha256": "916a4622d2180fb1adfed00e9d8b4b06ff6d219fbe043b726e24233ff0b4a17a"
     },
     {
       "id": "light_novel_fr",
@@ -80,9 +124,10 @@
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/light_novel_fr.js",
+      "iconUrl": "https://www.lightnovelfr.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "586d7de225013d8ce9fa24b14faee048018172a25b0c6c6304fb2ce78696f15f"
+      "sha256": "1305c2be676f645d6185f3659064235de13a926277f90009e92a44d536d9d2d8"
     },
     {
       "id": "novel_index",
@@ -93,9 +138,80 @@
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/novel_index.js",
+      "iconUrl": "https://novelindex.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "66b2a982d3d5ca2d785f8323deafc79de323a70d0ddb395fffaf6696e04fab40"
+      "sha256": "b059f1d1bcd8dbc0ad61a708ffed302a341ef93a93377aab51ebb42e24fea484"
+    },
+    {
+      "id": "massnovel",
+      "name": "MassNovel",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/massnovel.js",
+      "iconUrl": "https://massnovel.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "e2046af46690a94f706bac9d092b5a9f41fdbfffa5a9169f292ccb3d38c1dc80"
+    },
+    {
+      "id": "chireads",
+      "name": "Chireads",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/chireads.js",
+      "iconUrl": "https://chireads.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "ec790a2b96a30e87e12d171a5b7f38bef89ea52ea83a448aabb180c53b7bdf95"
+    },
+    {
+      "id": "novhell",
+      "name": "Novhell",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/novhell.js",
+      "iconUrl": "https://novhell.org/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "034937de360b998b1a25013943b7488979cc49d0338bb22add4ad325a0006e01"
+    },
+    {
+      "id": "noveldeglace",
+      "name": "NovelDeGlace",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/noveldeglace.js",
+      "iconUrl": "https://noveldeglace.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "sha256": "517d4dce7db072c2c2796d1be5565ed1920cd4b45efb27e3e9cbc5de7825775c"
+    },
+    {
+      "id": "novelupdates",
+      "name": "Novel Updates",
+      "lang": "en",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/novelupdates.js",
+      "iconUrl": "https://www.novelupdates.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "low",
+      "sha256": "ea3f4820ea02972766b08c69a7c8edb01ad86ea4b070468e0e9290098218adbd"
     }
   ]
 }
