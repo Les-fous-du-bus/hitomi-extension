@@ -341,17 +341,17 @@
     },
     {
       "id": "massnovel",
-      "name": "MassNovel",
+      "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/massnovel.js",
-      "iconUrl": "https://massnovel.fr/favicon.ico",
+      "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "9589902dc6aa1ab62293ed793509eb59a0228e607a1e9084065304d89a0712ed"
+      "sha256": "d62815c9bb8773837331f401a8e99bf96f473c446acd2b1cfac0c965b16065f2"
     },
     {
       "id": "chireads",

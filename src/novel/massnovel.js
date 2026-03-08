@@ -1,6 +1,6 @@
 /**
  * MassNovel — Extension Hitomi Reader (Light Novel)
- * Source : https://massnovel.fr
+ * Source : https://novelfrance.fr
  * Methode : HTML scraping (regex) — Madara WordPress theme
  * Langue : fr
  * Cloudflare : NON
@@ -10,7 +10,7 @@
  * @version 1.0.0
  */
 
-var BASE_URL = "https://massnovel.fr";
+var BASE_URL = "https://novelfrance.fr";
 
 function stripTags(str) {
   if (!str) return "";
@@ -32,7 +32,7 @@ function decodeHtml(str) {
 var MATURE_GENRES = ["adulte", "ecchi", "smut", "mature", "adult"];
 
 class DefaultExtension extends MProvider {
-  get name() { return "MassNovel"; }
+  get name() { return "NovelFrance"; }
   get lang() { return "fr"; }
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
