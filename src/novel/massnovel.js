@@ -163,7 +163,7 @@ class DefaultExtension extends MProvider {
       // Try new endpoint first: POST to {url}ajax/chapters/
       try {
         var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
-        var ajaxRes = await fetchv2(trailingUrl + "ajax/chapters/", { "Referer": fullUrl });
+        var ajaxRes = await fetchv2(trailingUrl + "ajax/chapters/", { method: "POST", "Referer": fullUrl });
         if (ajaxRes && ajaxRes.indexOf("wp-manga-chapter") !== -1) {
           chapterHtml = ajaxRes;
         }

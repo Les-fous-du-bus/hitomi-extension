@@ -40,6 +40,7 @@ class DefaultExtension extends MProvider {
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
   get isMature() { return false; }
+  get hasCloudflare() { return true; }
 
   async getPopular(page) {
     try {
