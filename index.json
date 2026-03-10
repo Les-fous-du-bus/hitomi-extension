@@ -27,8 +27,9 @@
       "cloudflare": false,
       "jsUrl": "src/manga/manga_plus.js",
       "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
-      "status": "active",
-      "obsolescenceRisk": "low",
+      "status": "dormant",
+      "obsolescenceRisk": "high",
+      "note": "API returns protobuf, needs decoder",
       "sha256": "74265f8a61a10317afb65e8235e8cc93b52605d779dd34dacd500a9a1fcb47a2"
     },
     {
@@ -316,14 +317,14 @@
       "name": "LightNovelFR",
       "lang": "fr",
       "space": "light_novel",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/light_novel_fr.js",
       "iconUrl": "https://www.lightnovelfr.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "b83057461fc09295cc10a6339dd65b35dcf5c3d7691b56f652537a4048a56529"
+      "sha256": "88ba1aa4c3db3dacde2003ede0520aa467ff87d977708c31be913895241f5957"
     },
     {
       "id": "novel_index",
@@ -335,8 +336,9 @@
       "cloudflare": false,
       "jsUrl": "src/novel/novel_index.js",
       "iconUrl": "https://novelindex.com/favicon.ico",
-      "status": "active",
-      "obsolescenceRisk": "medium",
+      "status": "dormant",
+      "obsolescenceRisk": "high",
+      "note": "Site uses JS redirect, not scrapable",
       "sha256": "484de0d9349b7a4694cac34cc027193105b5bee3a27eed563ca02685933c0dd1"
     },
     {
@@ -344,14 +346,14 @@
       "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 3,
+      "version": 4,
       "mature": false,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/novel/massnovel.js",
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "3cf229e64a35af81965d6ee70f7a830f054ec0577b97ca10c983b445915015b9"
+      "sha256": "a94904f8e92ad8e041fc600e06d19cd48f57bc0a07be259706955231d2852663"
     },
     {
       "id": "chireads",

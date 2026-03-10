@@ -20,6 +20,13 @@
 
 var BASE_URL = "https://novelfrance.fr";
 
+var HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0",
+  Referer: BASE_URL + "/",
+  Accept: "application/json, text/plain, */*",
+};
+
 function stripTags(str) {
   if (!str) return "";
   return str.replace(/<[^>]*>/g, "");
@@ -49,7 +56,7 @@ class DefaultExtension extends MProvider {
   async getPopular(page) {
     try {
       var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
-      var res = await fetchv2(url, {});
+      var res = await fetchv2(url, { headers: HEADERS });
       return this._parseApiList(res);
     } catch (e) {
       return { list: [], hasNextPage: false };
@@ -59,7 +66,7 @@ class DefaultExtension extends MProvider {
   async getLatestUpdates(page) {
     try {
       var url = BASE_URL + "/api/novels?page=" + page + "&sort=latest";
-      var res = await fetchv2(url, {});
+      var res = await fetchv2(url, { headers: HEADERS });
       return this._parseApiList(res);
     } catch (e) {
       return { list: [], hasNextPage: false };
@@ -71,7 +78,7 @@ class DefaultExtension extends MProvider {
       // NovelFrance API does not support server-side search.
       // Fetch all novels and filter client-side.
       var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
-      var res = await fetchv2(url, {});
+      var res = await fetchv2(url, { headers: HEADERS });
       var result = this._parseApiList(res);
 
       if (query && query.trim()) {
@@ -96,7 +103,7 @@ class DefaultExtension extends MProvider {
       // url can be full URL or /novel/slug
       var slug = this._slugFromUrl(url);
       var apiUrl = BASE_URL + "/api/novels/" + slug;
-      var res = await fetchv2(apiUrl, {});
+      var res = await fetchv2(apiUrl, { headers: HEADERS });
       var data = {};
       try { data = JSON.parse(res); } catch (e) { data = {}; }
 
@@ -161,7 +168,7 @@ class DefaultExtension extends MProvider {
 
       // Step 1: get total chapter count from API
       var apiUrl = BASE_URL + "/api/novels/" + slug;
-      var apiRes = await fetchv2(apiUrl, {});
+      var apiRes = await fetchv2(apiUrl, { headers: HEADERS });
       var data = {};
       try { data = JSON.parse(apiRes); } catch (e) {}
 
@@ -175,7 +182,7 @@ class DefaultExtension extends MProvider {
 
       // Step 2: scrape HTML page for actual chapter data (titles, dates)
       var pageUrl = BASE_URL + "/novel/" + slug;
-      var htmlRes = await fetchv2(pageUrl, {});
+      var htmlRes = await fetchv2(pageUrl, { headers: HEADERS });
 
       // Extract chapter data from RSC payload (escaped JSON in the HTML).
       // The text contains \" before each key/value in the serialized RSC data.
@@ -248,7 +255,7 @@ class DefaultExtension extends MProvider {
   async getContent(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      var res = await fetchv2(fullUrl, { headers: HEADERS });
 
       // Extract chapter-content div using depth-aware parsing.
       // The simple regex approach fails because the content has nested divs.
