@@ -161,7 +161,7 @@ class DefaultExtension extends LNProvider {
     );
     const coverHtml = coverContainerMatch
       ? coverContainerMatch[1]
-      : html.match(/<img[^>]*covers[^>]*>/i)?.[0] || "";
+      : (function() { var m = html.match(/<img[^>]*covers[^>]*>/i); return m ? m[0] : ""; })();
     const imgTagMatch = coverHtml.match(/<img[^>]+>/i);
     const cover = extractImgSrcFromHtml(imgTagMatch ? imgTagMatch[0] : coverHtml);
 

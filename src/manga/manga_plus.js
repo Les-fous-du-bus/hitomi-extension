@@ -106,10 +106,11 @@ function parseTitleList(json, page = 1) {
 
   try {
     // Chercher titres FR ou titres tout langue
+    var s = json && json.success ? json.success : {};
     const viewData =
-      json?.success?.allTitlesViewV2?.AllTitlesByLanguage ||
-      json?.success?.recommendedTitleListV2?.titles ||
-      json?.success?.updatedTitleV2Group?.updatedTitles ||
+      (s.allTitlesViewV2 && s.allTitlesViewV2.AllTitlesByLanguage) ||
+      (s.recommendedTitleListV2 && s.recommendedTitleListV2.titles) ||
+      (s.updatedTitleV2Group && s.updatedTitleV2Group.updatedTitles) ||
       [];
 
     // AllTitlesByLanguage peut être un tableau de groupes par langue
@@ -121,12 +122,12 @@ function parseTitleList(json, page = 1) {
           g.language === 6 || // FR
           (typeof g.language === "string" && g.language.toLowerCase().includes("fr"))
       );
-      if (frGroup?.titles) {
+      if (frGroup && frGroup.titles) {
         titles = frGroup.titles;
-      } else if (viewData[0]?.title_id || viewData[0]?.titleId) {
+      } else if (viewData[0] && (viewData[0].title_id || viewData[0].titleId)) {
         // Directement des titres
         titles = viewData;
-      } else if (viewData[0]?.titles) {
+      } else if (viewData[0] && viewData[0].titles) {
         // Premier groupe
         titles = viewData[0].titles;
       }
@@ -181,10 +182,12 @@ class DefaultExtension extends MProvider {
     const json = JSON.parse(res);
 
     try {
+      var s2 = json && json.success ? json.success : {};
       const groups =
-        json?.success?.updatedTitleV2Group?.updatedTitles || [];
+        (s2.updatedTitleV2Group && s2.updatedTitleV2Group.updatedTitles) || [];
       const list = groups.map((g) => {
-        const t = g.titleGroups?.[0]?.titles?.[0] || g.title || g;
+        var tg0 = g.titleGroups && g.titleGroups[0];
+        const t = (tg0 && tg0.titles && tg0.titles[0]) || g.title || g;
         return {
           title: t.name || t.title_name || "Unknown",
           url: `https://mangaplus.shueisha.co.jp/titles/${t.title_id || t.titleId}`,
@@ -217,11 +220,12 @@ class DefaultExtension extends MProvider {
     // Reconstruit la liste complète pour filtrer
     let fullList = all.list;
     try {
+      var ss = json && json.success ? json.success : {};
       const viewData =
-        json?.success?.allTitlesViewV2?.AllTitlesByLanguage || [];
+        (ss.allTitlesViewV2 && ss.allTitlesViewV2.AllTitlesByLanguage) || [];
       let titles = [];
       const frGroup = viewData.find((g) => g.language === 6);
-      titles = frGroup?.titles || (viewData[0]?.titles ?? []);
+      titles = (frGroup && frGroup.titles) || (viewData[0] && viewData[0].titles) || [];
 
       fullList = titles
         .filter((t) => {
@@ -248,20 +252,22 @@ class DefaultExtension extends MProvider {
 
   async getMangaDetail(url) {
     // url = "https://mangaplus.shueisha.co.jp/titles/{id}"
-    const titleId = url.split("/titles/")[1]?.split("?")[0];
+    var titleParts = url.split("/titles/")[1];
+    const titleId = titleParts ? titleParts.split("?")[0] : "";
     const apiUrl = `${API_BASE}/title_detailV2?title_id=${titleId}&clang=${LANG}`;
 
     const res = await fetchv2(apiUrl, { headers: HEADERS });
     const json = JSON.parse(res);
 
-    const detail = json?.success?.titleDetailView || json?.success?.title_detail_view;
+    var sd = json && json.success ? json.success : {};
+    const detail = sd.titleDetailView || sd.title_detail_view;
     if (!detail) throw new Error("MangaPlus: title not found");
 
     const t = detail.title || {};
     const author = t.author || "";
     const authors = author ? [author] : [];
 
-    const status = STATUS_MAP[detail.chapterListGroup?.isCompleted ? 1 : 0] || "ongoing";
+    const status = STATUS_MAP[(detail.chapterListGroup && detail.chapterListGroup.isCompleted) ? 1 : 0] || "ongoing";
 
     return {
       title: t.name || "Unknown",
@@ -276,13 +282,15 @@ class DefaultExtension extends MProvider {
   }
 
   async getChapterList(url) {
-    const titleId = url.split("/titles/")[1]?.split("?")[0];
+    var titleParts2 = url.split("/titles/")[1];
+    const titleId = titleParts2 ? titleParts2.split("?")[0] : "";
     const apiUrl = `${API_BASE}/title_detailV2?title_id=${titleId}&clang=${LANG}`;
 
     const res = await fetchv2(apiUrl, { headers: HEADERS });
     const json = JSON.parse(res);
 
-    const detail = json?.success?.titleDetailView || json?.success?.title_detail_view;
+    var sd2 = json && json.success ? json.success : {};
+    const detail = sd2.titleDetailView || sd2.title_detail_view;
     if (!detail) return [];
 
     const chapters = [];
@@ -321,7 +329,8 @@ class DefaultExtension extends MProvider {
 
   async getPageList(url) {
     // url = "https://mangaplus.shueisha.co.jp/viewer/{chapterId}"
-    const chapterId = url.split("/viewer/")[1]?.split("?")[0];
+    var viewerParts = url.split("/viewer/")[1];
+    const chapterId = viewerParts ? viewerParts.split("?")[0] : "";
     const apiUrl =
       `${API_BASE}/manga_viewer?chapter_id=${chapterId}` +
       `&split=yes&img_quality=high&clang=${LANG}`;
@@ -329,7 +338,8 @@ class DefaultExtension extends MProvider {
     const res = await fetchv2(apiUrl, { headers: HEADERS });
     const json = JSON.parse(res);
 
-    const viewer = json?.success?.mangaViewer || json?.success?.manga_viewer;
+    var sd3 = json && json.success ? json.success : {};
+    const viewer = sd3.mangaViewer || sd3.manga_viewer;
     if (!viewer) throw new Error("MangaPlus: viewer data not found");
 
     const pages = [];
@@ -339,7 +349,7 @@ class DefaultExtension extends MProvider {
       pageList.map(async (p, index) => {
         // Les pages peuvent être { mangaPage: { imageUrl, width, height } } ou { BrankPage }
         const page = p.mangaPage || p.manga_page;
-        if (!page?.image_url && !page?.imageUrl) return null;
+        if (!page || (!page.image_url && !page.imageUrl)) return null;
 
         const rawImageUrl = page.image_url || page.imageUrl;
 

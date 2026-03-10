@@ -8,28 +8,28 @@
       "name": "MangaDex",
       "lang": "multi",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/mangadex.js",
       "iconUrl": "https://mangadex.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "5846c96d89c7e5a44572c4261c3fd0c4a97aa7053b2c2ccd5cd02b1cf3ec2545"
+      "sha256": "912a4f0016fa738376f85f491aa56dc0391964ceefb2191e86294c50f7b09419"
     },
     {
       "id": "manga_plus",
       "name": "MangaPlus",
       "lang": "fr",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/manga_plus.js",
       "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "15c6c5f72afea7eb0e42949fe46588dd0d26e164228fb2e9a791e63f96d519f0"
+      "sha256": "74265f8a61a10317afb65e8235e8cc93b52605d779dd34dacd500a9a1fcb47a2"
     },
     {
       "id": "comick",
@@ -302,42 +302,42 @@
       "name": "Royal Road",
       "lang": "en",
       "space": "light_novel",
-      "version": 1,
+      "version": 2,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/novel/royal_road.js",
       "iconUrl": "https://www.royalroad.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "916a4622d2180fb1adfed00e9d8b4b06ff6d219fbe043b726e24233ff0b4a17a"
+      "sha256": "484b81a15d79df1c3e453d402d6a319cfe664ea81580427fcaedb76a1883ac9e"
     },
     {
       "id": "light_novel_fr",
       "name": "LightNovelFR",
       "lang": "fr",
       "space": "light_novel",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/light_novel_fr.js",
       "iconUrl": "https://www.lightnovelfr.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "1305c2be676f645d6185f3659064235de13a926277f90009e92a44d536d9d2d8"
+      "sha256": "b83057461fc09295cc10a6339dd65b35dcf5c3d7691b56f652537a4048a56529"
     },
     {
       "id": "novel_index",
       "name": "NovelIndex",
       "lang": "fr",
       "space": "light_novel",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/novel_index.js",
       "iconUrl": "https://novelindex.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "b059f1d1bcd8dbc0ad61a708ffed302a341ef93a93377aab51ebb42e24fea484"
+      "sha256": "484de0d9349b7a4694cac34cc027193105b5bee3a27eed563ca02685933c0dd1"
     },
     {
       "id": "massnovel",

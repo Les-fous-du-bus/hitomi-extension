@@ -156,9 +156,13 @@ class DefaultExtension extends MProvider {
           var ajaxUrl = BASE_URL + "/wp-admin/admin-ajax.php";
           var postBody = "action=manga_get_chapters&manga=" + mangaId;
           var ajaxRes = await fetchv2(ajaxUrl, {
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Referer": fullUrl,
-            "X-Requested-With": "XMLHttpRequest",
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "Referer": fullUrl,
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: postBody,
           });
           // fetchv2 may not support POST, so fallback to inline parsing
           if (ajaxRes && ajaxRes !== "0") {
@@ -178,7 +182,10 @@ class DefaultExtension extends MProvider {
       if (!chapterHtml || chapterHtml.indexOf("wp-manga-chapter") === -1) {
         try {
           var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
-          var newRes = await fetchv2(trailingUrl + "ajax/chapters/", { "Referer": fullUrl });
+          var newRes = await fetchv2(trailingUrl + "ajax/chapters/", {
+            method: "POST",
+            headers: { "Referer": fullUrl },
+          });
           if (newRes && newRes.indexOf("wp-manga-chapter") !== -1) {
             chapterHtml = newRes;
           }

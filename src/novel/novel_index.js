@@ -47,7 +47,9 @@ function absoluteUrl(href) {
  */
 function extractImgSrcFromHtml(html) {
   if (!html) return "";
-  for (const attr of ["data-src", "data-lazy", "src"]) {
+  var _attrs = ["data-src", "data-lazy", "src"];
+  for (var _ai = 0; _ai < _attrs.length; _ai++) {
+    var attr = _attrs[_ai];
     const m = html.match(new RegExp(attr + '=["\'](([^"\']+))["\']', "i"));
     if (m && !m[1].includes("data:image")) {
       const s = m[1];
@@ -107,8 +109,9 @@ function parseList(html) {
 
     if (!linkMatch) continue;
     const url = absoluteUrl(linkMatch[1]);
+    var titleAttrMatch = linkMatch[0].match(/title=["']([^"']+)["']/i);
     const title = (
-      linkMatch[0].match(/title=["']([^"']+)["']/i)?.[1] ||
+      (titleAttrMatch && titleAttrMatch[1]) ||
       linkMatch[2].replace(/<[^>]+>/g, "")
     ).trim();
     if (!title || !url) continue;

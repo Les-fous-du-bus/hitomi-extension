@@ -57,14 +57,15 @@ function extractTitle(titleObj) {
  */
 function parseMangaItem(item) {
   const attrs = item.attributes || {};
-  const title = extractTitle(attrs.title || attrs.altTitles?.[0] || {});
+  const altTitles = attrs.altTitles || [];
+  const title = extractTitle(attrs.title || altTitles[0] || {});
 
   // Récupération cover depuis relationships
   let coverFileName = "";
   const coverRel = (item.relationships || []).find(
     (r) => r.type === "cover_art"
   );
-  if (coverRel?.attributes?.fileName) {
+  if (coverRel && coverRel.attributes && coverRel.attributes.fileName) {
     coverFileName = coverRel.attributes.fileName;
   }
 
@@ -213,18 +214,21 @@ class DefaultExtension extends MProvider {
 
     // Couverture
     const coverRel = rels.find((r) => r.type === "cover_art");
-    const coverFileName = coverRel?.attributes?.fileName || "";
+    const coverFileName = (coverRel && coverRel.attributes && coverRel.attributes.fileName) ? coverRel.attributes.fileName : "";
     const imageUrl = buildCoverUrl(mangaId, coverFileName);
 
     // Auteurs / Artistes
     const authors = rels
       .filter((r) => r.type === "author" || r.type === "artist")
-      .map((r) => r.attributes?.name || "")
+      .map((r) => (r.attributes && r.attributes.name) ? r.attributes.name : "")
       .filter(Boolean);
 
     // Genres via tags
     const genres = (attrs.tags || []).map(
-      (t) => t.attributes?.name?.en || t.attributes?.name?.fr || ""
+      (t) => {
+        const n = t.attributes && t.attributes.name;
+        return (n && (n.en || n.fr)) || "";
+      }
     ).filter(Boolean);
 
     // Statut

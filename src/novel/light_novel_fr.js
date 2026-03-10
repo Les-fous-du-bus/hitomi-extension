@@ -53,7 +53,9 @@ function absoluteUrl(href) {
  */
 function extractImgSrcFromHtml(html) {
   if (!html) return "";
-  for (const attr of ["data-src", "data-lazy-src", "src"]) {
+  var _attrs = ["data-src", "data-lazy-src", "src"];
+  for (var _ai = 0; _ai < _attrs.length; _ai++) {
+    var attr = _attrs[_ai];
     const m = html.match(new RegExp(attr + '=["\'](([^"\']+))["\']', "i"));
     if (m && !m[1].includes("data:image")) {
       const s = m[1];
