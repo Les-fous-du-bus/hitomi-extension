@@ -294,27 +294,24 @@ class DefaultExtension extends MProvider {
   _parseMadaraList(html) {
     var list = [];
 
-    // Madara search/listing results: .c-tabs-item__content or .page-item-detail
-    var itemMatches = html.match(/<div class="(?:page-item-detail|c-tabs-item__content)"[^>]*>(.*?)<\/div>\s*<\/div>\s*<\/div>/gs);
-    if (!itemMatches) {
-      // Alternative: broader match
-      itemMatches = html.match(/<div class="(?:page-item-detail|c-tabs-item__content)"[^>]*>[^]*?(?=<div class="(?:page-item-detail|c-tabs-item__content)"|$)/g);
-    }
+    // Madara search/listing results: class may contain extra words like "row"
+    var itemMatches = html.match(/<div class="[^"]*(?:page-item-detail|c-tabs-item__content)[^"]*"[^>]*>[^]*?(?=<div class="[^"]*(?:page-item-detail|c-tabs-item__content)[^"]*"|$)/g);
 
     if (itemMatches) {
       for (var i = 0; i < itemMatches.length; i++) {
         var item = itemMatches[i];
 
-        // Title from .post-title a
-        var nameMatch = item.match(/<(?:h3|h4|h5)[^>]*class="[^"]*post-title[^"]*"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s) ||
-                        item.match(/class="post-title"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s);
+        // Title from .post-title a (post-title can be on a div parent, not the h3)
+        var nameMatch = item.match(/class="[^"]*post-title[^"]*"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s);
         if (!nameMatch) continue;
 
         var mangaUrl = nameMatch[1];
         var title = stripTags(nameMatch[2]).trim();
 
-        // Image
-        var imgMatch = item.match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"([^"]+)"/);
+        // Image: prioritize data-src over src to avoid lazy-load placeholders
+        var imgMatch = item.match(/data-src\s*=\s*"(https?[^"]+)"/);
+        if (!imgMatch) imgMatch = item.match(/data-lazy-src\s*=\s*"(https?[^"]+)"/);
+        if (!imgMatch) imgMatch = item.match(/<img[^>]*\bsrc\s*=\s*"(https?[^"]+)"/);
         var imageUrl = imgMatch ? imgMatch[1] : "";
 
         if (title) {

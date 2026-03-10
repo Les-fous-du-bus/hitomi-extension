@@ -92,14 +92,14 @@
       "name": "Mangas Origines",
       "lang": "fr",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/mangas_origines.js",
       "iconUrl": "https://mangas-origines.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "5d2af65ab4e9f35a2299374719920b66f73703a6fe0622b0008df5d1ac9c782f"
+      "sha256": "582181e1aa816ad54c80e0f001281e6d793e6e906adbd0f84c9a47e03c62621f"
     },
     {
       "id": "sushi_scan",
@@ -344,14 +344,14 @@
       "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/massnovel.js",
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "d62815c9bb8773837331f401a8e99bf96f473c446acd2b1cfac0c965b16065f2"
+      "sha256": "3cf229e64a35af81965d6ee70f7a830f054ec0577b97ca10c983b445915015b9"
     },
     {
       "id": "chireads",

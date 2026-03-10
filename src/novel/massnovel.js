@@ -1,13 +1,21 @@
 /**
- * MassNovel — Extension Hitomi Reader (Light Novel)
+ * NovelFrance — Extension Hitomi Reader (Light Novel)
  * Source : https://novelfrance.fr
- * Methode : HTML scraping (regex) — Madara WordPress theme
+ * Methode : JSON API + HTML scraping (Next.js app)
  * Langue : fr
- * Cloudflare : NON
+ * Cloudflare : OUI (Cloudflare Rocket Loader detected)
  * Mature : partiel (genres Adulte, Ecchi, Smut)
  *
+ * Architecture du site (novelfrance.fr) :
+ *   - API listings  : /api/novels?page=N&sort=popular|latest
+ *   - API search    : /api/novels?page=N (no server-side search, filter client-side)
+ *   - API detail    : /api/novels/{slug}
+ *   - Chapitre HTML : /novel/{slug}/chapter-{N}
+ *   - Chapter list  : embedded in novel page HTML (50 latest SSR)
+ *                     + sequential URL construction from total count
+ *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 2.0.0
  */
 
 var BASE_URL = "https://novelfrance.fr";
@@ -40,9 +48,9 @@ class DefaultExtension extends MProvider {
 
   async getPopular(page) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=&post_type=wp-manga&m_orderby=trending";
+      var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
       var res = await fetchv2(url, {});
-      return this._parseMadaraList(res);
+      return this._parseApiList(res);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -50,9 +58,9 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=&post_type=wp-manga&m_orderby=latest";
+      var url = BASE_URL + "/api/novels?page=" + page + "&sort=latest";
       var res = await fetchv2(url, {});
-      return this._parseMadaraList(res);
+      return this._parseApiList(res);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -60,9 +68,24 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query) + "&post_type=wp-manga";
+      // NovelFrance API does not support server-side search.
+      // Fetch all novels and filter client-side.
+      var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
       var res = await fetchv2(url, {});
-      return this._parseMadaraList(res);
+      var result = this._parseApiList(res);
+
+      if (query && query.trim()) {
+        var q = query.trim().toLowerCase();
+        var filtered = [];
+        for (var i = 0; i < result.list.length; i++) {
+          if (result.list[i].title.toLowerCase().indexOf(q) !== -1) {
+            filtered.push(result.list[i]);
+          }
+        }
+        return { list: filtered, hasNextPage: result.hasNextPage };
+      }
+
+      return result;
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -70,40 +93,32 @@ class DefaultExtension extends MProvider {
 
   async getMangaDetail(url) {
     try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      // url can be full URL or /novel/slug
+      var slug = this._slugFromUrl(url);
+      var apiUrl = BASE_URL + "/api/novels/" + slug;
+      var res = await fetchv2(apiUrl, {});
+      var data = {};
+      try { data = JSON.parse(res); } catch (e) { data = {}; }
 
-      // Title
-      var titleMatch = res.match(/<div class="post-title"[^>]*>[^]*?<h1[^>]*>(.*?)<\/h1>/s) ||
-                        res.match(/<h1[^>]*>(.*?)<\/h1>/s);
-      var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
-      // Remove badge spans
-      title = title.replace(/\s*(HOT|NEW|FREE)\s*/gi, "").trim();
+      if (!data.title) {
+        return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
+      }
 
-      // Cover
-      var coverMatch = res.match(/<div class="summary_image"[^>]*>[^]*?<img[^>]*(?:data-src|data-lazy-src|src)="([^"]+)"/s);
-      var imageUrl = coverMatch ? coverMatch[1] : "";
-
-      // Description
-      var descMatch = res.match(/<div class="summary__content"[^>]*>(.*?)<\/div>/s) ||
-                      res.match(/<div class="description-summary"[^>]*>(.*?)<\/div>/s);
-      var description = descMatch ? stripTags(descMatch[1]).trim() : "";
+      // Cover image: relative path needs base URL
+      var imageUrl = data.coverImage || "";
+      if (imageUrl && !imageUrl.startsWith("http")) {
+        imageUrl = BASE_URL + imageUrl;
+      }
 
       // Genres
       var genres = [];
-      var genreMatch = res.match(/Genre[^<]*<\/h5>[^]*?<div class="summary-content"[^>]*>(.*?)<\/div>/s) ||
-                       res.match(/<div class="genres-content"[^>]*>(.*?)<\/div>/s);
-      if (genreMatch) {
-        var genreLinks = genreMatch[1].match(/<a[^>]*>(.*?)<\/a>/gs);
-        if (genreLinks) {
-          for (var i = 0; i < genreLinks.length; i++) {
-            var g = stripTags(genreLinks[i]).trim();
-            if (g) genres.push(g);
-          }
+      if (data.genres && data.genres.length) {
+        for (var i = 0; i < data.genres.length; i++) {
+          if (data.genres[i].name) genres.push(data.genres[i].name);
         }
       }
 
-      // Check mature from genres
+      // Mature check
       var isMature = false;
       for (var k = 0; k < genres.length; k++) {
         if (MATURE_GENRES.indexOf(genres[k].toLowerCase()) !== -1) {
@@ -112,30 +127,24 @@ class DefaultExtension extends MProvider {
         }
       }
 
-      // Author
-      var authors = [];
-      var authorMatch = res.match(/Author[^<]*<\/h5>[^]*?<div class="summary-content"[^>]*>(.*?)<\/div>/s) ||
-                        res.match(/<div class="manga-authors"[^>]*>(.*?)<\/div>/s);
-      if (authorMatch) {
-        var authorText = stripTags(authorMatch[1]).trim();
-        if (authorText && authorText !== "Updating") authors.push(authorText);
-      }
-
       // Status
       var status = "unknown";
-      var statusMatch = res.match(/Status[^<]*<\/h5>[^]*?<div class="summary-content"[^>]*>(.*?)<\/div>/s);
-      if (statusMatch) {
-        var st = stripTags(statusMatch[1]).trim().toLowerCase();
-        if (st.indexOf("ongoing") !== -1 || st.indexOf("en cours") !== -1) status = "ongoing";
-        else if (st.indexOf("completed") !== -1 || st.indexOf("termin") !== -1) status = "completed";
-        else if (st.indexOf("hiatus") !== -1 || st.indexOf("pause") !== -1) status = "hiatus";
+      if (data.status) {
+        var st = data.status.toLowerCase();
+        if (st === "ongoing") status = "ongoing";
+        else if (st === "completed") status = "completed";
+        else if (st === "hiatus") status = "hiatus";
       }
 
+      // Authors
+      var authors = [];
+      if (data.author) authors.push(data.author);
+
       return {
-        title: decodeHtml(title),
-        url: url,
+        title: decodeHtml(data.title),
+        url: BASE_URL + "/novel/" + slug,
         imageUrl: imageUrl,
-        description: decodeHtml(description),
+        description: decodeHtml(data.description || ""),
         status: status,
         genres: genres,
         authors: authors,
@@ -148,81 +157,88 @@ class DefaultExtension extends MProvider {
 
   async getChapterList(url) {
     try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      var slug = this._slugFromUrl(url);
 
-      // Get manga ID for AJAX call
-      var mangaId = "";
-      var idMatch = res.match(/class="rating-post-id"[^>]*value="(\d+)"/) ||
-                    res.match(/data-id="(\d+)"/) ||
-                    res.match(/id="manga-chapters-holder"[^>]*data-id="(\d+)"/);
-      if (idMatch) mangaId = idMatch[1];
+      // Step 1: get total chapter count from API
+      var apiUrl = BASE_URL + "/api/novels/" + slug;
+      var apiRes = await fetchv2(apiUrl, {});
+      var data = {};
+      try { data = JSON.parse(apiRes); } catch (e) {}
 
-      var chapterHtml = res;
-
-      // Try new endpoint first: POST to {url}ajax/chapters/
-      try {
-        var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
-        var ajaxRes = await fetchv2(trailingUrl + "ajax/chapters/", { method: "POST", headers: { "Referer": fullUrl } });
-        if (ajaxRes && ajaxRes.indexOf("wp-manga-chapter") !== -1) {
-          chapterHtml = ajaxRes;
-        }
-      } catch (e) {
-        // Fallback to main page
+      var totalChapters = 0;
+      if (data._count && data._count.chapters) {
+        totalChapters = data._count.chapters;
       }
+      // Check firstChapter slug to determine if numbering starts at 0 or 1
+      var firstSlug = (data.firstChapter && data.firstChapter.slug) || "chapter-0";
+      var startsAtZero = firstSlug === "chapter-0";
 
-      // If still no chapters, try the old admin-ajax endpoint
-      if (chapterHtml.indexOf("wp-manga-chapter") === -1 && mangaId) {
-        try {
-          var ajaxUrl = BASE_URL + "/wp-admin/admin-ajax.php";
-          var ajaxRes2 = await fetchv2(ajaxUrl, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "Referer": fullUrl,
-            },
-            body: "action=manga_get_chapters&manga=" + mangaId,
-          });
-          if (ajaxRes2 && ajaxRes2 !== "0" && ajaxRes2.indexOf("wp-manga-chapter") !== -1) {
-            chapterHtml = ajaxRes2;
-          }
-        } catch (e) {}
-      }
+      // Step 2: scrape HTML page for actual chapter data (titles, dates)
+      var pageUrl = BASE_URL + "/novel/" + slug;
+      var htmlRes = await fetchv2(pageUrl, {});
 
+      // Extract chapter data from RSC payload (escaped JSON in the HTML).
+      // The text contains \" before each key/value in the serialized RSC data.
       var chapters = [];
-      var chapterMatches = chapterHtml.match(/<li class="wp-manga-chapter[^"]*"[^>]*>[^]*?<\/li>/gs);
-      if (!chapterMatches) return [];
+      var chapterPattern = /\\"chapterNumber\\":(\d+),\\"title\\":\\"([^"]*?)\\",\\"slug\\":\\"(chapter-\d+)\\",\\"createdAt\\":\\"([^"]*?)\\"/g;
+      var m;
+      var seen = {};
+      while ((m = chapterPattern.exec(htmlRes)) !== null) {
+        var num = parseInt(m[1]);
+        var chTitle = m[2].replace(/\\"/g, '"');
+        var chSlug = m[3];
+        var createdAt = m[4];
+        if (seen[chSlug]) continue;
+        seen[chSlug] = true;
 
-      var total = chapterMatches.length;
-      for (var i = 0; i < chapterMatches.length; i++) {
-        var ch = chapterMatches[i];
-        var linkMatch = ch.match(/<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s);
-        if (!linkMatch) continue;
-
-        var chapUrl = linkMatch[1];
-        var chapTitle = stripTags(linkMatch[2]).trim();
-
-        var dateMatch = ch.match(/class="chapter-release-date"[^>]*>[^]*?<i[^>]*>(.*?)<\/i>/s) ||
-                        ch.match(/class="chapter-release-date"[^>]*>(.*?)<\/span>/s);
         var dateUpload = Date.now();
-        if (dateMatch) {
-          var parsed = this._parseMadaraDate(stripTags(dateMatch[1]).trim());
-          if (parsed) dateUpload = parsed;
-        }
-
-        var chapNum = total - i;
-        var numMatch = chapTitle.match(/(\d+(?:\.\d+)?)/);
-        if (numMatch) chapNum = parseFloat(numMatch[1]);
+        try { dateUpload = new Date(createdAt).getTime(); } catch (e) {}
 
         chapters.push({
-          title: chapTitle || "Chapitre " + chapNum,
-          url: chapUrl,
-          number: chapNum,
+          title: decodeHtml(chTitle) || ("Chapitre " + num),
+          url: BASE_URL + "/novel/" + slug + "/" + chSlug,
+          number: num,
           dateUpload: dateUpload,
         });
       }
 
-      chapters.reverse();
+      // Also extract from href links (fallback)
+      if (chapters.length === 0) {
+        var linkPattern = /href="\/novel\/[^"]*\/(chapter-(\d+))"/g;
+        var lm;
+        while ((lm = linkPattern.exec(htmlRes)) !== null) {
+          var chSlug2 = lm[1];
+          var num2 = parseInt(lm[2]);
+          if (seen[chSlug2]) continue;
+          seen[chSlug2] = true;
+          chapters.push({
+            title: "Chapitre " + num2,
+            url: BASE_URL + "/novel/" + slug + "/" + chSlug2,
+            number: num2,
+            dateUpload: Date.now(),
+          });
+        }
+      }
+
+      // Step 3: if we know totalChapters and have fewer, generate missing entries
+      if (totalChapters > chapters.length) {
+        var startNum = startsAtZero ? 0 : 1;
+        var endNum = startsAtZero ? totalChapters - 1 : totalChapters;
+        for (var n = startNum; n <= endNum; n++) {
+          var genSlug = "chapter-" + n;
+          if (!seen[genSlug]) {
+            chapters.push({
+              title: "Chapitre " + n,
+              url: BASE_URL + "/novel/" + slug + "/" + genSlug,
+              number: n,
+              dateUpload: 0,
+            });
+          }
+        }
+      }
+
+      // Sort ascending by chapter number
+      chapters.sort(function(a, b) { return a.number - b.number; });
       return chapters;
     } catch (e) {
       return [];
@@ -234,22 +250,51 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, {});
 
-      // Madara reading content selectors
-      var contentMatch = res.match(/<div class="text-left"[^>]*>(.*?)<\/div>\s*<\/div>/s) ||
-                         res.match(/<div class="entry-content"[^>]*>(.*?)<\/div>\s*<\/div>/s) ||
-                         res.match(/<div class="reading-content"[^>]*>(.*?)<\/div>\s*<\/div>/s);
-
-      if (contentMatch) {
-        return contentMatch[1];
+      // Extract chapter-content div using depth-aware parsing.
+      // The simple regex approach fails because the content has nested divs.
+      var startIdx = res.indexOf('chapter-content');
+      if (startIdx !== -1) {
+        var openTag = res.indexOf(">", startIdx);
+        if (openTag !== -1) {
+          var depth = 1;
+          var pos = openTag + 1;
+          var endPos = -1;
+          while (depth > 0 && pos < res.length) {
+            var nextOpen = res.indexOf("<div", pos);
+            var nextClose = res.indexOf("</div>", pos);
+            if (nextClose === -1) break;
+            if (nextOpen !== -1 && nextOpen < nextClose) {
+              depth++;
+              pos = nextOpen + 4;
+            } else {
+              depth--;
+              if (depth === 0) { endPos = nextClose; break; }
+              pos = nextClose + 6;
+            }
+          }
+          if (endPos !== -1) {
+            var content = res.substring(openTag + 1, endPos);
+            // Clean interactive elements, SVGs, scripts
+            content = content
+              .replace(/<button[^>]*>[\s\S]*?<\/button>/gi, "")
+              .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, "")
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+              .replace(/<!--[\s\S]*?-->/g, "")
+              .trim();
+            if (content.length > 50) return content;
+          }
+        }
       }
 
-      // Broader fallback
-      var bodyMatch = res.match(/<div class="text-left"[^>]*>(.*)/s);
-      if (bodyMatch) {
-        var endIdx = bodyMatch[1].indexOf("</div>");
-        if (endIdx !== -1) {
-          return bodyMatch[1].substring(0, endIdx);
+      // Fallback: extract all paragraphs from the page
+      var paragraphs = [];
+      var pMatch = res.match(/<p[^>]*>([^<]{20,})<\/p>/gs);
+      if (pMatch) {
+        for (var i = 0; i < pMatch.length; i++) {
+          paragraphs.push(pMatch[i]);
         }
+        return paragraphs.join("\n");
       }
 
       return "<p>Contenu non disponible</p>";
@@ -264,95 +309,51 @@ class DefaultExtension extends MProvider {
         type: "SelectFilter",
         name: "Tri",
         values: [
-          { displayName: "Tendance", value: "trending" },
+          { displayName: "Populaire", value: "popular" },
           { displayName: "Derniere MAJ", value: "latest" },
-          { displayName: "A-Z", value: "alphabet" },
-          { displayName: "Note", value: "rating" },
-          { displayName: "Nouveau", value: "new-manga" },
         ],
         default: 0,
       },
     ];
   }
 
-  _parseMadaraList(html) {
+  _parseApiList(jsonStr) {
+    var data = {};
+    try { data = JSON.parse(jsonStr); } catch (e) { return { list: [], hasNextPage: false }; }
+
     var list = [];
-    var seen = {};
-
-    // Strategy 1: standard Madara page-item-detail
-    var itemMatches = html.match(/<div class="(?:page-item-detail|c-tabs-item__content)"[^>]*>[^]*?(?=<div class="(?:page-item-detail|c-tabs-item__content)"|<\/div>\s*<\/div>\s*<\/div>\s*<nav|$)/g);
-
-    if (itemMatches) {
-      for (var i = 0; i < itemMatches.length; i++) {
-        var item = itemMatches[i];
-        var nameMatch = item.match(/class="[^"]*post-title[^"]*"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s);
-        if (!nameMatch) continue;
-
-        var mangaUrl = nameMatch[1];
-        var title = stripTags(nameMatch[2]).trim();
-        title = title.replace(/\s*(HOT|NEW|FREE)\s*/gi, "").trim();
-
-        var imgMatch = item.match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"([^"]+)"/);
-        var imageUrl = imgMatch ? imgMatch[1] : "";
-
-        if (title && !seen[mangaUrl]) {
-          seen[mangaUrl] = true;
-          list.push({ title: decodeHtml(title), url: mangaUrl, imageUrl: imageUrl, isMature: false });
-        }
+    var novels = data.novels || [];
+    for (var i = 0; i < novels.length; i++) {
+      var n = novels[i];
+      var imageUrl = n.coverImage || "";
+      if (imageUrl && !imageUrl.startsWith("http")) {
+        imageUrl = BASE_URL + imageUrl;
       }
+
+      list.push({
+        title: decodeHtml(n.title || ""),
+        url: BASE_URL + "/novel/" + (n.slug || ""),
+        imageUrl: imageUrl,
+        isMature: false,
+      });
     }
 
-    // Strategy 2: massnovel.fr variant — <h3><a href="/novel/slug/">Title</a></h3>
-    if (list.length === 0) {
-      var h3Matches = html.match(/<h3[^>]*>\s*<a[^>]*href="([^"]*\/novel\/[^"]+)"[^>]*>(.*?)<\/a>\s*<\/h3>/gs);
-      if (h3Matches) {
-        for (var j = 0; j < h3Matches.length; j++) {
-          var m = h3Matches[j].match(/<a[^>]*href="([^"]*\/novel\/[^"]+)"[^>]*>(.*?)<\/a>/s);
-          if (!m) continue;
-          var novelUrl = m[1];
-          var novelTitle = stripTags(m[2]).trim();
-          if (!novelTitle || seen[novelUrl]) continue;
-          seen[novelUrl] = true;
-
-          // Look for cover image just before the h3
-          var coverUrl = "";
-          var imgIdx = html.indexOf(h3Matches[j]);
-          if (imgIdx > 0) {
-            var preceding = html.substring(Math.max(0, imgIdx - 500), imgIdx);
-            var imgM = preceding.match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"([^"]+)"[^>]*/g);
-            if (imgM) coverUrl = (imgM[imgM.length - 1].match(/(?:data-src|data-lazy-src|src)\s*=\s*"([^"]+)"/) || [])[1] || "";
-          }
-
-          list.push({ title: decodeHtml(novelTitle), url: novelUrl, imageUrl: coverUrl, isMature: false });
-        }
-      }
-    }
-
-    return { list: list, hasNextPage: list.length >= 10 };
+    var totalPages = data.totalPages || 1;
+    var currentPage = data.page || 1;
+    return { list: list, hasNextPage: currentPage < totalPages };
   }
 
-  _parseMadaraDate(dateText) {
-    try {
-      if (!dateText) return null;
-      dateText = dateText.trim().toLowerCase();
-      var numMatch = dateText.match(/(\d+)/);
-      if (!numMatch) return null;
-      var num = parseInt(numMatch[1]);
-      var now = Date.now();
-
-      if (/second|seconde/.test(dateText)) return now - num * 1000;
-      if (/minute|min/.test(dateText)) return now - num * 60000;
-      if (/hour|heure/.test(dateText)) return now - num * 3600000;
-      if (/day|jour/.test(dateText)) return now - num * 86400000;
-      if (/week|semaine/.test(dateText)) return now - num * 604800000;
-      if (/month|mois/.test(dateText)) return now - num * 2592000000;
-      if (/year|an/.test(dateText)) return now - num * 31536000000;
-
-      var d = new Date(dateText);
-      if (!isNaN(d.getTime())) return d.getTime();
-      return null;
-    } catch (e) {
-      return null;
+  _slugFromUrl(url) {
+    if (!url) return "";
+    // Extract slug from URL like /novel/shadow-slave or https://novelfrance.fr/novel/shadow-slave
+    var cleaned = url.replace(/[?#].*$/, "").replace(/\/$/, "");
+    var parts = cleaned.split("/");
+    // Find the part after "novel"
+    for (var i = 0; i < parts.length; i++) {
+      if (parts[i] === "novel" && i + 1 < parts.length) {
+        return parts[i + 1];
+      }
     }
+    return parts[parts.length - 1];
   }
 }
