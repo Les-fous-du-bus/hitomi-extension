@@ -91,8 +91,8 @@ class DefaultExtension extends MProvider {
 
   async getPopular(page) {
     try {
-      // Madara standard: /manga/page/N/?m_orderby=views
-      var url = BASE_URL + "/manga/page/" + page + "/?m_orderby=views";
+      // Madara mangaSubString override: /catalogues/ (verified vs keiyoushi MangasOriginesFr.kt L22)
+      var url = BASE_URL + "/catalogues/" + (page > 1 ? "page/" + page + "/" : "") + "?m_orderby=views";
       var res = await fetchv2(url, { headers: HEADERS });
       return this._parseMadaraList(res);
     } catch (e) {
@@ -109,7 +109,8 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/manga/page/" + page + "/?m_orderby=latest";
+      // Madara mangaSubString override: /catalogues/ (verified vs keiyoushi MangasOriginesFr.kt L22)
+      var url = BASE_URL + "/catalogues/" + (page > 1 ? "page/" + page + "/" : "") + "?m_orderby=latest";
       var res = await fetchv2(url, { headers: HEADERS });
       return this._parseMadaraList(res);
     } catch (e) {
