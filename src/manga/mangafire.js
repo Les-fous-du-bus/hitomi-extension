@@ -36,6 +36,7 @@ class DefaultExtension extends MProvider {
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
   get isMature() { return false; }
+  get hasCloudflare() { return true; }
 
   async getPopular(page) {
     try {
@@ -152,26 +153,51 @@ class DefaultExtension extends MProvider {
       var html = chapData.result || "";
       var chapters = [];
 
-      // Parse chapter list from HTML
-      var chapterMatches = html.match(/<a[^>]*data-id="([^"]*)"[^>]*>(.*?)<\/a>/gs);
+      // Parse chapter list: <li class="item" data-number="N">
+      //   <a href="/read/slug/lang/chapter-N" title="Vol X - Chap N">
+      //     <span>Chapter N: Title</span><span>Date</span>
+      //   </a>
+      // </li>
+      var chapterMatches = html.match(/<li[^>]*class="item"[^>]*>[^]*?<\/li>/gs);
+      if (!chapterMatches) {
+        // Fallback: try old format with data-id
+        chapterMatches = html.match(/<a[^>]*data-id="[^"]*"[^>]*>.*?<\/a>/gs);
+      }
       if (!chapterMatches) return [];
 
       for (var i = 0; i < chapterMatches.length; i++) {
-        var aMatch = chapterMatches[i].match(/data-id="([^"]*)"/);
-        var nameMatch = chapterMatches[i].match(/>(.*?)<\/a>/s);
-        if (!aMatch || !nameMatch) continue;
+        var item = chapterMatches[i];
+        var hrefMatch = item.match(/<a[^>]*href="([^"]+)"/);
+        if (!hrefMatch) continue;
 
-        var chapterId = aMatch[1];
-        var chapterName = stripTags(nameMatch[1]).trim();
+        var chapterUrl = hrefMatch[1];
+        if (!chapterUrl.startsWith("http")) {
+          chapterUrl = BASE_URL + chapterUrl;
+        }
+
+        // Title from first span or title attribute
+        var titleAttr = item.match(/<a[^>]*title="([^"]+)"/);
+        var spanMatch = item.match(/<span[^>]*>(.*?)<\/span>/s);
+        var chapterName = titleAttr ? titleAttr[1] : (spanMatch ? stripTags(spanMatch[1]).trim() : "");
+
         var chapterNum = 0;
-        var numMatch = chapterName.match(/(\d+(?:\.\d+)?)/);
+        var numMatch = (chapterName || "").match(/(\d+(?:\.\d+)?)/);
         if (numMatch) chapterNum = parseFloat(numMatch[1]);
+
+        // Date from second span
+        var dateUpload = Date.now();
+        var spans = item.match(/<span[^>]*>(.*?)<\/span>/gs);
+        if (spans && spans.length > 1) {
+          var dateText = stripTags(spans[spans.length - 1]).trim();
+          var d = new Date(dateText);
+          if (!isNaN(d.getTime())) dateUpload = d.getTime();
+        }
 
         chapters.push({
           title: chapterName || "Chapter " + (i + 1),
-          url: BASE_URL + "/ajax/read/chapter/" + chapterId,
+          url: chapterUrl,
           number: chapterNum || i + 1,
-          dateUpload: Date.now(),
+          dateUpload: dateUpload,
         });
       }
 
@@ -268,6 +294,7 @@ class DefaultExtension extends MProvider {
             url: link.startsWith("http") ? link : BASE_URL + link,
             imageUrl: imageUrl,
             isMature: false,
+            genres: [],
           });
         }
       }

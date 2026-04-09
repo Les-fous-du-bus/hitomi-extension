@@ -273,6 +273,7 @@ class DefaultExtension extends MProvider {
             url: novelUrl,
             imageUrl: imageUrl,
             isMature: false,
+            genres: [],
           });
         }
       }

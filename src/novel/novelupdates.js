@@ -40,6 +40,7 @@ class DefaultExtension extends MProvider {
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
   get isMature() { return false; }
+  get hasCloudflare() { return true; }
 
   async getPopular(page) {
     try {
@@ -353,6 +354,7 @@ class DefaultExtension extends MProvider {
             url: novelUrl,
             imageUrl: imageUrl,
             isMature: false,
+            genres: [],
           });
         }
       }
@@ -372,6 +374,7 @@ class DefaultExtension extends MProvider {
               url: link[1],
               imageUrl: img ? img[1] : "",
               isMature: false,
+              genres: [],
             });
           }
         }

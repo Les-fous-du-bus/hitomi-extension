@@ -117,10 +117,15 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Accept-Encoding": "deflate" });
 
-      // Title
-      var titleMatch = res.match(/<(?:div|h1) class="inform-product-txt"[^>]*>(.*?)<\/(?:div|h1)>/s) ||
+      // Title — can be h3.inform-title or div.inform-product-txt
+      var titleMatch = res.match(/<h3 class="inform-title[^"]*"[^>]*>(.*?)<\/h3>/s) ||
+                        res.match(/<(?:div|h1) class="inform-product-txt"[^>]*>(.*?)<\/(?:div|h1)>/s) ||
                         res.match(/<div class="inform-title"[^>]*>(.*?)<\/div>/s);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
+      // Keep only first part before | (removes original language title)
+      if (title.indexOf("|") !== -1) {
+        title = title.split("|")[0].trim();
+      }
 
       // Cover
       var coverMatch = res.match(/<div class="inform-product[^"]*"[^>]*>[^]*?<img[^>]*src="([^"]+)"/s) ||
@@ -132,33 +137,36 @@ class DefaultExtension extends MProvider {
                       res.match(/<div class="inform-intr-txt"[^>]*>(.*?)<\/div>/s);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
-      // Author and Status from info columns
+      // Author and Status from h6 info block or info columns
       var authors = [];
       var status = "unknown";
-      var infoMatch = res.match(/<div class="inform-(?:product-txt|inform-data)"[^>]*>[^]*?<div class="inform-intr-col"[^>]*>(.*?)<\/div>/s) ||
-                      res.match(/<div class="inform-inform-data"[^>]*>[^]*?<h6[^>]*>(.*?)<\/h6>/s);
+      var infoMatch = res.match(/<h6[^>]*>(.*?)<\/h6>/s) ||
+                      res.match(/<div class="inform-(?:product-txt|inform-data)"[^>]*>[^]*?<div class="inform-intr-col"[^>]*>(.*?)<\/div>/s);
       if (infoMatch) {
-        var infoText = stripTags(infoMatch[1]);
+        var infoText = stripTags(infoMatch[1]).replace(/\u00a0/g, " ");
         // Extract author
         var authorIdx = infoText.indexOf("Auteur :");
-        if (authorIdx === -1) authorIdx = infoText.indexOf("Fantrad :");
+        if (authorIdx === -1) authorIdx = infoText.indexOf("Auteur:");
         if (authorIdx !== -1) {
-          var statusIdx = infoText.indexOf("Statut de Parution");
-          if (statusIdx !== -1) {
-            var authorName = infoText.substring(authorIdx, statusIdx)
-              .replace(/Auteur\s*:\s*/, "")
-              .replace(/Fantrad\s*:\s*/, "")
-              .trim();
-            if (authorName) authors.push(authorName);
-          }
+          // Author text ends at next field label (Traducteur, Statut, etc.)
+          var nextField = infoText.indexOf("Traducteur", authorIdx + 8);
+          if (nextField === -1) nextField = infoText.indexOf("Statut", authorIdx + 8);
+          if (nextField === -1) nextField = authorIdx + 100;
+          var authorName = infoText.substring(authorIdx + 9, nextField).trim();
+          if (authorName) authors.push(authorName);
         }
         // Extract status
-        var statutIdx = infoText.indexOf("Statut de Parution :");
+        var statutIdx = infoText.indexOf("Statut de Parution");
+        if (statutIdx === -1) statutIdx = infoText.indexOf("Statut");
         if (statutIdx !== -1) {
-          var statusText = infoText.substring(statutIdx + 21).trim().toLowerCase();
-          if (statusText.indexOf("complet") !== -1) status = "completed";
-          else if (statusText.indexOf("pause") !== -1) status = "hiatus";
-          else status = "ongoing";
+          var colonIdx = infoText.indexOf(":", statutIdx);
+          if (colonIdx !== -1) {
+            var statusText = infoText.substring(colonIdx + 1).trim().toLowerCase();
+            if (statusText.indexOf("complet") !== -1) status = "completed";
+            else if (statusText.indexOf("pause") !== -1) status = "hiatus";
+            else if (statusText.indexOf("abandon") !== -1 || statusText.indexOf("arret") !== -1) status = "abandoned";
+            else status = "ongoing";
+          }
         }
       }
 
@@ -317,21 +325,33 @@ class DefaultExtension extends MProvider {
         var item = items[i];
         var imgMatch = item.match(/<img[^>]*src="([^"]+)"/);
         var linkMatch = item.match(/<a[^>]*href="([^"]+)"/);
-        var nameMatch = item.match(/<div[^>]*>[^]*?<\/div>/s);
+        // Title: prefer 'title' attribute on first <a>, else text in recommended-list-txt div
+        var novelTitle = "";
+        var titleAttr = item.match(/<a[^>]*title="([^"]+)"/);
+        if (titleAttr) {
+          novelTitle = titleAttr[1];
+        } else {
+          var txtDiv = item.match(/<div class="recommended-list-txt"[^>]*>[^]*?<\/div>/s);
+          if (txtDiv) {
+            novelTitle = stripTags(txtDiv[0]).trim();
+          }
+        }
+        // Clean title: keep only first part before |
+        if (novelTitle.indexOf("|") !== -1) {
+          novelTitle = novelTitle.split("|")[0].trim();
+        }
+        novelTitle = novelTitle.replace(/\s+/g, " ").trim();
+        if (novelTitle.length > 100) novelTitle = novelTitle.substring(0, 100);
 
         if (linkMatch) {
           var novelUrl = linkMatch[1];
-          var novelTitle = nameMatch ? stripTags(nameMatch[0]).trim() : "";
-          // Clean title
-          novelTitle = novelTitle.replace(/\s+/g, " ").trim();
-          if (novelTitle.length > 100) novelTitle = novelTitle.substring(0, 100);
-
           if (novelTitle && novelUrl.indexOf(BASE_URL) !== -1) {
             list.push({
               title: decodeHtml(novelTitle),
               url: novelUrl,
               imageUrl: imgMatch ? imgMatch[1] : "",
               isMature: false,
+              genres: [],
             });
           }
         }
@@ -343,40 +363,67 @@ class DefaultExtension extends MProvider {
 
   _parseNovelList(html) {
     var list = [];
-    // Parse from category listing pages
-    var items = html.match(/<li[^>]*>[^]*?<\/li>/gs);
-    if (!items) {
-      // Try #content li pattern
-      var contentMatch = html.match(/<(?:ul|div) class="romans-content"[^>]*>(.*?)<\/(?:ul|div)>/s) ||
-                         html.match(/<div id="content"[^>]*>(.*?)<\/div>/s);
-      if (contentMatch) {
-        items = contentMatch[1].match(/<li[^>]*>[^]*?<\/li>/gs);
-      }
+    // Category listing: <div id="content" class="news-list"><ul><li>
+    //   <div class="news-list-img"><a title="Title"><img src="..."></a></div>
+    //   <div class="news-list-inform">
+    //     <div class="news-list-tit"><h5><a href="..." title="Title">...</a></h5></div>
+    //     ...
+    //   </div>
+    // </li>
+    var contentMatch = html.match(/<div[^>]*class="news-list"[^>]*>(.*)/s);
+    if (!contentMatch) {
+      contentMatch = html.match(/<div id="content"[^>]*>(.*)/s);
     }
+    var searchArea = contentMatch ? contentMatch[1] : html;
 
-    if (items) {
-      for (var i = 0; i < items.length; i++) {
-        var item = items[i];
-        var linkMatch = item.match(/<a[^>]*href="([^"]+)"/);
-        var imgMatch = item.match(/<img[^>]*src="([^"]+)"/);
-        var titleMatch = item.match(/<div[^>]*>(.*?)<\/div>/s);
+    var items = searchArea.match(/<li>[^]*?<\/li>/gs);
+    if (!items) return { list: list, hasNextPage: false };
 
-        if (linkMatch && linkMatch[1].indexOf(BASE_URL) !== -1) {
-          var title = titleMatch ? stripTags(titleMatch[1]).trim() : "";
-          title = title.replace(/\s+/g, " ").trim();
-
-          if (title && title.length > 1) {
-            list.push({
-              title: decodeHtml(title),
-              url: linkMatch[1],
-              imageUrl: imgMatch ? imgMatch[1] : "",
-              isMature: false,
-            });
-          }
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+      var linkMatch = item.match(/<a[^>]*href="([^"]+)"[^>]*title="([^"]+)"/);
+      if (!linkMatch) {
+        linkMatch = item.match(/<a[^>]*title="([^"]+)"[^>]*href="([^"]+)"/);
+        if (linkMatch) {
+          // Swap groups: title is [1], href is [2]
+          var tmp = linkMatch[1];
+          linkMatch[1] = linkMatch[2];
+          linkMatch[2] = tmp;
         }
       }
+      if (!linkMatch) continue;
+      if (linkMatch[1].indexOf(BASE_URL) === -1) continue;
+
+      var imgMatch = item.match(/<img[^>]*src="([^"]+)"/);
+
+      // Title: from title attribute, keep only first part before |
+      var title = linkMatch[2] || "";
+      if (title.indexOf("|") !== -1) {
+        title = title.split("|")[0].trim();
+      }
+      title = title.replace(/\s+/g, " ").trim();
+
+      if (title && title.length > 1) {
+        list.push({
+          title: decodeHtml(title),
+          url: linkMatch[1],
+          imageUrl: imgMatch ? imgMatch[1] : "",
+          isMature: false,
+          genres: [],
+        });
+      }
     }
 
-    return { list: list, hasNextPage: list.length > 0 };
+    // Deduplicate (links appear twice: in img div and in title div)
+    var seen = {};
+    var unique = [];
+    for (var j = 0; j < list.length; j++) {
+      if (!seen[list[j].url]) {
+        seen[list[j].url] = true;
+        unique.push(list[j]);
+      }
+    }
+
+    return { list: unique, hasNextPage: unique.length > 0 };
   }
 }

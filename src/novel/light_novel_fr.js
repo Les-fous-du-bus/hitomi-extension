@@ -1,277 +1,474 @@
 /**
- * LightNovelFR — Extension Hitomi Reader Ultimate
- * Source : https://www.lightnovelfr.com
- * Type : Scraping HTML
- * Langue : FR
- * Cloudflare : NON (hébergement standard)
- * Mature : partiel (certains LN seinen/adult)
- * ContentType : LIGHT_NOVEL
+ * LightNovelFR — Extension Hitomi Reader (Light Novel)
+ * Source : https://lightnovelfr.com  (sans www — verifie session 013)
+ * Methode : HTML scraping (regex) — template LightNovelWP (WordPress)
+ * Langue : fr
+ * Cloudflare : NON
+ * Mature : partiel (genres Adulte, Ecchi, Smut)
  *
- * Architecture :
- *   - Populaire/Récent : /roman-list?sort=views|date
- *   - Recherche        : /recherche?query=...
- *   - Détail           : page roman /roman/{slug}
- *   - Chapitres        : inclus dans page roman (accordion)
- *   - Contenu          : page chapitre → HTML brut du texte
+ * Architecture du site (LightNovelWP theme — identique a 30+ sites LN) :
+ *   - Listing pop/latest  : /series/?page=N[&order=latest]
+ *   - Recherche           : /page/N/?s={query}
+ *   - Detail + chapitres  : /series/{slug}/
+ *     -> cover/title : class ts-post-image + post-title h1
+ *     -> genres      : class genxed a / class sertogenre a
+ *     -> summary     : div[itemprop=description] ou div.entry-content
+ *     -> info        : class spe / class serl (labels FR: auteur, statut, artiste)
+ *     -> chapitres   : class eplister > ul > li avec epl-num / epl-title / epl-date / epl-price
+ *   - Contenu chap        : /{slug-chapitre}/
+ *     -> class epcontent jusqu'a class bottomnav
  *
- * Sélecteurs CSS / regex documentés :
- *   - Grille liste   : div.manga-item, article.novel-item
- *   - Titre item     : h3 a, a.manga-name, a.novel-title
- *   - Cover item     : img.img-thumbnail, img.img-responsive
- *   - Détail titre   : h1.novel-title, h1.entry-title
- *   - Détail cover   : div.novel-cover img
- *   - Détail desc    : div.summary-content p, div.novel-synopsis
- *   - Détail auteur  : a[href*='auteur'], .novel-author a
- *   - Genres tags    : a.label-info, span.badge a
- *   - Chapitres      : ul.chapter-list li a, div#chapter-list a
- *   - Contenu chap   : div#chapter-content, div.reading-content
+ * Selecteurs documentes (briefing @homura session 013 vs lnreader-plugins) :
+ *   - Grille liste : article.bsx (LightNovelWP standard)
+ *   - Link+title   : <a href title>
+ *   - Cover        : img data-src > src (dans .ts-post-image)
+ *   - Statuts FR   : "en cours", "en pause", "complete", "abandonne"
+ *   - Chap lockes  : epl-price != "gratuit" / "libre"  -> skip
  *
  * @author @khun — Extension Strategist
- * @version 2.0.0
+ * @version 4.0.0
  */
 
-const BASE_URL = "https://www.lightnovelfr.com";
+var BASE_URL = "https://lightnovelfr.com";
 
-const HEADERS = {
+var HEADERS = {
   "User-Agent":
-    "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0",
-  Referer: BASE_URL + "/",
-  "Accept-Language": "fr-FR,fr;q=0.9",
+    "Mozilla/5.0 (Linux; Android 13; SM-G991B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+  "Referer": BASE_URL + "/",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+  "Accept-Language": "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
 };
 
-function absoluteUrl(href) {
-  if (!href) return "";
-  if (href.startsWith("http")) return href;
-  if (href.startsWith("//")) return "https:" + href;
-  if (href.startsWith("/")) return BASE_URL + href;
-  return BASE_URL + "/" + href;
+var MATURE_GENRES = ["adulte", "ecchi", "smut", "mature", "adult", "hentai"];
+
+function stripTags(str) {
+  if (!str) return "";
+  return str.replace(/<[^>]*>/g, "");
 }
 
-/**
- * Extrait l'URL d'image depuis un fragment HTML de balise <img>.
- * Priorité : data-src → data-lazy-src → src.
- */
-function extractImgSrcFromHtml(html) {
-  if (!html) return "";
-  for (const attr of ["data-src", "data-lazy-src", "src"]) {
-    const m = html.match(new RegExp(attr + '=["\'](([^"\']+))["\']', "i"));
-    if (m && !m[1].includes("data:image")) {
-      const s = m[1];
-      if (s.startsWith("//")) return "https:" + s;
-      if (s.startsWith("/")) return BASE_URL + s;
-      return s;
+function decodeHtml(str) {
+  if (!str) return "";
+  return str
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&hellip;/g, "...")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#39;/g, "'");
+}
+
+// Extract best image URL from an img tag string.
+// Priority: data-src > data-lazy-src > src.
+function extractImageFromTag(imgTag) {
+  if (!imgTag) return "";
+  var candidates = [];
+
+  var dataSrc = imgTag.match(/data-src\s*=\s*["']([^"']+)["']/);
+  if (dataSrc) candidates.push(dataSrc[1].trim());
+
+  var dataLazy = imgTag.match(/data-lazy-src\s*=\s*["']([^"']+)["']/);
+  if (dataLazy) candidates.push(dataLazy[1].trim());
+
+  var src = imgTag.match(/\bsrc\s*=\s*["']([^"']+)["']/);
+  if (src) candidates.push(src[1].trim());
+
+  for (var i = 0; i < candidates.length; i++) {
+    var url = candidates[i];
+    if (url.indexOf("data:image") === -1 &&
+        url.indexOf("blank.gif") === -1 &&
+        url.indexOf("placeholder") === -1 &&
+        url.length > 10) {
+      if (url.indexOf("//") === 0) return "https:" + url;
+      if (url.indexOf("/") === 0) return BASE_URL + url;
+      return url;
     }
   }
   return "";
 }
 
-/**
- * Parse une liste de romans depuis le HTML brut de la page.
- * Regex-based — fiable avec QuickJS/polyfill limité.
- */
-function parseList(html) {
-  const list = [];
-
-  // Plusieurs layouts possibles — chercher des blocs manga-item / novel-item
-  const blockRegex =
-    /<(?:div|article)[^>]+class="[^"]*(?:manga-item|novel-item|list-truyen-item-wrap)[^"]*"[^>]*>([\s\S]*?)<\/(?:div|article)>/gi;
-
-  let m;
-  while ((m = blockRegex.exec(html)) !== null) {
-    const block = m[0];
-
-    // Titre + URL : chercher <a> avec titre ou texte
-    const linkMatch =
-      block.match(/<a[^>]+href=["']([^"']+)["'][^>]*title=["']([^"']+)["'][^>]*>/i) ||
-      block.match(/<a[^>]+title=["']([^"']+)["'][^>]+href=["']([^"']+)["'][^>]*>/i) ||
-      block.match(/<(?:h3|h4)[^>]*>[\s\S]*?<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i);
-
-    if (!linkMatch) continue;
-
-    let url, title;
-    if (linkMatch[0].includes("title=")) {
-      // Pattern avec attribut title
-      const hrefM = linkMatch[0].match(/href=["']([^"']+)["']/i);
-      const titleM = linkMatch[0].match(/title=["']([^"']+)["']/i);
-      url = hrefM ? absoluteUrl(hrefM[1]) : "";
-      title = titleM ? titleM[1].trim() : "";
-    } else {
-      url = absoluteUrl(linkMatch[1]);
-      title = linkMatch[2].replace(/<[^>]+>/g, "").trim();
-    }
-
-    if (!title || !url) continue;
-
-    // Cover : première img du bloc
-    const imgMatch = block.match(/<img[^>]+>/i);
-    const cover = extractImgSrcFromHtml(imgMatch ? imgMatch[0] : "");
-
-    list.push({ title, url, cover });
-  }
-
-  // hasNextPage
-  const hasNextPage =
-    /rel=["']next["']/i.test(html) ||
-    /class="[^"]*btn-next[^"]*"/i.test(html) ||
-    /class="[^"]*active[^"]*"[^>]*>[\s\S]{0,300}?<li[^>]*>[\s\S]*?<a/i.test(html);
-
-  return { list, hasNextPage };
+function absoluteUrl(href) {
+  if (!href) return "";
+  if (href.indexOf("http") === 0) return href;
+  if (href.indexOf("//") === 0) return "https:" + href;
+  if (href.indexOf("/") === 0) return BASE_URL + href;
+  return BASE_URL + "/" + href;
 }
 
-class DefaultExtension extends LNProvider {
-  get id()      { return "light_novel_fr"; }
-  get name()    { return "LightNovelFR"; }
-  get lang()    { return "fr"; }
+class DefaultExtension extends MProvider {
+  get name() { return "LightNovelFR"; }
+  get lang() { return "fr"; }
   get baseUrl() { return BASE_URL; }
-  get iconUrl() { return ""; }
+  get supportsLatest() { return true; }
+  get isMature() { return false; }
+  get hasCloudflare() { return false; }
 
-  // ─────────────────────────────────────────────
-  // CATALOGUE
-  // ─────────────────────────────────────────────
-
-  async popularNovels(page) {
-    const url = `${BASE_URL}/roman-list?sort=views&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
-    return parseList(html);
+  async getPopular(page) {
+    try {
+      var url = BASE_URL + "/series/?page=" + page;
+      var res = await fetchv2(url, { headers: HEADERS });
+      return this._parseList(res);
+    } catch (e) {
+      return { list: [], hasNextPage: false };
+    }
   }
 
-  async searchNovels(searchTerm, page) {
-    const url =
-      `${BASE_URL}/recherche?q=${encodeURIComponent(searchTerm || "")}` +
-      `&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
-    return parseList(html);
+  async getLatestUpdates(page) {
+    try {
+      var url = BASE_URL + "/series/?page=" + page + "&order=latest";
+      var res = await fetchv2(url, { headers: HEADERS });
+      return this._parseList(res);
+    } catch (e) {
+      return { list: [], hasNextPage: false };
+    }
   }
 
-  // ─────────────────────────────────────────────
-  // DÉTAIL + CHAPITRES
-  // ─────────────────────────────────────────────
+  async search(query, page, filters) {
+    try {
+      var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query || "");
+      var res = await fetchv2(url, { headers: HEADERS });
+      return this._parseList(res);
+    } catch (e) {
+      return { list: [], hasNextPage: false };
+    }
+  }
 
-  async parseNovelAndChapters(novelUrl) {
-    const html = await fetchv2(novelUrl, { headers: HEADERS });
+  async getMangaDetail(url) {
+    try {
+      var fullUrl = url.indexOf("http") === 0 ? url : BASE_URL + url;
+      var res = await fetchv2(fullUrl, { headers: HEADERS });
 
-    // Titre
-    const titleMatch =
-      html.match(/<h1[^>]*class="[^"]*novel-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) ||
-      html.match(/<h1[^>]*class="[^"]*entry-title[^"]*"[^>]*>([\s\S]*?)<\/h1>/i) ||
-      html.match(/<h3[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/h3>/i);
-    const title = titleMatch
-      ? titleMatch[1].replace(/<[^>]+>/g, "").trim()
-      : "LightNovelFR";
+      // Title — post-title h1 (LightNovelWP) fallback entry-title
+      var titleMatch = res.match(/<h1[^>]*class="[^"]*(?:entry-title|post-title)[^"]*"[^>]*>([\s\S]*?)<\/h1>/);
+      if (!titleMatch) titleMatch = res.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+      var title = titleMatch ? decodeHtml(stripTags(titleMatch[1])).trim() : "LightNovelFR";
 
-    // Cover
-    const coverContainerMatch = html.match(
-      /<div[^>]*class="[^"]*(?:novel-cover|book-img|manga-info-pic)[^"]*"[^>]*>([\s\S]*?)<\/div>/i
-    );
-    const coverBlock = coverContainerMatch ? coverContainerMatch[0] : "";
-    const coverImgMatch = coverBlock.match(/<img[^>]+>/i);
-    const cover = extractImgSrcFromHtml(coverImgMatch ? coverImgMatch[0] : "");
+      // Cover — class ts-post-image (theme LightNovelWP)
+      var imageUrl = "";
+      var tsPostBlock = res.match(/<img[^>]*class="[^"]*ts-post-image[^"]*"[^>]*>/);
+      if (tsPostBlock) imageUrl = extractImageFromTag(tsPostBlock[0]);
+      if (!imageUrl) {
+        var infoxBlock = res.match(/<div[^>]*class="[^"]*(?:thumb|thumbook)[^"]*"[^>]*>[\s\S]*?<img[^>]*>/);
+        if (infoxBlock) imageUrl = extractImageFromTag(infoxBlock[0]);
+      }
 
-    // Auteur — chercher les liens vers /auteur/
-    const authorMatches = html.match(/href=["'][^"']*auteur[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi) || [];
-    const authors = [];
-    authorMatches.forEach((a) => {
-      const t = a.replace(/<[^>]+>/g, "").trim();
-      if (t && !authors.includes(t)) authors.push(t);
-    });
-    const author = authors.join(", ");
+      // Description — div[itemprop=description] OR div.entry-content
+      var descMatch = res.match(/<div[^>]*itemprop=["']description["'][^>]*>([\s\S]*?)<\/div>/);
+      if (!descMatch) descMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+      if (!descMatch) descMatch = res.match(/<div[^>]*class="[^"]*summary[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+      var description = descMatch ? decodeHtml(stripTags(descMatch[1])).trim() : "";
 
-    // Description
-    const descMatch =
-      html.match(/<div[^>]*class="[^"]*summary-content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-      html.match(/<div[^>]*class="[^"]*novel-synopsis[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-      html.match(/<div[^>]*class="[^"]*description-summary[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
-    const description = descMatch
-      ? descMatch[1].replace(/<[^>]+>/g, "").trim()
-      : "";
-
-    // Statut — chercher dans les li info
-    let status = "unknown";
-    const infoListMatch = html.match(
-      /<ul[^>]*class="[^"]*manga-info-text[^"]*"[^>]*>([\s\S]*?)<\/ul>/i
-    );
-    if (infoListMatch) {
-      const liMatches = infoListMatch[1].match(/<li[^>]*>([\s\S]*?)<\/li>/gi) || [];
-      liMatches.forEach((li) => {
-        const text = li.replace(/<[^>]+>/g, "").toLowerCase();
-        if (text.includes("statut") || text.includes("status")) {
-          if (text.includes("en cours")) status = "ongoing";
-          else if (text.includes("terminé") || text.includes("complet")) status = "completed";
-          else if (text.includes("pause") || text.includes("hiatus")) status = "hiatus";
+      // Genres — class genxed / sertogenre a
+      var genres = [];
+      var genreBlock = res.match(/<(?:div|span)[^>]*class="[^"]*(?:genxed|sertogenre|mgen)[^"]*"[^>]*>([\s\S]*?)<\/(?:div|span)>/);
+      if (genreBlock) {
+        var genreLinks = genreBlock[1].match(/<a[^>]*>([\s\S]*?)<\/a>/g);
+        if (genreLinks) {
+          for (var i = 0; i < genreLinks.length; i++) {
+            var g = decodeHtml(stripTags(genreLinks[i])).trim();
+            if (g) genres.push(g);
+          }
         }
-      });
+      }
+
+      // Mature detection
+      var isMature = false;
+      for (var mi = 0; mi < genres.length; mi++) {
+        if (MATURE_GENRES.indexOf(genres[mi].toLowerCase()) !== -1) {
+          isMature = true;
+          break;
+        }
+      }
+
+      // Info block — class spe / serl (LightNovelWP)
+      var authors = [];
+      var status = "unknown";
+
+      var infoBlock = res.match(/<div[^>]*class="[^"]*(?:spe|serl)[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/);
+      if (!infoBlock) infoBlock = res.match(/<div[^>]*class="[^"]*(?:spe|serl)[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+
+      if (infoBlock) {
+        var infoHtml = infoBlock[1];
+        // Spans containing <b>Label</b> value  or <span><b>Label</b> value</span>
+        var spanRegex = /<span[^>]*>([\s\S]*?)<\/span>/g;
+        var sm;
+        while ((sm = spanRegex.exec(infoHtml)) !== null) {
+          var spanText = decodeHtml(stripTags(sm[1])).trim().toLowerCase();
+          if (!spanText) continue;
+
+          if (spanText.indexOf("auteur") === 0 || spanText.indexOf("author") === 0) {
+            var authorVal = spanText.replace(/^(auteur|author)\s*:?\s*/, "").trim();
+            if (authorVal && authorVal !== "updating" && authorVal !== "n/a") {
+              authors.push(authorVal);
+            }
+          } else if (spanText.indexOf("artiste") === 0 || spanText.indexOf("artist") === 0) {
+            var artistVal = spanText.replace(/^(artiste|artist)\s*:?\s*/, "").trim();
+            if (artistVal && artistVal !== "updating" && artistVal !== "n/a" && authors.indexOf(artistVal) === -1) {
+              authors.push(artistVal);
+            }
+          } else if (spanText.indexOf("statut") === 0 || spanText.indexOf("status") === 0) {
+            var st = spanText.replace(/^(statut|status)\s*:?\s*/, "").trim();
+            if (st.indexOf("en cours") !== -1 || st.indexOf("ongoing") !== -1) status = "ongoing";
+            else if (st.indexOf("complete") !== -1 || st.indexOf("termine") !== -1 || st.indexOf("completed") !== -1) status = "completed";
+            else if (st.indexOf("en pause") !== -1 || st.indexOf("hiatus") !== -1 || st.indexOf("pause") !== -1) status = "hiatus";
+            else if (st.indexOf("abandon") !== -1 || st.indexOf("dropped") !== -1 || st.indexOf("cancel") !== -1) status = "abandoned";
+          }
+        }
+      }
+
+      return {
+        title: title,
+        url: fullUrl,
+        imageUrl: imageUrl,
+        description: description,
+        status: status,
+        genres: genres,
+        authors: authors,
+        isMature: isMature,
+      };
+    } catch (e) {
+      return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
     }
+  }
 
-    // Genres — liens label-info, badge, genre
-    const genres = [];
-    const genreRegex = /<a[^>]*class="[^"]*(?:label-info|genre-item)[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
-    let gMatch;
-    while ((gMatch = genreRegex.exec(html)) !== null) {
-      const g = gMatch[1].replace(/<[^>]+>/g, "").trim();
-      if (g && !genres.includes(g)) genres.push(g);
-    }
+  async getChapterList(url) {
+    try {
+      var fullUrl = url.indexOf("http") === 0 ? url : BASE_URL + url;
+      var res = await fetchv2(fullUrl, { headers: HEADERS });
 
-    // Chapitres — liens dans ul.chapter-list ou div#chapter-list
-    const chapters = [];
-    const chListMatch =
-      html.match(/<ul[^>]*class="[^"]*chapter-list[^"]*"[^>]*>([\s\S]*?)<\/ul>/i) ||
-      html.match(/<div[^>]*id="chapter-list"[^>]*>([\s\S]*?)<\/div>/i) ||
-      html.match(/<ul[^>]*class="[^"]*row-content-chapter[^"]*"[^>]*>([\s\S]*?)<\/ul>/i);
+      var chapters = [];
 
-    if (chListMatch) {
-      const chLinkRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
-      let cMatch;
-      let idx = 0;
-      while ((cMatch = chLinkRegex.exec(chListMatch[1])) !== null) {
-        const chUrl = absoluteUrl(cMatch[1]);
-        if (!chUrl) continue;
-        const rawName = cMatch[2].replace(/<[^>]+>/g, "").trim();
-        const numMatch =
-          rawName.match(/chapitre\s*([\d.]+)/i) ||
-          rawName.match(/ch(?:ap)?\.?\s*([\d.]+)/i) ||
-          rawName.match(/([\d.]+)/);
-        const chapterNumber = numMatch ? parseFloat(numMatch[1]) : idx + 1;
+      // LightNovelWP — class eplister > ul > li
+      var epListerBlock = res.match(/<div[^>]*class="[^"]*eplister[^"]*"[^>]*>[\s\S]*?<ul[^>]*>([\s\S]*?)<\/ul>/);
+      if (!epListerBlock) return [];
+
+      var liBlocks = epListerBlock[1].match(/<li[^>]*>[\s\S]*?<\/li>/g) || [];
+
+      for (var i = 0; i < liBlocks.length; i++) {
+        var li = liBlocks[i];
+
+        var hrefMatch = li.match(/<a[^>]+href="([^"]+)"/);
+        if (!hrefMatch) continue;
+        var chUrl = absoluteUrl(hrefMatch[1]);
+
+        var numMatch = li.match(/class="[^"]*epl-num[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/);
+        var titleMatch = li.match(/class="[^"]*epl-title[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/);
+        var dateMatch = li.match(/class="[^"]*epl-date[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/);
+        var priceMatch = li.match(/class="[^"]*epl-price[^"]*"[^>]*>([\s\S]*?)<\/(?:span|div)>/);
+
+        // Skip locked (premium) chapters — keep only free
+        if (priceMatch) {
+          var priceText = decodeHtml(stripTags(priceMatch[1])).trim().toLowerCase();
+          if (priceText && priceText !== "gratuit" && priceText !== "libre" && priceText !== "free") {
+            continue;
+          }
+        }
+
+        var numText = numMatch ? decodeHtml(stripTags(numMatch[1])).trim() : "";
+        var titleText = titleMatch ? decodeHtml(stripTags(titleMatch[1])).trim() : "";
+        var dateText = dateMatch ? decodeHtml(stripTags(dateMatch[1])).trim() : "";
+
+        // Chapter number extraction
+        var chapNum = liBlocks.length - i;
+        var nm = (numText + " " + titleText).match(/(\d+(?:\.\d+)?)/);
+        if (nm) chapNum = parseFloat(nm[1]);
+
+        var chapFullTitle = "";
+        if (numText && titleText) chapFullTitle = numText + " - " + titleText;
+        else if (numText) chapFullTitle = numText;
+        else if (titleText) chapFullTitle = titleText;
+        else chapFullTitle = "Chapitre " + chapNum;
+
+        var dateUpload = this._parseDate(dateText);
+
         chapters.push({
-          name: rawName || `Chapitre ${chapterNumber}`,
+          title: chapFullTitle,
           url: chUrl,
-          chapterNumber,
-          releaseTime: "",
+          number: chapNum,
+          dateUpload: dateUpload,
         });
-        idx++;
+      }
+
+      // LightNovelWP lists chapters newest-first; reverse for oldest-first reading order
+      chapters.reverse();
+      return chapters;
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async getContent(url) {
+    try {
+      var fullUrl = url.indexOf("http") === 0 ? url : BASE_URL + url;
+      var res = await fetchv2(fullUrl, { headers: HEADERS });
+
+      // Strategy 1: class epcontent jusqu'a class bottomnav (LightNovelWP)
+      var epMatch = res.match(/<div[^>]*class="[^"]*epcontent[^"]*"[^>]*>([\s\S]*?)<div[^>]*class="[^"]*bottomnav/);
+      if (epMatch) {
+        return this._cleanContent(epMatch[1]);
+      }
+
+      // Strategy 2: class entry-content (fallback WP standard)
+      var entryMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<footer|<\/article|<nav|<div[^>]*class="[^"]*(?:bottomnav|chnav))/);
+      if (entryMatch) {
+        return this._cleanContent(entryMatch[1]);
+      }
+
+      // Strategy 3: all substantial <p> paragraphs
+      var paragraphs = res.match(/<p[^>]*>[\s\S]*?<\/p>/g) || [];
+      var joined = [];
+      for (var i = 0; i < paragraphs.length; i++) {
+        var text = stripTags(paragraphs[i]).trim();
+        if (text.length > 20) joined.push(paragraphs[i]);
+      }
+      if (joined.length > 0) return this._cleanContent(joined.join("\n"));
+
+      return "<p>Contenu non disponible</p>";
+    } catch (e) {
+      return "<p>Erreur de chargement</p>";
+    }
+  }
+
+  getFilterList() {
+    return [
+      {
+        type: "SelectFilter",
+        name: "Tri",
+        values: [
+          { displayName: "Populaire", value: "popular" },
+          { displayName: "Derniere MAJ", value: "latest" },
+        ],
+        default: 0,
+      },
+    ];
+  }
+
+  _cleanContent(html) {
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<svg[\s\S]*?<\/svg>/gi, "")
+      .replace(/<button[\s\S]*?<\/button>/gi, "")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+      .replace(/<!--[\s\S]*?-->/g, "")
+      .replace(/<div[^>]*class="[^"]*(?:ads|adsense|code-block|chnav|chapter-nav|ezoic)[^"]*"[^>]*>[\s\S]*?<\/div>/gi, "")
+      .trim();
+  }
+
+  _parseList(html) {
+    var list = [];
+
+    // LightNovelWP listing: article.bsx > a > div.bigor (or listupd a.tip)
+    // Pattern 1: article bsx with <a href title>
+    var articleMatches = html.match(/<article[^>]*class="[^"]*bs[^"]*"[^>]*>[\s\S]*?<\/article>/g);
+
+    if (!articleMatches) {
+      // Fallback: div.bsx or div.listupd > a.tip
+      articleMatches = html.match(/<div[^>]*class="[^"]*bsx[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>/g);
+    }
+
+    if (articleMatches) {
+      for (var i = 0; i < articleMatches.length; i++) {
+        var block = articleMatches[i];
+
+        // Link + title (title attribute preferred)
+        var linkMatch = block.match(/<a[^>]+href="([^"]+)"[^>]*title="([^"]*)"/);
+        var novelUrl = "";
+        var title = "";
+
+        if (linkMatch) {
+          novelUrl = absoluteUrl(linkMatch[1]);
+          title = decodeHtml(linkMatch[2]).trim();
+        } else {
+          // Fallback: href without title, use alt from img or inner text
+          var hrefOnly = block.match(/<a[^>]+href="([^"]+)"/);
+          if (!hrefOnly) continue;
+          novelUrl = absoluteUrl(hrefOnly[1]);
+
+          var altMatch = block.match(/<img[^>]+alt="([^"]+)"/);
+          if (altMatch) title = decodeHtml(altMatch[1]).trim();
+          else {
+            var h3Match = block.match(/<h\d[^>]*>([\s\S]*?)<\/h\d>/);
+            if (h3Match) title = decodeHtml(stripTags(h3Match[1])).trim();
+          }
+        }
+
+        if (!title || !novelUrl) continue;
+
+        // Cover — first img in block, data-src > src
+        var imgTag = block.match(/<img[^>]*>/);
+        var imageUrl = imgTag ? extractImageFromTag(imgTag[0]) : "";
+
+        list.push({
+          title: title,
+          url: novelUrl,
+          imageUrl: imageUrl,
+          isMature: false,
+          genres: [],
+        });
       }
     }
 
-    // Trier du plus récent au plus ancien
-    chapters.sort((a, b) => b.chapterNumber - a.chapterNumber);
-
-    return { title, url: novelUrl, cover, author, description, status, genres, chapters };
-  }
-
-  // ─────────────────────────────────────────────
-  // LECTURE — HTML brut du chapitre
-  // ─────────────────────────────────────────────
-
-  async parseChapter(chapterUrl) {
-    const html = await fetchv2(chapterUrl, { headers: HEADERS });
-
-    // Contenu principal du chapitre
-    const contentMatch =
-      html.match(/<div[^>]*id="chapter-content"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
-      html.match(/<div[^>]*class="[^"]*reading-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
-      html.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i) ||
-      html.match(/<article[^>]*class="[^"]*chapter-content[^"]*"[^>]*>([\s\S]*?)<\/article>/i);
-
-    if (!contentMatch) {
-      return "<p>Contenu non disponible</p>";
+    // Fallback: listupd a.tip direct pattern (alt LightNovelWP layout)
+    if (list.length === 0) {
+      var tipRegex = /<a[^>]+class="[^"]*tip[^"]*"[^>]+href="([^"]+)"[^>]*title="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
+      var tm;
+      while ((tm = tipRegex.exec(html)) !== null) {
+        var tUrl = absoluteUrl(tm[1]);
+        var tTitle = decodeHtml(tm[2]).trim();
+        var tImgTag = tm[3].match(/<img[^>]*>/);
+        var tImage = tImgTag ? extractImageFromTag(tImgTag[0]) : "";
+        if (tTitle && tUrl) {
+          list.push({ title: tTitle, url: tUrl, imageUrl: tImage, isMature: false, genres: [] });
+        }
+      }
     }
 
-    let content = contentMatch[1];
+    // hasNextPage: look for pagination "next" link or current page indicator
+    var hasNextPage = /class="[^"]*(?:next|r)[^"]*"[^>]*>\s*(?:&raquo;|&gt;|Next|Suivant|>)/.test(html) ||
+                      /<a[^>]+href="[^"]*\/page\/\d+/.test(html);
 
-    // Nettoyage des éléments parasites (scripts, styles, pub, nav)
-    content = content.replace(/<script[\s\S]*?<\/script>/gi, "");
-    content = content.replace(/<style[\s\S]*?<\/style>/gi, "");
-    content = content.replace(/<[^>]*class="[^"]*(?:ads|adsense|navigation|chapter-nav)[^"]*"[^>]*>[\s\S]*?<\/[^>]+>/gi, "");
+    return { list: list, hasNextPage: hasNextPage };
+  }
 
-    return content.trim();
+  _parseDate(text) {
+    try {
+      if (!text) return Date.now();
+      var lc = text.toLowerCase();
+
+      var numMatch = lc.match(/(\d+)/);
+      if (numMatch) {
+        var num = parseInt(numMatch[1]);
+        var now = Date.now();
+        if (/second|seconde/.test(lc)) return now - num * 1000;
+        if (/minute|min/.test(lc)) return now - num * 60000;
+        if (/hour|heure/.test(lc)) return now - num * 3600000;
+        if (/day|jour/.test(lc)) return now - num * 86400000;
+        if (/week|semaine/.test(lc)) return now - num * 604800000;
+        if (/month|mois/.test(lc)) return now - num * 2592000000;
+        if (/year|an/.test(lc)) return now - num * 31536000000;
+      }
+
+      // FR month names
+      var frMonths = {
+        "janvier": 0, "fevrier": 1, "février": 1, "mars": 2, "avril": 3,
+        "mai": 4, "juin": 5, "juillet": 6, "aout": 7, "août": 7,
+        "septembre": 8, "octobre": 9, "novembre": 10, "decembre": 11, "décembre": 11
+      };
+      var frMatch = lc.match(/(\d{1,2})\s+([a-zéû]+)\s+(\d{4})/);
+      if (frMatch && frMonths[frMatch[2]] !== undefined) {
+        var d = new Date(parseInt(frMatch[3]), frMonths[frMatch[2]], parseInt(frMatch[1]));
+        if (!isNaN(d.getTime())) return d.getTime();
+      }
+
+      var d2 = new Date(text);
+      if (!isNaN(d2.getTime())) return d2.getTime();
+      return Date.now();
+    } catch (e) {
+      return Date.now();
+    }
   }
 }

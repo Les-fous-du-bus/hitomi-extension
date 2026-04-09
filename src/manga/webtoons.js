@@ -279,6 +279,7 @@ class DefaultExtension extends MProvider {
             url: hrefMatch[1],
             imageUrl: imgMatch ? imgMatch[1] : "",
             isMature: false,
+            genres: [],
           });
         }
       }
@@ -300,6 +301,7 @@ class DefaultExtension extends MProvider {
               url: aHref[1],
               imageUrl: aImg ? aImg[1] : "",
               isMature: false,
+              genres: [],
             });
           }
         }

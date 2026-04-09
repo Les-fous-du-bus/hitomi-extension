@@ -100,8 +100,8 @@ class DefaultExtension extends MProvider {
                      res.match(/<img[^>]*src="([^"]+)"[^>]*alt="poster"/s);
       var imageUrl = imgMatch ? imgMatch[1] : "";
 
-      // Description
-      var descMatch = res.match(/<span class="font-medium text-sm"[^>]*>(.*?)<\/span>/s);
+      // Description — class includes color suffix e.g. "font-medium text-sm text-[#A2A2A2]"
+      var descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>(.*?)<\/span>/s);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
       // Status
@@ -157,28 +157,33 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
       var chapters = [];
-      // Match chapter groups
-      var chapterMatches = res.match(/<div class="scrollbar-thumb-themecolor[^"]*"[^>]*>(.*)/s);
-      if (!chapterMatches) return [];
-
-      var groupHtml = chapterMatches[1];
-      var groupMatches = groupHtml.match(/<div[^>]*class="group"[^>]*>[^]*?<\/div>\s*<\/div>/gs);
-      if (!groupMatches) {
-        // Fallback: match all chapter links
-        groupMatches = groupHtml.match(/<a[^>]*href="([^"]*chapter[^"]*)"[^>]*>[^]*?<\/a>/gs);
+      // Chapter items: <div class="pl-4 py-2 border rounded-md group ...">
+      //   <a href="slug/chapter/N">
+      //     <h3 class="text-sm ...">Chapter N<span>Title</span></h3>
+      //     <h3 class="text-xs ...">Date</h3>
+      //   </a>
+      // </div>
+      var blockMatches = res.match(/<div[^>]*class="[^"]*group[^"]*"[^>]*>[^]*?<\/div>/gs);
+      if (!blockMatches) {
+        // Fallback: match all chapter links directly
+        blockMatches = res.match(/<a[^>]*href="[^"]*chapter\/\d+[^"]*"[^>]*>.*?<\/a>/gs);
       }
+      if (!blockMatches) return [];
 
-      if (!groupMatches) return [];
-
-      for (var i = 0; i < groupMatches.length; i++) {
-        var block = groupMatches[i];
+      var seen = {};
+      for (var i = 0; i < blockMatches.length; i++) {
+        var block = blockMatches[i];
 
         // URL
-        var hrefMatch = block.match(/<a[^>]*href="([^"]+)"/);
+        var hrefMatch = block.match(/<a[^>]*href="([^"]*chapter\/\d+[^"]*)"/);
         if (!hrefMatch) continue;
         var chapUrl = hrefMatch[1];
 
-        // Title
+        // Deduplicate
+        if (seen[chapUrl]) continue;
+        seen[chapUrl] = true;
+
+        // Title from first h3
         var h3Match = block.match(/<h3[^>]*>(.*?)<\/h3>/s);
         var chapTitle = h3Match ? stripTags(h3Match[1]).trim() : "";
 
@@ -187,7 +192,7 @@ class DefaultExtension extends MProvider {
         var numMatch = chapTitle.match(/Chapter\s+(\d+(?:\.\d+)?)/i);
         if (numMatch) chapNum = parseFloat(numMatch[1]);
 
-        // Date
+        // Date from second h3 (text-xs)
         var dateUpload = Date.now();
         var dateMatches = block.match(/<h3[^>]*>(.*?)<\/h3>/gs);
         if (dateMatches && dateMatches.length > 1) {
@@ -197,15 +202,15 @@ class DefaultExtension extends MProvider {
         }
 
         if (chapUrl) {
-          // Store path relative to series for getPageList
-          var seriesPath = chapUrl;
-          if (!seriesPath.startsWith("http")) {
-            seriesPath = BASE_URL + "/series/" + seriesPath;
+          // Build full URL
+          var fullChapUrl = chapUrl;
+          if (!fullChapUrl.startsWith("http")) {
+            fullChapUrl = BASE_URL + "/series/" + fullChapUrl;
           }
 
           chapters.push({
-            title: chapTitle || "Chapter " + (i + 1),
-            url: seriesPath,
+            title: chapTitle || "Chapter " + (chapNum || i + 1),
+            url: fullChapUrl,
             number: chapNum || i + 1,
             dateUpload: dateUpload,
           });
@@ -296,25 +301,41 @@ class DefaultExtension extends MProvider {
   _parseSeriesList(html) {
     var list = [];
 
-    // Match manga grid items: <a> elements in div.grid
-    var gridMatch = html.match(/<div class="grid[^"]*"[^>]*>(.*?)<\/div>\s*(?:<div|<nav|<\/main)/s);
-    var searchArea = gridMatch ? gridMatch[1] : html;
-
-    var aMatches = searchArea.match(/<a[^>]*href="([^"]+)"[^>]*>[^]*?<img[^>]*src="([^"]+)"[^>]*>[^]*?<span class="block[^"]*"[^>]*>(.*?)<\/span>/gs);
+    // AsuraScans uses Next.js with Tailwind. Series grid items are:
+    // <a href="series/slug-id"> or <a href="/series/slug-id">
+    //   <div>...<img src="...">...<span class="block text-[13.3px] font-bold">Title</span>...</div>
+    // </a>
+    var aMatches = html.match(/<a[^>]*href="[/]?series\/[^"]*"[^>]*>.*?<\/a>/gs);
     if (aMatches) {
+      var seen = {};
       for (var i = 0; i < aMatches.length; i++) {
         var m = aMatches[i];
         var href = m.match(/<a[^>]*href="([^"]+)"/);
         var img = m.match(/<img[^>]*src="([^"]+)"/);
-        var name = m.match(/<span class="block[^"]*"[^>]*>(.*?)<\/span>/s);
+        // Title: span with "block" and "font-bold" classes (Tailwind)
+        var name = m.match(/<span class="block[^"]*font-bold[^"]*"[^>]*>(.*?)<\/span>/s);
+        if (!name) {
+          // Fallback: any text link for the series that is not just an image
+          name = m.match(/>([^<]{3,})<\/a>/s);
+        }
 
         if (href && name) {
-          var mangaUrl = href[1].startsWith("http") ? href[1] : BASE_URL + href[1];
+          var path = href[1];
+          // Normalize: ensure leading /
+          if (!path.startsWith("/") && !path.startsWith("http")) {
+            path = "/" + path;
+          }
+          var mangaUrl = path.startsWith("http") ? path : BASE_URL + path;
+          // Deduplicate (same series has image link + title link)
+          if (seen[mangaUrl]) continue;
+          seen[mangaUrl] = true;
+
           list.push({
             title: decodeHtml(stripTags(name[1]).trim()),
             url: mangaUrl,
             imageUrl: img ? img[1] : "",
             isMature: false,
+            genres: [],
           });
         }
       }

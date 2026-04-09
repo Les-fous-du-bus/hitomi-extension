@@ -209,11 +209,27 @@ class DefaultExtension extends MProvider {
     for (var i = 0; i < data.length; i++) {
       var manga = data[i];
       var isMature = manga.content_rating === "mature" || manga.content_rating === "erotica";
+
+      // Extract genres from md_comic_md_genres if available in list response
+      var genres = [];
+      if (manga.md_comic_md_genres) {
+        for (var g = 0; g < manga.md_comic_md_genres.length; g++) {
+          var gg = manga.md_comic_md_genres[g];
+          if (gg.md_genres && gg.md_genres.name) genres.push(gg.md_genres.name);
+        }
+      } else if (manga.genres && Array.isArray(manga.genres)) {
+        for (var gi = 0; gi < manga.genres.length; gi++) {
+          if (typeof manga.genres[gi] === "string") genres.push(manga.genres[gi]);
+          else if (manga.genres[gi] && manga.genres[gi].name) genres.push(manga.genres[gi].name);
+        }
+      }
+
       list.push({
         title: manga.title || "Unknown",
         url: "/comic/" + manga.hid + "/#",
         imageUrl: manga.cover_url || "",
         isMature: isMature,
+        genres: genres,
       });
     }
 

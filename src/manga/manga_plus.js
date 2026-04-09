@@ -138,6 +138,7 @@ function parseTitleList(json, page = 1) {
       url: `https://mangaplus.shueisha.co.jp/titles/${t.title_id || t.titleId}`,
       imageUrl: buildMPCover(t.portrait_image_url || t.thumbnailUrl || ""),
       isMature: false,
+      genres: [],
     }));
 
     return { list, hasNextPage: start + pageSize < titles.length };
@@ -190,6 +191,7 @@ class DefaultExtension extends MProvider {
           url: `https://mangaplus.shueisha.co.jp/titles/${t.title_id || t.titleId}`,
           imageUrl: buildMPCover(t.portrait_image_url || ""),
           isMature: false,
+          genres: [],
         };
       });
       return { list, hasNextPage: list.length === 20 };
@@ -233,6 +235,7 @@ class DefaultExtension extends MProvider {
           url: `https://mangaplus.shueisha.co.jp/titles/${t.title_id || t.titleId}`,
           imageUrl: buildMPCover(t.portrait_image_url || ""),
           isMature: false,
+          genres: [],
         }));
     } catch (e) {
       // fallback

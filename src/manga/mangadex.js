@@ -70,13 +70,20 @@ function parseMangaItem(item) {
 
   const isMature =
     attrs.contentRating === "erotica" ||
-    attrs.contentRating === "pornographic";
+    attrs.contentRating === "pornographic" ||
+    attrs.contentRating === "suggestive";
+
+  // Extract genres from attributes.tags (available in list responses)
+  const genres = (attrs.tags || []).map(
+    (t) => t.attributes?.name?.en || t.attributes?.name?.fr || ""
+  ).filter(Boolean);
 
   return {
     title,
     url: `${BASE_API}/manga/${item.id}`,
     imageUrl: buildCoverUrl(item.id, coverFileName),
     isMature,
+    genres,
   };
 }
 
@@ -108,7 +115,7 @@ class DefaultExtension extends MProvider {
       `&availableTranslatedLanguage[]=${LANG}` +
       `&includes[]=cover_art` +
       `&order[followedCount]=desc` +
-      `&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica`;
+      `&contentRating[]=safe&contentRating[]=suggestive`;
 
     const res = await fetchv2(url, {});
     const json = JSON.parse(res);
