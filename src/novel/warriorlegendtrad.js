@@ -7,7 +7,13 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed /light-novel (mobile UA): 14 novels via
+ *   `h2.entry-title > a[href="https://warriorlegendtrad.wordpress.com/YYYY/..."]`.
+ * - Page 2 (/crea) retained for original works.
+ * - Theme unchanged since v1.0.0 -- selectors kept.
  */
 
 var BASE_URL = "https://warriorlegendtrad.wordpress.com";

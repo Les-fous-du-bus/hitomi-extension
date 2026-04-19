@@ -160,20 +160,6 @@
       "sha256": "c91f7314a9b9d6342f3f669948ca248491b64529cd3d12016fb278f66c1761d6"
     },
     {
-      "id": "scantrad_vf",
-      "name": "ScantradVF",
-      "lang": "fr",
-      "space": "manga",
-      "version": 1,
-      "mature": false,
-      "cloudflare": true,
-      "jsUrl": "src/manga/scantrad_vf.js",
-      "iconUrl": "https://scantrad-vf.co/favicon.ico",
-      "status": "active",
-      "obsolescenceRisk": "high",
-      "sha256": "5a3dd6da6ab57d91b4d759fd9c612448665f7fb99071a0c1758d9baa6115e85c"
-    },
-    {
       "id": "manga_scantrad",
       "name": "MangaScantrad",
       "lang": "fr",
@@ -200,20 +186,6 @@
       "status": "active",
       "obsolescenceRisk": "high",
       "sha256": "254168385adf885133e386f7c4722ff2b2c6b2233dfafee3e47c1f7a914d40cd"
-    },
-    {
-      "id": "phenix_scans",
-      "name": "PhenixScans",
-      "lang": "fr",
-      "space": "manga",
-      "version": 1,
-      "mature": false,
-      "cloudflare": false,
-      "jsUrl": "src/manga/phenix_scans.js",
-      "iconUrl": "https://phenixscans.fr/favicon.ico",
-      "status": "dormant",
-      "obsolescenceRisk": "high",
-      "sha256": "e014abde6df15c66f322c9826ed96814d0c935167a5ce597a21acda4b90bab41"
     },
     {
       "id": "epsilon_scan",
@@ -269,7 +241,7 @@
       "iconUrl": "https://www.mangahere.cc/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "7a81c84fd8e70b4f7c5cca28641fd2c922adb7af269bec6de630a5962d38ffb9"
+      "sha256": "854d55ae8d2757cfaa9d7607752c345caf9c174e31b07c602a62e921634d9801"
     },
     {
       "id": "toonily",
@@ -342,21 +314,6 @@
       "sha256": "88ba1aa4c3db3dacde2003ede0520aa467ff87d977708c31be913895241f5957"
     },
     {
-      "id": "novel_index",
-      "name": "NovelIndex",
-      "lang": "fr",
-      "space": "light_novel",
-      "version": 2,
-      "mature": false,
-      "cloudflare": false,
-      "jsUrl": "src/novel/novel_index.js",
-      "iconUrl": "https://novelindex.com/favicon.ico",
-      "status": "dormant",
-      "obsolescenceRisk": "high",
-      "note": "Site uses JS redirect, not scrapable",
-      "sha256": "484de0d9349b7a4694cac34cc027193105b5bee3a27eed563ca02685933c0dd1"
-    },
-    {
       "id": "massnovel",
       "name": "NovelFrance",
       "lang": "fr",
@@ -410,7 +367,7 @@
       "iconUrl": "https://noveldeglace.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "517d4dce7db072c2c2796d1be5565ed1920cd4b45efb27e3e9cbc5de7825775c"
+      "sha256": "7e7ea8d0555e827789c8ca15dbc9044690331433e2a23cd0d94fc8f40fd434de"
     },
     {
       "id": "novelupdates",
@@ -438,7 +395,7 @@
       "iconUrl": "https://xiaowaz.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "c577fbbadebdbd218e4928c09cf32f3068b09aa37b52095e530beab925a9d952"
+      "sha256": "91383f4cf2e6847f34895c94a4db8da55566523e1a36edabe1a095dc27072ff7"
     },
     {
       "id": "kisswood",
@@ -466,7 +423,7 @@
       "iconUrl": "https://wuxialnscantrad.wordpress.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "c140cc08c3b3ac0155b9d322eb381a1dcbd7f9834847354e3b085e0b5932fdc2"
+      "sha256": "66b6e38cb32e16f2d73af0f98c987da33b868f15f3071b1c5820757c5f790db8"
     },
     {
       "id": "warriorlegendtrad",
@@ -480,7 +437,7 @@
       "iconUrl": "https://warriorlegendtrad.wordpress.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "238c65e0154b046d2d1958f9cc3a5e981033af7bac5a6768949ca0d054d9eedb"
+      "sha256": "4b3c829cdefd8189742889bf9519e8f66e48d9d125f4aead379e65cf3d3be557"
     },
     {
       "id": "scribblehub",
@@ -522,7 +479,7 @@
       "iconUrl": "https://lnmtl.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "2d3eba60707873015516cafcd8dbc40f962354777ff8d31fd53ec1bf1a23434a"
+      "sha256": "0baca721f4b37a00bf8d267935132bab697ff89254dc1c7bac9b5f50ff546157"
     },
     {
       "id": "novelbuddy",

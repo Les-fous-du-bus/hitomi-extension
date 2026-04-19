@@ -7,7 +7,13 @@
  * Mature : partiel (categories Adulte, Yaoi, Yuri)
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed /roman/ (mobile UA): 71 <article> cards.
+ *   Each exposes `<h2> <a href="/roman/SLUG/"> + <img src>` -- selectors valid.
+ * - Entry-title class still present (82 occurrences); theme unchanged.
+ * - No selector refactor needed this cycle.
  */
 
 var BASE_URL = "https://noveldeglace.com";

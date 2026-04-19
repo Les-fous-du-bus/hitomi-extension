@@ -22,7 +22,15 @@
  *   - Contenu    : /chapter/{slug}
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed /novel?orderBy=favourites&order=desc&page=1 (mobile UA):
+ *   10 novels per page wrapped as `.media > .media-left > a > img[alt][src]`.
+ * - Old `.panel` grid is gone; current markup is Bootstrap `.media` / `.media-body`.
+ *   The existing `parseList` already keys off `.media-left`, which is the
+ *   reliable anchor -> kept.
+ * - Chapter JSON endpoint /chapter?volumeId=N still answers 200.
  */
 
 var BASE_URL = "https://lnmtl.com";

@@ -7,7 +7,15 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed https://wuxialnscantrad.wordpress.com/ (mobile UA).
+ * - Menu structure refreshed: `menu-item-2210` (Lightnovels, 5 entries)
+ *   still present. `menu-item-3960` (WuxiaProjets) added as secondary
+ *   slug source to widen the catalogue (projets hors-ln).
+ * - Novel link pattern: <li><a href="https://wuxialnscantrad.wordpress.com/SLUG/">.
+ * - Sub-menu regex preserved, now iterated over both menu IDs.
  */
 
 var BASE_URL = "https://wuxialnscantrad.wordpress.com";
@@ -246,20 +254,27 @@ class DefaultExtension extends MProvider {
 
   _parseNavNovels(html) {
     var list = [];
+    var seen = {};
 
-    // Novels are in menu-item-2210 sub-menu
-    var menuMatch = html.match(/menu-item-2210[\s\S]*?<ul[^>]*class="sub-menu"[^>]*>([\s\S]*?)<\/ul>/);
-    if (!menuMatch) return { list: list, hasNextPage: false };
+    // 2026-04-19: iterate both Lightnovels (2210) and WuxiaProjets (3960) sub-menus
+    var menuIds = ["2210", "3960"];
+    for (var mi = 0; mi < menuIds.length; mi++) {
+      var re = new RegExp("menu-item-" + menuIds[mi] + "[\\s\\S]*?<ul[^>]*class=\"sub-menu\"[^>]*>([\\s\\S]*?)<\\/ul>");
+      var menuMatch = html.match(re);
+      if (!menuMatch) continue;
 
-    var menuContent = menuMatch[1];
-    var novelPattern = /<li[^>]*><a href="(https?:\/\/wuxialnscantrad\.wordpress\.com\/[^"]+)"[^>]*>([^<]+)<\/a><\/li>/g;
-    var match;
+      var menuContent = menuMatch[1];
+      var novelPattern = /<li[^>]*><a href="(https?:\/\/wuxialnscantrad\.wordpress\.com\/[^"]+)"[^>]*>([^<]+)<\/a><\/li>/g;
+      var match;
 
-    while ((match = novelPattern.exec(menuContent)) !== null) {
-      var novelUrl = match[1];
-      var novelTitle = decodeHtml(match[2]).trim();
+      while ((match = novelPattern.exec(menuContent)) !== null) {
+        var novelUrl = match[1];
+        if (seen[novelUrl]) continue;
+        seen[novelUrl] = true;
 
-      if (novelTitle) {
+        var novelTitle = decodeHtml(match[2]).trim();
+        if (!novelTitle) continue;
+
         list.push({
           title: novelTitle,
           url: novelUrl,

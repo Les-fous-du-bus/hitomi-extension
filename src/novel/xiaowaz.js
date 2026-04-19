@@ -7,7 +7,15 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed https://xiaowaz.fr/ (mobile UA): 20 novels reachable via
+ *   `li.page_item > a[href]` pointing to /series-en-cours|/oeuvres-originales|
+ *   /series-abandonnees.
+ * - Former WordPress page /liste-des-projets/ is gone (404); code already
+ *   scrapes the sidebar sub-menu, no change needed.
+ * - Selectors validated -- kept as-is.
  */
 
 var BASE_URL = "https://xiaowaz.fr";

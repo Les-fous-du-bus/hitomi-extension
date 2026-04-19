@@ -7,7 +7,16 @@
  * Mature : true (has adult content toggle)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * LIVE AUDIT 2026-04-19 (@khun)
+ * - Probed https://www.mangahere.cc/directory/1.htm?latest (mobile UA)
+ * - Wrapping container is `.line-list > .manga-list-1 > ul.manga-list-1-list`.
+ *   Directory list selector `manga-list-1-cover` + href=/manga/slug/ matches
+ *   70 novels on page 1 -> regex kept as-is.
+ * - Search page /search?title= uses `manga-list-4-list` + `manga-list-4-cover`
+ *   -> regex kept as-is.
+ * - No selector change needed; retained for reference during next rotation.
  */
 
 var BASE_URL = "https://www.mangahere.cc";
