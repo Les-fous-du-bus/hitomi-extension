@@ -6,8 +6,16 @@
  * Cloudflare : NON
  * Mature : false
  *
+ * Audit live 2026-04-19 (@khun) :
+ *   - /category/translatedtales/ repond 200, le container est maintenant
+ *     <div class="romans"><div class="romans-content">
+ *       <div class="romans-list-news"><ul><li>
+ *         <a href="..." title="Titre | Original"><img src="cover"></a>
+ *   - Ancien "news-list" disparu, remplace par "romans-list-news"
+ *   - Liens home popular OK inchange (.recommended-list-txt)
+ *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 var BASE_URL = "https://chireads.com";
@@ -369,10 +377,10 @@ class DefaultExtension extends MProvider {
     //     ...
     //   </div>
     // </li>
-    var contentMatch = html.match(/<div[^>]*class="news-list"[^>]*>(.*)/s);
-    if (!contentMatch) {
-      contentMatch = html.match(/<div id="content"[^>]*>(.*)/s);
-    }
+    // 2026-04-19: new theme uses "romans-list-news" (legacy "news-list" gone)
+    var contentMatch = html.match(/<div[^>]*class="romans-list-news"[^>]*>([\s\S]*)/) ||
+                        html.match(/<div[^>]*class="news-list"[^>]*>([\s\S]*)/) ||
+                        html.match(/<div id="content"[^>]*>([\s\S]*)/);
     var searchArea = contentMatch ? contentMatch[1] : html;
 
     var items = searchArea.match(/<li>[^]*?<\/li>/gs);

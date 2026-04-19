@@ -80,28 +80,29 @@
       "name": "Webtoons",
       "lang": "multi",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/webtoons.js",
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
-      "obsolescenceRisk": "low",
-      "sha256": "aca85b5451c657364f80ce6d7f23971962b3d20f2478f6eb4d39b963b1a80287"
+      "obsolescenceRisk": "medium",
+      "sha256": "9630b1e188dd33bfa093127a27c2b396875433dd38fe15fc1ff5a1fe62209494"
     },
     {
       "id": "asurascans",
       "name": "Asura Scans",
       "lang": "en",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/asurascans.js",
-      "iconUrl": "https://asuracomic.net/favicon.ico",
+      "iconUrl": "https://asurascans.com/favicon.ico",
       "status": "active",
-      "obsolescenceRisk": "medium",
-      "sha256": "5ca1df5751314a566f42eff855706f2994e1e4da0c2ea7a445bff1ce2b22cfa6"
+      "obsolescenceRisk": "high",
+      "note": "Domain migrated from asuracomic.net to asurascans.com (2026-04-19). /series route replaced by /comics.",
+      "sha256": "063343cfabf0cd787bf482adb2b8beff164040f615eaa273521eae9f0c6bd31b"
     },
     {
       "id": "mangas_origines",
@@ -332,28 +333,29 @@
       "name": "Chireads",
       "lang": "fr",
       "space": "light_novel",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/chireads.js",
       "iconUrl": "https://chireads.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "ced3238c3d4a952619df832dd11e7d033bba8f8f785abcd42ac82669915a9c07"
+      "sha256": "ae875e02bd850df632f9fab2e998a55bdeeec877e7355798f1d584cfbf3552ee"
     },
     {
       "id": "novhell",
       "name": "Novhell",
       "lang": "fr",
       "space": "light_novel",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/novhell.js",
       "iconUrl": "https://novhell.org/favicon.ico",
-      "status": "active",
-      "obsolescenceRisk": "medium",
-      "sha256": "034937de360b998b1a25013943b7488979cc49d0338bb22add4ad325a0006e01"
+      "status": "broken",
+      "obsolescenceRisk": "high",
+      "note": "Small site (~7 novels). Homepage parser refreshed 2026-04-19 but total count below 10-item threshold; marked broken pending content growth.",
+      "sha256": "6a6f243f56d2a9812b3696b970ec27873b25e199c26ba3624a2a2b85098a823e"
     },
     {
       "id": "noveldeglace",

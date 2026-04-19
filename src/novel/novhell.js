@@ -6,8 +6,14 @@
  * Cloudflare : NON
  * Mature : false
  *
+ * Audit live 2026-04-19 (@khun) :
+ *   - Site tres restreint (~7 romans publies). Homepage liste 5 figures
+ *   - Legacy "/roman/" inexistant
+ *   - On complete maintenant via les liens <a href="https://novhell.org/<slug>/"> hors wp-json
+ *   - Detail: meta og:title + meta description
+ *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 var BASE_URL = "https://novhell.org";
@@ -242,6 +248,14 @@ class DefaultExtension extends MProvider {
 
   _parseHomepageNovels(html) {
     var list = [];
+    var seen = {};
+
+    // Reserved slugs that are NOT novels
+    var skipSlugs = {
+      "a-propos": 1, "feed": 1, "me-contacter": 1, "mentions-legales": 1,
+      "politique-de-confidentialite": 1, "wp-json": 1, "category": 1,
+      "tag": 1, "author": 1, "wp-admin": 1, "wp-login.php": 1,
+    };
 
     // Novhell homepage: article div div div figure elements
     var figureMatches = html.match(/<figure[^>]*>(.*?)<\/figure>/gs);
@@ -268,6 +282,8 @@ class DefaultExtension extends MProvider {
         }
 
         if (title && novelUrl && novelUrl.indexOf(BASE_URL) !== -1) {
+          if (seen[novelUrl]) continue;
+          seen[novelUrl] = true;
           list.push({
             title: decodeHtml(title),
             url: novelUrl,
@@ -276,6 +292,26 @@ class DefaultExtension extends MProvider {
           });
         }
       }
+    }
+
+    // 2026-04-19: complement via anchors pointing to /<slug>/ pages
+    // Site is small (~7 novels) so we dedupe against the figure-based list
+    var anchorRegex = /<a[^>]*href="(https:\/\/novhell\.org\/([a-z0-9-]+)\/)"[^>]*>([\s\S]*?)<\/a>/gi;
+    var am;
+    while ((am = anchorRegex.exec(html)) !== null) {
+      var u = am[1];
+      var slug = am[2];
+      if (skipSlugs[slug]) continue;
+      if (seen[u]) continue;
+      var t = stripTags(am[3]).trim();
+      if (!t || t.length < 3) continue;
+      seen[u] = true;
+      list.push({
+        title: decodeHtml(t),
+        url: u,
+        imageUrl: "",
+        isMature: false,
+      });
     }
 
     return { list: list, hasNextPage: false };

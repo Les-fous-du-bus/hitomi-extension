@@ -6,8 +6,21 @@
  * Cloudflare : NON
  * Mature : false
  *
+ * Audit live 2026-04-19 (@khun) :
+ *   - /fr/originals renvoie ~97 cards au format
+ *     <a href="/<lang>/<genre>/<slug>/list?title_no=N">
+ *     <img alt=""><div class="info_text">
+ *       <div class="genre">...</div>
+ *       <strong class="title">Titre</strong>
+ *     </div></a>
+ *   - Detail: <h1 class="subj">, <p class="summary">, <h2 class="genre">
+ *   - Chapitres desktop: <li class="_episodeItem" id="episode_N"> avec
+ *     <span class="subj"><span>Ep.N</span></span>, <span class="date">, <span class="tx">#N</span>
+ *   - Mobile m.webtoons.com: SSR quasi vide, on reste sur desktop
+ *   - Viewer pages: #_imageList > img[data-url] (inchange)
+ *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
  */
 
 var BASE_URL = "https://www.webtoons.com";
@@ -136,20 +149,18 @@ class DefaultExtension extends MProvider {
 
   async getChapterList(url) {
     try {
-      // Webtoons chapters are on the mobile site for full listing
+      // 2026-04-19: mobile SSR est vide, on reste sur desktop
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var mobileUrl = fullUrl.replace(BASE_URL, MOBILE_URL);
-      var res = await fetchv2(mobileUrl, { "User-Agent": UA_MOBILE });
+      var res = await fetchv2(fullUrl, {});
 
       var chapters = [];
-      // Match episode list items
-      var episodeMatches = res.match(/<li[^>]*id="[^"]*episode[^"]*"[^>]*>[^]*?<\/li>/gs);
+      // Desktop episode items: <li class="_episodeItem" id="episode_N" data-episode-no="N">
+      var episodeMatches = res.match(/<li[^>]*id="episode_\d+"[^>]*>[\s\S]*?<\/li>/g);
       if (!episodeMatches) return [];
 
       for (var i = 0; i < episodeMatches.length; i++) {
         var ep = episodeMatches[i];
 
-        // URL
         var hrefMatch = ep.match(/<a[^>]*href="([^"]+)"/);
         if (!hrefMatch) continue;
         var chapUrl = hrefMatch[1];
@@ -157,28 +168,25 @@ class DefaultExtension extends MProvider {
           chapUrl = chapUrl.replace(MOBILE_URL, BASE_URL);
         }
 
-        // Title
-        var titleMatch = ep.match(/class="sub_title[^"]*"[^>]*>[^]*?<span class="ellipsis"[^>]*>(.*?)<\/span>/s);
-        var chapTitle = titleMatch ? stripTags(titleMatch[1]).trim() : "";
-
-        // Chapter number
-        var numMatch = ep.match(/<div class="row">[^]*?<div class="num"[^>]*>(.*?)<\/div>/s);
+        // Chapter number from data-episode-no or from <span class="tx">#N</span>
         var chapNum = 0;
-        if (numMatch) {
-          var numText = stripTags(numMatch[1]).trim();
-          var hashIdx = numText.indexOf("#");
-          if (hashIdx > -1) {
-            chapNum = parseFloat(numText.substring(hashIdx + 1)) || 0;
-            chapTitle += " Ch. " + numText.substring(hashIdx + 1);
-          }
+        var noMatch = ep.match(/data-episode-no="(\d+)"/);
+        if (noMatch) chapNum = parseInt(noMatch[1]);
+        if (!chapNum) {
+          var txMatch = ep.match(/<span class="tx"[^>]*>#(\d+)/);
+          if (txMatch) chapNum = parseInt(txMatch[1]);
         }
 
+        // Title from subj span (e.g. "Ep.3") + inner label if any
+        var titleMatch = ep.match(/<span class="subj"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/);
+        var chapTitle = titleMatch ? stripTags(titleMatch[1]).trim() : "";
+        if (!chapTitle && chapNum) chapTitle = "Ep." + chapNum;
+
         // Date
-        var dateMatch = ep.match(/class="date"[^>]*>(.*?)<\/span>/s);
+        var dateMatch = ep.match(/<span class="date"[^>]*>([^<]+)<\/span>/);
         var dateUpload = Date.now();
         if (dateMatch) {
-          var dateText = stripTags(dateMatch[1]).trim();
-          var parsed = this._parseDate(dateText);
+          var parsed = this._parseDate(stripTags(dateMatch[1]).trim());
           if (parsed) dateUpload = parsed;
         }
 
@@ -263,46 +271,38 @@ class DefaultExtension extends MProvider {
 
   _parseMangaListFromPage(html) {
     var list = [];
+    var seen = {};
 
-    // Match webtoon list items
-    var itemMatches = html.match(/<li[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>[^]*?<img[^>]*src="([^"]+)"[^>]*>[^]*?<strong class="title"[^>]*>(.*?)<\/strong>/gs);
-    if (itemMatches) {
-      for (var i = 0; i < itemMatches.length; i++) {
-        var m = itemMatches[i];
-        var hrefMatch = m.match(/<a[^>]*href="([^"]+)"/);
-        var imgMatch = m.match(/<img[^>]*src="([^"]+)"/);
-        var titleMatch = m.match(/<strong class="title"[^>]*>(.*?)<\/strong>/s);
-
-        if (hrefMatch && titleMatch) {
-          list.push({
-            title: decodeHtml(stripTags(titleMatch[1]).trim()),
-            url: hrefMatch[1],
-            imageUrl: imgMatch ? imgMatch[1] : "",
-            isMature: false,
-          });
-        }
-      }
+    // 2026-04-19: originals grid uses
+    //   <a href="...list?title_no=N"> ... <img src alt=""> ... <strong class="title">Title</strong>
+    // Tested on /fr/originals -> 97 matches
+    var pat = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*alt="[^"]*">[\s\S]*?<strong class="title">([^<]+)<\/strong>/g;
+    var m;
+    while ((m = pat.exec(html)) !== null) {
+      var url = m[1];
+      if (seen[url]) continue;
+      seen[url] = true;
+      list.push({
+        title: decodeHtml(stripTags(m[3]).trim()),
+        url: url,
+        imageUrl: m[2],
+        isMature: false,
+      });
     }
 
-    // Fallback: more generic pattern
+    // Fallback for search pages using <p class="subj">
     if (list.length === 0) {
-      var altMatches = html.match(/<a[^>]*href="(\/[^"]*\/[^"]*\/list[^"]*)"[^>]*>[^]*?<img[^>]*src="([^"]+)"[^>]*>[^]*?<p class="subj"[^>]*>(.*?)<\/p>/gs);
-      if (altMatches) {
-        for (var j = 0; j < altMatches.length; j++) {
-          var am = altMatches[j];
-          var aHref = am.match(/<a[^>]*href="([^"]+)"/);
-          var aImg = am.match(/<img[^>]*src="([^"]+)"/);
-          var aTitle = am.match(/<p class="subj"[^>]*>(.*?)<\/p>/s);
-
-          if (aHref && aTitle) {
-            list.push({
-              title: decodeHtml(stripTags(aTitle[1]).trim()),
-              url: aHref[1],
-              imageUrl: aImg ? aImg[1] : "",
-              isMature: false,
-            });
-          }
-        }
+      var pat2 = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<p[^>]*class="[^"]*subj[^"]*"[^>]*>([\s\S]*?)<\/p>/g;
+      var m2;
+      while ((m2 = pat2.exec(html)) !== null) {
+        if (seen[m2[1]]) continue;
+        seen[m2[1]] = true;
+        list.push({
+          title: decodeHtml(stripTags(m2[3]).trim()),
+          url: m2[1],
+          imageUrl: m2[2],
+          isMature: false,
+        });
       }
     }
 

@@ -1,16 +1,24 @@
 /**
  * AsuraScans — Extension Hitomi Reader
- * Source : https://asuracomic.net
- * Methode : HTML scraping (regex) + Next.js JSON parsing
+ * Source : https://asurascans.com (ex https://asuracomic.net, redirect automatique)
+ * Methode : HTML scraping (regex) sur le theme Tailwind actuel
  * Langue : en
  * Cloudflare : partiel (retry si erreur)
  * Mature : false
  *
+ * Audit live 2026-04-19 (@khun) :
+ *   - Ancien domaine asuracomic.net redirige vers asurascans.com (301)
+ *   - /series => 404, nouvelle route /comics (grid Tailwind paginee)
+ *   - Cards: <a href="/comics/<slug>-<hash>"> autour de <img alt="Title">
+ *   - Detail: <h1> avec classe "lg:text-[32px] font-semibold", cover <img alt="<Title>">
+ *   - Chapitres: <a href="/comics/<slug>-<hash>/chapter/<N>">
+ *   - Pages lecture: Next.js RSC payload __next_f.push (inchange)
+ *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
  */
 
-var BASE_URL = "https://asuracomic.net";
+var BASE_URL = "https://asurascans.com";
 
 function stripTags(str) {
   if (!str) return "";
@@ -55,9 +63,10 @@ class DefaultExtension extends MProvider {
   get supportsLatest() { return true; }
   get isMature() { return false; }
 
+  // URL tested 2026-04-19: GET https://asurascans.com/comics?page=1 -> 200, 21 cards
   async getPopular(page) {
     try {
-      var url = BASE_URL + "/series?name=&status=-1&types=-1&order=rating&page=" + page;
+      var url = BASE_URL + "/comics?order=rating&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
       return this._parseSeriesList(res);
     } catch (e) {
@@ -67,7 +76,7 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/series?genres=&status=-1&types=-1&order=update&page=" + page;
+      var url = BASE_URL + "/comics?order=update&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
       return this._parseSeriesList(res);
     } catch (e) {
@@ -77,7 +86,7 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var url = BASE_URL + "/series?name=" + encodeURIComponent(query) + "&page=" + page;
+      var url = BASE_URL + "/comics?s=" + encodeURIComponent(query) + "&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
       return this._parseSeriesList(res);
     } catch (e) {
@@ -90,23 +99,27 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
-      // Title
-      var titleMatch = res.match(/<span class="text-xl font-bold"[^>]*>(.*?)<\/span>/s) ||
-                        res.match(/<h1[^>]*>(.*?)<\/h1>/s);
+      // Title: new theme <h1 class="text-xl lg:text-[32px] font-semibold ..."> or fallback <title>
+      var titleMatch = res.match(/<h1[^>]*class="[^"]*font-semibold[^"]*"[^>]*>\s*([^<]+?)\s*<\/h1>/s) ||
+                        res.match(/<h1[^>]*>([^<]+)<\/h1>/s) ||
+                        res.match(/<title>([^<|]+)(?:\s*\|[^<]*)?<\/title>/);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
 
-      // Cover
-      var imgMatch = res.match(/<img[^>]*alt="poster"[^>]*src="([^"]+)"/s) ||
-                     res.match(/<img[^>]*src="([^"]+)"[^>]*alt="poster"/s);
+      // Cover: mobile cover img id="mobile-cover-img" or img alt="<Title>" pointing to covers/
+      var imgMatch = res.match(/<img[^>]*id="mobile-cover-img"[^>]*src="([^"]+)"/s) ||
+                     res.match(/<img[^>]*src="(https:\/\/cdn\.asurascans\.com\/[^"]*covers\/[^"]+)"/s) ||
+                     res.match(/<img[^>]*alt="poster"[^>]*src="([^"]+)"/s);
       var imageUrl = imgMatch ? imgMatch[1] : "";
 
-      // Description — class includes color suffix e.g. "font-medium text-sm text-[#A2A2A2]"
-      var descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>(.*?)<\/span>/s);
+      // Description
+      var descMatch = res.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
+      if (!descMatch) descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>(.*?)<\/span>/s);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
       // Status
       var status = "unknown";
-      var statusMatch = res.match(/Status<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s);
+      var statusMatch = res.match(/Status<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s) ||
+                         res.match(/>Status<\/[^>]+>\s*<[^>]*>\s*([A-Za-z]+)/s);
       if (statusMatch) {
         var st = stripTags(statusMatch[1]).trim().toLowerCase();
         if (st === "ongoing") status = "ongoing";
@@ -117,22 +130,20 @@ class DefaultExtension extends MProvider {
 
       // Author
       var authors = [];
-      var authorMatch = res.match(/Author<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s);
+      var authorMatch = res.match(/Author<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s) ||
+                         res.match(/>Author<\/[^>]+>\s*<[^>]*>\s*([^<]+)/s);
       if (authorMatch) {
         var authorText = stripTags(authorMatch[1]).trim();
-        if (authorText) authors.push(authorText);
+        if (authorText && authorText.toLowerCase() !== "n/a") authors.push(authorText);
       }
 
       // Genres
       var genres = [];
-      var genreSection = res.match(/Genres<\/h3>[^]*?<div[^>]*>(.*?)<\/div>/s);
-      if (genreSection) {
-        var genreLinks = genreSection[1].match(/<button[^>]*class="text-white[^>]*>(.*?)<\/button>/gs);
-        if (genreLinks) {
-          for (var i = 0; i < genreLinks.length; i++) {
-            var g = stripTags(genreLinks[i]).trim();
-            if (g) genres.push(g);
-          }
+      var genreLinks = res.match(/<a[^>]*href="\/comics\?genres=[^"]+"[^>]*>(.*?)<\/a>/gs);
+      if (genreLinks) {
+        for (var i = 0; i < genreLinks.length; i++) {
+          var g = stripTags(genreLinks[i]).trim();
+          if (g) genres.push(g);
         }
       }
 
@@ -157,64 +168,50 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
       var chapters = [];
-      // Chapter items: <div class="pl-4 py-2 border rounded-md group ...">
-      //   <a href="slug/chapter/N">
-      //     <h3 class="text-sm ...">Chapter N<span>Title</span></h3>
-      //     <h3 class="text-xs ...">Date</h3>
-      //   </a>
-      // </div>
-      var blockMatches = res.match(/<div[^>]*class="[^"]*group[^"]*"[^>]*>[^]*?<\/div>/gs);
-      if (!blockMatches) {
-        // Fallback: match all chapter links directly
-        blockMatches = res.match(/<a[^>]*href="[^"]*chapter\/\d+[^"]*"[^>]*>.*?<\/a>/gs);
-      }
-      if (!blockMatches) return [];
+      // 2026-04-19: chapter anchors <a href="/comics/<slug>/chapter/<N>">
+      var linkMatches = res.match(/<a[^>]*href="(\/?comics\/[^"]+\/chapter\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gs);
+      if (!linkMatches) return [];
 
       var seen = {};
-      for (var i = 0; i < blockMatches.length; i++) {
-        var block = blockMatches[i];
-
-        // URL
-        var hrefMatch = block.match(/<a[^>]*href="([^"]*chapter\/\d+[^"]*)"/);
+      for (var i = 0; i < linkMatches.length; i++) {
+        var block = linkMatches[i];
+        var hrefMatch = block.match(/href="([^"]+)"/);
         if (!hrefMatch) continue;
         var chapUrl = hrefMatch[1];
-
-        // Deduplicate
         if (seen[chapUrl]) continue;
         seen[chapUrl] = true;
 
-        // Title from first h3
-        var h3Match = block.match(/<h3[^>]*>(.*?)<\/h3>/s);
-        var chapTitle = h3Match ? stripTags(h3Match[1]).trim() : "";
+        // Title: first h3 or text inside
+        var h3 = block.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
+        var chapTitle = h3 ? stripTags(h3[1]).trim() : stripTags(block).trim();
 
         // Chapter number
         var chapNum = 0;
-        var numMatch = chapTitle.match(/Chapter\s+(\d+(?:\.\d+)?)/i);
-        if (numMatch) chapNum = parseFloat(numMatch[1]);
+        var numFromUrl = chapUrl.match(/chapter\/(\d+(?:\.\d+)?)/);
+        if (numFromUrl) chapNum = parseFloat(numFromUrl[1]);
+        if (!chapNum) {
+          var numFromTitle = chapTitle.match(/Chapter\s+(\d+(?:\.\d+)?)/i);
+          if (numFromTitle) chapNum = parseFloat(numFromTitle[1]);
+        }
 
-        // Date from second h3 (text-xs)
+        // Date (optional secondary h3 / .text-xs)
         var dateUpload = Date.now();
-        var dateMatches = block.match(/<h3[^>]*>(.*?)<\/h3>/gs);
-        if (dateMatches && dateMatches.length > 1) {
-          var dateText = stripTags(dateMatches[1]).trim();
+        var dateMatch = block.match(/<h3[^>]*class="[^"]*text-xs[^"]*"[^>]*>([^<]+)<\/h3>/) ||
+                         block.match(/<h3[^>]*>([\s\S]*?)<\/h3>[\s\S]*?<h3[^>]*>([\s\S]*?)<\/h3>/);
+        if (dateMatch) {
+          var dateText = stripTags(dateMatch[dateMatch.length - 1]).trim();
           var cleanDate = dateText.replace(/(\d+)(st|nd|rd|th)/, "$1");
-          dateUpload = parseAsuraDate(cleanDate);
+          var parsed = parseAsuraDate(cleanDate);
+          if (parsed) dateUpload = parsed;
         }
 
-        if (chapUrl) {
-          // Build full URL
-          var fullChapUrl = chapUrl;
-          if (!fullChapUrl.startsWith("http")) {
-            fullChapUrl = BASE_URL + "/series/" + fullChapUrl;
-          }
-
-          chapters.push({
-            title: chapTitle || "Chapter " + (chapNum || i + 1),
-            url: fullChapUrl,
-            number: chapNum || i + 1,
-            dateUpload: dateUpload,
-          });
-        }
+        var fullChapUrl = chapUrl.startsWith("http") ? chapUrl : BASE_URL + (chapUrl.startsWith("/") ? chapUrl : "/" + chapUrl);
+        chapters.push({
+          title: chapTitle || "Chapter " + (chapNum || i + 1),
+          url: fullChapUrl,
+          number: chapNum || i + 1,
+          dateUpload: dateUpload,
+        });
       }
 
       return chapters;
@@ -225,32 +222,25 @@ class DefaultExtension extends MProvider {
 
   async getPageList(url) {
     try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + "/series/" + url;
+      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
       // AsuraScans uses Next.js: pages data is in self.__next_f.push scripts
       var scriptMatches = res.match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/gs);
       if (!scriptMatches) return [];
 
-      // Concatenate all script data
       var allScriptData = "";
       for (var i = 0; i < scriptMatches.length; i++) {
         var content = scriptMatches[i].match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/s);
         if (content) allScriptData += content[1];
       }
 
-      // Find pages JSON
       var pagesMatch = allScriptData.match(/\\"pages\\":(\[.*?\])/);
-      if (!pagesMatch) {
-        // Try unescaped
-        pagesMatch = allScriptData.match(/"pages":(\[.*?\])/);
-      }
+      if (!pagesMatch) pagesMatch = allScriptData.match(/"pages":(\[.*?\])/);
       if (!pagesMatch) return [];
 
       var pagesData = pagesMatch[1].replace(/\\(.)/g, "$1");
       var pages = JSON.parse(pagesData);
-
-      // Sort by order field
       pages.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
 
       var result = [];
@@ -264,7 +254,6 @@ class DefaultExtension extends MProvider {
           });
         }
       }
-
       return result;
     } catch (e) {
       return [];
@@ -284,65 +273,51 @@ class DefaultExtension extends MProvider {
         ],
         default: 0,
       },
-      {
-        type: "SelectFilter",
-        name: "Status",
-        values: [
-          { displayName: "All", value: "-1" },
-          { displayName: "Ongoing", value: "0" },
-          { displayName: "Hiatus", value: "1" },
-          { displayName: "Completed", value: "2" },
-        ],
-        default: 0,
-      },
     ];
   }
 
   _parseSeriesList(html) {
     var list = [];
+    var seen = {};
 
-    // AsuraScans uses Next.js with Tailwind. Series grid items are:
-    // <a href="series/slug-id"> or <a href="/series/slug-id">
-    //   <div>...<img src="...">...<span class="block text-[13.3px] font-bold">Title</span>...</div>
-    // </a>
-    var aMatches = html.match(/<a[^>]*href="[/]?series\/[^"]*"[^>]*>.*?<\/a>/gs);
-    if (aMatches) {
-      var seen = {};
-      for (var i = 0; i < aMatches.length; i++) {
-        var m = aMatches[i];
-        var href = m.match(/<a[^>]*href="([^"]+)"/);
-        var img = m.match(/<img[^>]*src="([^"]+)"/);
-        // Title: span with "block" and "font-bold" classes (Tailwind)
-        var name = m.match(/<span class="block[^"]*font-bold[^"]*"[^>]*>(.*?)<\/span>/s);
-        if (!name) {
-          // Fallback: any text link for the series that is not just an image
-          name = m.match(/>([^<]{3,})<\/a>/s);
-        }
+    // 2026-04-19: cards are <a href="/comics/<slug>-<hash>"> with nested <img alt="<Title>">
+    // Tested on https://asurascans.com/comics -> 21 unique series on page 1
+    var aRegex = /<a[^>]*href="(\/?comics\/[a-z0-9-]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+    var m;
+    while ((m = aRegex.exec(html)) !== null) {
+      var path = m[1];
+      var inner = m[2];
+      // Skip if contains nested link (menu, pagination)
+      if (inner.indexOf("<a ") !== -1) continue;
 
-        if (href && name) {
-          var path = href[1];
-          // Normalize: ensure leading /
-          if (!path.startsWith("/") && !path.startsWith("http")) {
-            path = "/" + path;
-          }
-          var mangaUrl = path.startsWith("http") ? path : BASE_URL + path;
-          // Deduplicate (same series has image link + title link)
-          if (seen[mangaUrl]) continue;
-          seen[mangaUrl] = true;
+      var imgMatch = inner.match(/<img[^>]*src="([^"]+)"[^>]*alt="([^"]+)"/) ||
+                      inner.match(/<img[^>]*alt="([^"]*)"[^>]*src="([^"]+)"/);
+      if (!imgMatch) continue;
 
-          list.push({
-            title: decodeHtml(stripTags(name[1]).trim()),
-            url: mangaUrl,
-            imageUrl: img ? img[1] : "",
-            isMature: false,
-          });
-        }
+      var imageUrl, title;
+      if (imgMatch[0].indexOf("src=") < imgMatch[0].indexOf("alt=")) {
+        imageUrl = imgMatch[1];
+        title = imgMatch[2];
+      } else {
+        title = imgMatch[1];
+        imageUrl = imgMatch[2];
       }
+
+      if (!title || title === "Asura Scans") continue;
+      if (!path.startsWith("/")) path = "/" + path;
+      var mangaUrl = BASE_URL + path;
+      if (seen[mangaUrl]) continue;
+      seen[mangaUrl] = true;
+
+      list.push({
+        title: decodeHtml(stripTags(title).trim()),
+        url: mangaUrl,
+        imageUrl: imageUrl,
+        isMature: false,
+      });
     }
 
-    // Check next page
-    var hasNextPage = html.indexOf(">Next<") !== -1 || html.indexOf("bg-themecolor") !== -1;
-
-    return { list: list, hasNextPage: hasNextPage && list.length > 0 };
+    var hasNextPage = html.indexOf("Next") !== -1 && list.length > 0;
+    return { list: list, hasNextPage: hasNextPage };
   }
 }
