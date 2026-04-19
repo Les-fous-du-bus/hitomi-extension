@@ -4,6 +4,21 @@
   "website": "https://github.com/Les-fous-du-bus/hitomi-extension",
   "extensions": [
     {
+      "id": "anime_sama",
+      "name": "AnimeSama",
+      "lang": "fr",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/manga/anime_sama.js",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
+      "status": "active",
+      "obsolescenceRisk": "high",
+      "note": "Domain rotates often (.fr -> .org -> .si -> .to). Fallback list embedded.",
+      "sha256": "4a4d0c76c195dd17dae6eb9d4da5c28d42b8a6e6a4c364fd05604c81c6808310"
+    },
+    {
       "id": "mangadex",
       "name": "MangaDex",
       "lang": "multi",
