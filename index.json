@@ -319,14 +319,15 @@
       "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 5,
+      "version": 6,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/massnovel.js",
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "sha256": "0d253d9733b2c013c402e09f7e8b7697c9ba8ee5296d312d3e23e2b2d0edb280"
+      "note": "v6: RSC depth-count + JSON.parse + Step 3 generation. Fixes pagination cap (2963 chap capped at 2168) and JSON title leak.",
+      "sha256": "d9d6a0f70d67be6572df8e70ae536b418df22a4ecd8f3fef6ea1dbf3d3d25099"
     },
     {
       "id": "chireads",

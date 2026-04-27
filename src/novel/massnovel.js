@@ -1,22 +1,31 @@
 /**
  * NovelFrance — Extension Hitomi Reader (Light Novel)
  * Source : https://novelfrance.fr
- * Methode : JSON API (listings) + RSC payload extraction (chapter content)
+ * Methode : JSON API (listings + detail) + RSC JSON parse (chapter list + content)
  * Langue : fr
- * Cloudflare : NON (pas de challenge CF detecte)
+ * Cloudflare : NON
  * Mature : partiel (genres Adulte, Ecchi, Smut)
  *
  * Architecture du site (novelfrance.fr) :
  *   - API listings  : /api/novels?page=N&sort=popular|latest
  *   - API detail    : /api/novels/{slug}
  *   - Chapter HTML  : /novel/{slug}/chapter-{N}
- *     -> Contenu dans RSC payload (self.__next_f.push), PAS dans le HTML DOM
- *     -> Paragraphes: "paragraphs":[{"id":"...","index":N,"content":"...","wordCount":N}]
- *   - Chapter list  : embedded in RSC payload (50 latest SSR)
- *                     + generated from totalChapters count
+ *     -> Contenu dans RSC payload (self.__next_f.push)
+ *     -> Chapter list : "initialChaptersResponse":{"chapters":[{...}]} (50 derniers)
+ *     -> Paragraphes  : "paragraphs":[{"index":N,"content":"...","wordCount":N}]
+ *
+ * Chantier B — Fix cap pagination :
+ *   L'API retourne totalChapters dans _count.chapters.
+ *   La page RSC contient les 50 derniers chapitres.
+ *   Les chapitres manquants sont generes de chapter-0 a chapter-(N-1).
+ *
+ * Chantier C — Fix titre JSON :
+ *   RSC payload encode le JSON comme \"field\":\"value\".
+ *   On extrait le bloc chapters JSON et on remplace \" -> " avant JSON.parse.
+ *   Plus de regex greedy = plus de fuite JSON dans les titres.
  *
  * @author @khun — Extension Strategist
- * @version 3.0.0
+ * @version 4.0.0
  */
 
 var BASE_URL = "https://novelfrance.fr";
@@ -56,8 +65,8 @@ function decodeHtml(str) {
     .replace(/&#39;/g, "'");
 }
 
-// Unescape JSON-escaped strings from RSC payload.
-// RSC payloads double-escape content: \" becomes ", \n becomes newline, etc.
+// Unescape RSC double-escaped strings.
+// RSC payloads encode \" as \\\" and newlines as \\n.
 function unescapeRsc(str) {
   if (!str) return "";
   return str
@@ -98,8 +107,8 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      // NovelFrance API does not support server-side search.
-      // Fetch paginated list and filter client-side.
+      // NovelFrance API ne supporte pas la recherche server-side.
+      // On filtre cote client sur la liste populaire.
       var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
       var res = await fetchv2(url, { headers: API_HEADERS });
       var result = this._parseApiList(res);
@@ -130,16 +139,18 @@ class DefaultExtension extends MProvider {
       try { data = JSON.parse(res); } catch (e) { data = {}; }
 
       if (!data.title) {
-        return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
+        return {
+          title: "Error", url: url, imageUrl: "",
+          description: "", status: "unknown",
+          genres: [], authors: [], isMature: false,
+        };
       }
 
-      // Cover image: relative path needs base URL prefix
       var imageUrl = data.coverImage || "";
       if (imageUrl && imageUrl.indexOf("http") !== 0) {
         imageUrl = BASE_URL + imageUrl;
       }
 
-      // Genres
       var genres = [];
       if (data.genres && data.genres.length) {
         for (var i = 0; i < data.genres.length; i++) {
@@ -147,7 +158,6 @@ class DefaultExtension extends MProvider {
         }
       }
 
-      // Mature check
       var isMature = false;
       for (var k = 0; k < genres.length; k++) {
         if (MATURE_GENRES.indexOf(genres[k].toLowerCase()) !== -1) {
@@ -156,7 +166,6 @@ class DefaultExtension extends MProvider {
         }
       }
 
-      // Status — API returns UPPERCASE (ONGOING, COMPLETED, etc.)
       var status = "unknown";
       if (data.status) {
         var st = data.status.toLowerCase();
@@ -166,7 +175,6 @@ class DefaultExtension extends MProvider {
         else if (st === "dropped" || st === "abandonne") status = "abandoned";
       }
 
-      // Authors
       var authors = [];
       if (data.author) authors.push(data.author);
 
@@ -181,7 +189,11 @@ class DefaultExtension extends MProvider {
         isMature: isMature,
       };
     } catch (e) {
-      return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
+      return {
+        title: "Error", url: url, imageUrl: "",
+        description: "", status: "unknown",
+        genres: [], authors: [], isMature: false,
+      };
     }
   }
 
@@ -189,7 +201,7 @@ class DefaultExtension extends MProvider {
     try {
       var slug = this._slugFromUrl(url);
 
-      // Step 1: get total chapter count + first chapter info from API
+      // Step 1 — API : total chapters + first chapter slug
       var apiUrl = BASE_URL + "/api/novels/" + slug;
       var apiRes = await fetchv2(apiUrl, { headers: API_HEADERS });
       var data = {};
@@ -199,94 +211,99 @@ class DefaultExtension extends MProvider {
       if (data._count && data._count.chapters) {
         totalChapters = data._count.chapters;
       }
-      var firstSlug = (data.firstChapter && data.firstChapter.slug) ? data.firstChapter.slug : "chapter-0";
+      var firstSlug = (data.firstChapter && data.firstChapter.slug)
+        ? data.firstChapter.slug
+        : "chapter-0";
       var startsAtZero = firstSlug === "chapter-0";
 
-      // Step 2: scrape HTML page for chapter data from RSC payload
+      // Step 2 — RSC payload : extraire les 50 derniers chapitres depuis la page HTML.
+      //
+      // La page Next.js embarque le JSON dans les self.__next_f.push() calls.
+      // Les champs sont double-echappes : \" (backslash + guillemet).
+      // On extrait le bloc JSON via depth-counting puis on re-parse apres
+      // avoir remplace \" par " (unescape un niveau).
+      //
+      // Cela resout le bug de titre JSON : plus de regex greedy sur les strings.
       var pageUrl = BASE_URL + "/novel/" + slug;
       var htmlRes = await fetchv2(pageUrl, { headers: HEADERS });
 
       var chapters = [];
       var seen = {};
 
-      // Pattern 1: RSC payload with escaped quotes (most common)
-      // Format: \"chapterNumber\":N,\"title\":\"...\",\"slug\":\"chapter-N\",\"createdAt\":\"...\"
-      var rscPattern = /\\"chapterNumber\\":(\d+),\\"title\\":\\"((?:[^\\]|\\.)*)\\",\\"slug\\":\\"(chapter-\d+)\\",\\"createdAt\\":\\"([^"]*?)\\"/g;
-      var m;
-      while ((m = rscPattern.exec(htmlRes)) !== null) {
-        var num = parseInt(m[1]);
-        var chTitle = unescapeRsc(m[2]);
-        var chSlug = m[3];
-        var createdAt = m[4];
-        if (seen[chSlug]) continue;
-        seen[chSlug] = true;
+      var rcrIdx = htmlRes.indexOf('"initialChaptersResponse"');
+      if (rcrIdx === -1) rcrIdx = htmlRes.indexOf('\\"initialChaptersResponse\\"');
 
-        var dateUpload = Date.now();
-        try {
-          var d = new Date(createdAt);
-          if (!isNaN(d.getTime())) dateUpload = d.getTime();
-        } catch (e) {}
-
-        chapters.push({
-          title: decodeHtml(chTitle) || ("Chapitre " + num),
-          url: BASE_URL + "/novel/" + slug + "/" + chSlug,
-          number: num,
-          dateUpload: dateUpload,
-        });
-      }
-
-      // Pattern 2: non-escaped JSON in RSC (alternate encoding)
-      if (chapters.length === 0) {
-        var jsonPattern = /"chapterNumber":(\d+),"title":"((?:[^"\\]|\\.)*)","slug":"(chapter-\d+)","createdAt":"([^"]*?)"/g;
-        var m2;
-        while ((m2 = jsonPattern.exec(htmlRes)) !== null) {
-          var num2 = parseInt(m2[1]);
-          var chTitle2 = m2[2];
-          var chSlug2 = m2[3];
-          var createdAt2 = m2[4];
-          if (seen[chSlug2]) continue;
-          seen[chSlug2] = true;
-
-          var dateUpload2 = Date.now();
+      if (rcrIdx !== -1) {
+        var arrStart = htmlRes.indexOf('[', rcrIdx);
+        if (arrStart !== -1) {
+          // depth-counting pour trouver la fin du tableau JSON
+          var depth = 0;
+          var arrEnd = arrStart;
+          var limit = Math.min(arrStart + 500000, htmlRes.length);
+          for (var i = arrStart; i < limit; i++) {
+            if (htmlRes[i] === '[') depth++;
+            else if (htmlRes[i] === ']') {
+              depth--;
+              if (depth === 0) { arrEnd = i; break; }
+            }
+          }
+          var rawArr = htmlRes.substring(arrStart, arrEnd + 1);
+          // Unescape RSC : remplace \" (backslash + guillemet) par guillemet seul.
+          // Dans rawArr, les backslashes sont de vrais caracteres backslash.
+          var jsonArr = rawArr.replace(/\\"/g, '"');
           try {
-            var d2 = new Date(createdAt2);
-            if (!isNaN(d2.getTime())) dateUpload2 = d2.getTime();
-          } catch (e) {}
-
-          chapters.push({
-            title: decodeHtml(chTitle2) || ("Chapitre " + num2),
-            url: BASE_URL + "/novel/" + slug + "/" + chSlug2,
-            number: num2,
-            dateUpload: dateUpload2,
-          });
+            var parsed = JSON.parse(jsonArr);
+            for (var pi = 0; pi < parsed.length; pi++) {
+              var ch = parsed[pi];
+              var chSlug = ch.slug || ("chapter-" + ch.chapterNumber);
+              if (seen[chSlug]) continue;
+              seen[chSlug] = true;
+              var dateUpload = Date.now();
+              try {
+                var d = new Date(ch.createdAt);
+                if (!isNaN(d.getTime())) dateUpload = d.getTime();
+              } catch (e) {}
+              chapters.push({
+                title: decodeHtml(ch.title) || ("Chapitre " + ch.chapterNumber),
+                url: BASE_URL + "/novel/" + slug + "/" + chSlug,
+                number: ch.chapterNumber,
+                dateUpload: dateUpload,
+              });
+            }
+          } catch (e) {
+            // JSON.parse echec — fallback sur les liens href
+          }
         }
       }
 
-      // Pattern 3: href links fallback
+      // Fallback : si RSC parse a echoue, extraire les liens href chapter
       if (chapters.length === 0) {
         var linkPattern = /href="\/novel\/[^"]*\/(chapter-(\d+))"/g;
         var lm;
         while ((lm = linkPattern.exec(htmlRes)) !== null) {
-          var chSlug3 = lm[1];
-          var num3 = parseInt(lm[2]);
-          if (seen[chSlug3]) continue;
-          seen[chSlug3] = true;
+          var chSlug2 = lm[1];
+          var num2 = parseInt(lm[2]);
+          if (seen[chSlug2]) continue;
+          seen[chSlug2] = true;
           chapters.push({
-            title: "Chapitre " + num3,
-            url: BASE_URL + "/novel/" + slug + "/" + chSlug3,
-            number: num3,
+            title: "Chapitre " + num2,
+            url: BASE_URL + "/novel/" + slug + "/" + chSlug2,
+            number: num2,
             dateUpload: Date.now(),
           });
         }
       }
 
-      // Step 3: if totalChapters known and we have fewer, generate missing entries
-      if (totalChapters > chapters.length) {
+      // Step 3 — Completion : generer les entrees manquantes depuis l'API total.
+      // Resout le cap de pagination : meme si la RSC ne retourne que 50 chapitres,
+      // les 2900+ restants sont generes avec le pattern chapter-N.
+      if (totalChapters > 0 && totalChapters > chapters.length) {
         var startNum = startsAtZero ? 0 : 1;
         var endNum = startsAtZero ? totalChapters - 1 : totalChapters;
         for (var n = startNum; n <= endNum; n++) {
           var genSlug = "chapter-" + n;
           if (!seen[genSlug]) {
+            seen[genSlug] = true;
             chapters.push({
               title: "Chapitre " + n,
               url: BASE_URL + "/novel/" + slug + "/" + genSlug,
@@ -297,7 +314,7 @@ class DefaultExtension extends MProvider {
         }
       }
 
-      // Sort ascending by chapter number
+      // Sort ascending
       chapters.sort(function(a, b) { return a.number - b.number; });
       return chapters;
     } catch (e) {
@@ -310,88 +327,63 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { headers: HEADERS });
 
-      // --- Strategy 1: Extract paragraphs from RSC payload ---
-      // NovelFrance is a Next.js app; chapter text is embedded in
-      // self.__next_f.push() as JSON with "paragraphs":[{...}] arrays.
-      // Two possible encodings: escaped quotes (\\") or raw JSON.
-
+      // Strategy 1 : extraire les paragraphes depuis le RSC payload.
+      // Format : "paragraphs":[{"index":N,"content":"...","wordCount":N}]
+      // Meme approche que getChapterList : depth-count + unescape + JSON.parse.
       var paragraphs = [];
       var foundRsc = false;
 
-      // Only match paragraphs that appear after "paragraphs" marker
       var paraStart = res.indexOf('"paragraphs"');
       if (paraStart === -1) paraStart = res.indexOf('\\"paragraphs\\"');
+
       if (paraStart !== -1) {
-        // Extract the section containing paragraphs (limit search scope)
-        var searchArea = res.substring(paraStart, Math.min(paraStart + 500000, res.length));
-
-        // Pattern A: escaped RSC format (most common in Next.js RSC payloads)
-        // Format: \"index\":N,\"content\":\"...\",\"wordCount\":N
-        // Use \"wordCount\" as reliable end delimiter instead of guessing quote escaping
-        var paraPattern = /\\"index\\":(\d+),\\"content\\":\\"([\s\S]*?)\\"[,}]\\"wordCount\\":/g;
-        var pm;
-        while ((pm = paraPattern.exec(searchArea)) !== null) {
-          var idx = parseInt(pm[1]);
-          var text = unescapeRsc(pm[2]).trim();
-          if (text) {
-            paragraphs.push({ index: idx, text: text });
-            foundRsc = true;
-          }
-        }
-
-        // Pattern B: non-escaped JSON format (alternate RSC encoding)
-        if (!foundRsc) {
-          var paraPattern2 = /"index":(\d+),"content":"([\s\S]*?)","wordCount":\d+/g;
-          var pm2;
-          while ((pm2 = paraPattern2.exec(searchArea)) !== null) {
-            var idx2 = parseInt(pm2[1]);
-            var text2 = pm2[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
-            if (text2) {
-              paragraphs.push({ index: idx2, text: text2 });
-              foundRsc = true;
+        var paraArrStart = res.indexOf('[', paraStart);
+        if (paraArrStart !== -1) {
+          var pd = 0;
+          var paraArrEnd = paraArrStart;
+          var plimit = Math.min(paraArrStart + 500000, res.length);
+          for (var pi2 = paraArrStart; pi2 < plimit; pi2++) {
+            if (res[pi2] === '[') pd++;
+            else if (res[pi2] === ']') {
+              pd--;
+              if (pd === 0) { paraArrEnd = pi2; break; }
             }
           }
-        }
-
-        // Pattern C: look for "content" field near "paragraphs" with simpler pattern
-        if (!foundRsc) {
-          var simplePattern = /\\"content\\":\\"([^"]{10,})\\"/g;
-          var sm;
-          var simpleIdx = 0;
-          while ((sm = simplePattern.exec(searchArea)) !== null) {
-            var sText = unescapeRsc(sm[1]).trim();
-            if (sText) {
-              paragraphs.push({ index: simpleIdx, text: sText });
-              simpleIdx++;
-              foundRsc = true;
+          var rawPara = res.substring(paraArrStart, paraArrEnd + 1);
+          var jsonPara = rawPara.replace(/\\"/g, '"');
+          try {
+            var parsedPara = JSON.parse(jsonPara);
+            for (var pp = 0; pp < parsedPara.length; pp++) {
+              var par = parsedPara[pp];
+              if (par.content && par.content.trim()) {
+                paragraphs.push({ index: par.index || pp, text: par.content.trim() });
+                foundRsc = true;
+              }
             }
+          } catch (e) {
+            // Fallback vers les strategies alternatives
           }
         }
       }
 
       if (foundRsc && paragraphs.length > 0) {
-        // Sort by index to preserve order
         paragraphs.sort(function(a, b) { return a.index - b.index; });
         var htmlParts = [];
-        for (var i = 0; i < paragraphs.length; i++) {
-          var pText = paragraphs[i].text;
-          // Skip title-only paragraphs (usually first paragraph repeats chapter title)
-          // but keep it if there are very few paragraphs
-          if (paragraphs.length > 3 && i === 0 && pText.match(/^(Chapitre|Chapter)\s+\d+/i)) {
+        for (var hi = 0; hi < paragraphs.length; hi++) {
+          var pText = paragraphs[hi].text;
+          if (paragraphs.length > 3 && hi === 0 && pText.match(/^(Chapitre|Chapter)\s+\d+/i)) {
             htmlParts.push("<h2>" + decodeHtml(pText) + "</h2>");
           } else {
-            // Preserve line breaks within paragraphs
             htmlParts.push("<p>" + decodeHtml(pText).replace(/\n/g, "<br>") + "</p>");
           }
         }
         return htmlParts.join("\n");
       }
 
-      // --- Strategy 2: Extract from article tag (rendered HTML) ---
+      // Strategy 2 : article tag
       var articleMatch = res.match(/<article[^>]*>([\s\S]*?)<\/article>/);
       if (articleMatch) {
         var articleContent = articleMatch[1];
-        // Remove header, nav, and interactive elements
         articleContent = articleContent
           .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, "")
           .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "")
@@ -404,47 +396,47 @@ class DefaultExtension extends MProvider {
         if (articleContent.length > 100) return articleContent;
       }
 
-      // --- Strategy 3: depth-aware chapter-content div extraction ---
-      var startIdx = res.indexOf("chapter-content");
-      if (startIdx !== -1) {
-        var openTag = res.indexOf(">", startIdx);
+      // Strategy 3 : depth-aware chapter-content div
+      var divStart = res.indexOf("chapter-content");
+      if (divStart !== -1) {
+        var openTag = res.indexOf(">", divStart);
         if (openTag !== -1) {
-          var depth = 1;
+          var depth2 = 1;
           var pos = openTag + 1;
           var endPos = -1;
-          while (depth > 0 && pos < res.length) {
+          while (depth2 > 0 && pos < res.length) {
             var nextOpen = res.indexOf("<div", pos);
             var nextClose = res.indexOf("</div>", pos);
             if (nextClose === -1) break;
             if (nextOpen !== -1 && nextOpen < nextClose) {
-              depth++;
+              depth2++;
               pos = nextOpen + 4;
             } else {
-              depth--;
-              if (depth === 0) { endPos = nextClose; break; }
+              depth2--;
+              if (depth2 === 0) { endPos = nextClose; break; }
               pos = nextClose + 6;
             }
           }
           if (endPos !== -1) {
-            var content = res.substring(openTag + 1, endPos);
-            content = content
+            var divContent = res.substring(openTag + 1, endPos);
+            divContent = divContent
               .replace(/<button[^>]*>[\s\S]*?<\/button>/gi, "")
               .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, "")
               .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
               .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
               .replace(/<!--[\s\S]*?-->/g, "")
               .trim();
-            if (content.length > 50) return content;
+            if (divContent.length > 50) return divContent;
           }
         }
       }
 
-      // --- Strategy 4: all <p> tags with substantial content ---
+      // Strategy 4 : <p> tags fallback
       var pParts = [];
       var pMatch = res.match(/<p[^>]*>([^<]{20,})<\/p>/gs);
       if (pMatch) {
-        for (var j = 0; j < pMatch.length; j++) {
-          pParts.push(pMatch[j]);
+        for (var pj = 0; pj < pMatch.length; pj++) {
+          pParts.push(pMatch[pj]);
         }
         if (pParts.length > 0) return pParts.join("\n");
       }
@@ -471,7 +463,9 @@ class DefaultExtension extends MProvider {
 
   _parseApiList(jsonStr) {
     var data = {};
-    try { data = JSON.parse(jsonStr); } catch (e) { return { list: [], hasNextPage: false }; }
+    try { data = JSON.parse(jsonStr); } catch (e) {
+      return { list: [], hasNextPage: false };
+    }
 
     var list = [];
     var novels = data.novels || [];
@@ -481,7 +475,6 @@ class DefaultExtension extends MProvider {
       if (imageUrl && imageUrl.indexOf("http") !== 0) {
         imageUrl = BASE_URL + imageUrl;
       }
-
       list.push({
         title: decodeHtml(n.title || ""),
         url: BASE_URL + "/novel/" + (n.slug || ""),
@@ -497,10 +490,8 @@ class DefaultExtension extends MProvider {
 
   _slugFromUrl(url) {
     if (!url) return "";
-    // Extract slug from URL like /novel/shadow-slave or https://novelfrance.fr/novel/shadow-slave
     var cleaned = url.replace(/[?#].*$/, "").replace(/\/$/, "");
     var parts = cleaned.split("/");
-    // Find the part after "novel"
     for (var i = 0; i < parts.length; i++) {
       if (parts[i] === "novel" && i + 1 < parts.length) {
         return parts[i + 1];
