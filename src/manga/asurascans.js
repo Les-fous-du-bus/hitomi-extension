@@ -99,11 +99,31 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
-      // Title: new theme <h1 class="text-xl lg:text-[32px] font-semibold ..."> or fallback <title>
+      // 2026-04 : Astro migration — try DescriptionModal astro-island first (most reliable).
+      // Format : <astro-island ... component-url=".../DescriptionModal..." props="{&quot;title&quot;:[0,&quot;...&quot;],&quot;description&quot;:[0,&quot;...&quot;]}">
+      var astroTitle = "", astroDescription = "";
+      var descModalRegex = /<astro-island[^>]*component-url="[^"]*DescriptionModal[^"]*"[^>]*\sprops="([^"]+)"/;
+      var modalMatch = res.match(descModalRegex);
+      if (modalMatch) {
+        var modalProps = modalMatch[1]
+          .replace(/&quot;/g, '"').replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/&#x27;/g, "'").replace(/&#39;/g, "'");
+        var astroTitleMatch = modalProps.match(/"title":\[0,"([^"]+)"\]/);
+        if (astroTitleMatch) astroTitle = astroTitleMatch[1];
+        var astroDescMatch = modalProps.match(/"description":\[0,"((?:[^"\\]|\\.)*)"\]/);
+        if (astroDescMatch) {
+          astroDescription = astroDescMatch[1]
+            .replace(/\\n/g, "\n").replace(/\\"/g, '"')
+            .replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+        }
+      }
+
+      // Title: priority Astro island > h1 font-semibold > h1 generic > <title>
       var titleMatch = res.match(/<h1[^>]*class="[^"]*font-semibold[^"]*"[^>]*>\s*([^<]+?)\s*<\/h1>/s) ||
                         res.match(/<h1[^>]*>([^<]+)<\/h1>/s) ||
                         res.match(/<title>([^<|]+)(?:\s*\|[^<]*)?<\/title>/);
-      var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
+      var title = astroTitle || (titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown");
 
       // Cover: mobile cover img id="mobile-cover-img" or img alt="<Title>" pointing to covers/
       var imgMatch = res.match(/<img[^>]*id="mobile-cover-img"[^>]*src="([^"]+)"/s) ||
@@ -111,10 +131,10 @@ class DefaultExtension extends MProvider {
                      res.match(/<img[^>]*alt="poster"[^>]*src="([^"]+)"/s);
       var imageUrl = imgMatch ? imgMatch[1] : "";
 
-      // Description
+      // Description: priority Astro DescriptionModal > meta description > inline span
       var descMatch = res.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
       if (!descMatch) descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>(.*?)<\/span>/s);
-      var description = descMatch ? stripTags(descMatch[1]).trim() : "";
+      var description = astroDescription || (descMatch ? stripTags(descMatch[1]).trim() : "");
 
       // Status
       var status = "unknown";
