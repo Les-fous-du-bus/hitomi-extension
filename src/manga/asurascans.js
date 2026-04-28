@@ -225,36 +225,78 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
-      // AsuraScans uses Next.js: pages data is in self.__next_f.push scripts
-      var scriptMatches = res.match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/gs);
-      if (!scriptMatches) return [];
+      // 2026-04 : AsuraScans a migre Next.js -> Astro. Les pages ne sont plus
+      // dans self.__next_f.push, mais HTML-encodees dans <astro-island props="...">.
+      // Format Astro RSC : "pages":[1,[[0,{"url":[0,"https://..."], ...}], ...]]
 
-      var allScriptData = "";
-      for (var i = 0; i < scriptMatches.length; i++) {
-        var content = scriptMatches[i].match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/s);
-        if (content) allScriptData += content[1];
-      }
+      // Strategie 1 : extraire props d'un <astro-island> contenant "pages"
+      var islandRegex = /<astro-island[^>]*\sprops="([^"]+)"/g;
+      var island;
+      while ((island = islandRegex.exec(res)) !== null) {
+        var raw = island[1];
+        if (raw.indexOf("pages") === -1) continue;
+        var decoded = raw
+          .replace(/&quot;/g, '"').replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+          .replace(/&#x27;/g, "'").replace(/&#39;/g, "'");
 
-      var pagesMatch = allScriptData.match(/\\"pages\\":(\[.*?\])/);
-      if (!pagesMatch) pagesMatch = allScriptData.match(/"pages":(\[.*?\])/);
-      if (!pagesMatch) return [];
-
-      var pagesData = pagesMatch[1].replace(/\\(.)/g, "$1");
-      var pages = JSON.parse(pagesData);
-      pages.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-
-      var result = [];
-      for (var j = 0; j < pages.length; j++) {
-        var pageUrl = pages[j].url || pages[j].src || "";
-        if (pageUrl) {
-          result.push({
-            index: j,
-            imageUrl: pageUrl,
-            headers: { "Referer": BASE_URL },
-          });
+        var pagesIdx = decoded.indexOf('"pages"');
+        var slice = pagesIdx >= 0 ? decoded.substring(pagesIdx) : decoded;
+        var urlRegex = /"url":\[0,"((?:https?:|\/)[^"]+\.(?:webp|jpg|jpeg|png))"\]/g;
+        var collected = [];
+        var u;
+        while ((u = urlRegex.exec(slice)) !== null) {
+          collected.push(u[1]);
+          if (collected.length > 500) break;
+        }
+        if (collected.length > 0) {
+          var out = [];
+          for (var k = 0; k < collected.length; k++) {
+            out.push({ index: k, imageUrl: collected[k], headers: { "Referer": BASE_URL } });
+          }
+          return out;
         }
       }
-      return result;
+
+      // Strategie 2 : fallback brut sur les URLs CDN (si Astro change encore)
+      var cdnRegex = /https:\/\/cdn\.asurascans\.com\/asura-images\/chapters\/[^"\s)]+\.(?:webp|jpg|jpeg|png)/g;
+      var seen = {};
+      var fallback = [];
+      var c;
+      while ((c = cdnRegex.exec(res)) !== null) {
+        if (seen[c[0]]) continue;
+        seen[c[0]] = true;
+        fallback.push({ index: fallback.length, imageUrl: c[0], headers: { "Referer": BASE_URL } });
+      }
+
+      // Strategie 3 : legacy Next.js __next_f.push (au cas ou retour en arriere)
+      if (fallback.length === 0) {
+        var scriptMatches = res.match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/gs);
+        if (scriptMatches) {
+          var allScriptData = "";
+          for (var i2 = 0; i2 < scriptMatches.length; i2++) {
+            var content = scriptMatches[i2].match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/s);
+            if (content) allScriptData += content[1];
+          }
+          var pagesMatch = allScriptData.match(/\\"pages\\":(\[.*?\])/) ||
+                           allScriptData.match(/"pages":(\[.*?\])/);
+          if (pagesMatch) {
+            var pagesData = pagesMatch[1].replace(/\\(.)/g, "$1");
+            try {
+              var pages = JSON.parse(pagesData);
+              pages.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+              for (var j = 0; j < pages.length; j++) {
+                var pageUrl = pages[j].url || pages[j].src || "";
+                if (pageUrl) {
+                  fallback.push({ index: j, imageUrl: pageUrl, headers: { "Referer": BASE_URL } });
+                }
+              }
+            } catch (jsonErr) {}
+          }
+        }
+      }
+
+      return fallback;
     } catch (e) {
       return [];
     }

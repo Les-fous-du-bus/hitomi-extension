@@ -94,15 +94,15 @@
       "name": "Asura Scans",
       "lang": "en",
       "space": "manga",
-      "version": 3,
+      "version": 4,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/asurascans.js",
       "iconUrl": "https://asurascans.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Domain migrated from asuracomic.net to asurascans.com (2026-04-19). /series route replaced by /comics.",
-      "sha256": "063343cfabf0cd787bf482adb2b8beff164040f615eaa273521eae9f0c6bd31b"
+      "note": "Astro migration handled in v4 (was Next.js). cdn.asurascans.com chapter images.",
+      "sha256": "f387425c83d71d37bf781d47dfffe4a5ce25213721fb6a62eae6cae60a33d2d4"
     },
     {
       "id": "mangas_origines",
