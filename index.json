@@ -318,14 +318,14 @@
       "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 6,
+      "version": 7,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/massnovel.js",
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "v6: RSC depth-count + JSON.parse + Step 3 generation. Fixes pagination cap (2963 chap capped at 2168) and JSON title leak.",
+      "note": "v7: strategy 4 regex flag /s removed (QuickJS compat) — use [\\s\\S] instead. Fixes empty content on old chapters in QuickJS runtime.",
       "sha256": "d9d6a0f70d67be6572df8e70ae536b418df22a4ecd8f3fef6ea1dbf3d3d25099"
     },
     {

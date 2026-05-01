@@ -25,7 +25,7 @@
  *   Plus de regex greedy = plus de fuite JSON dans les titres.
  *
  * @author @khun — Extension Strategist
- * @version 4.0.0
+ * @version 4.0.1
  */
 
 var BASE_URL = "https://novelfrance.fr";
@@ -433,7 +433,7 @@ class DefaultExtension extends MProvider {
 
       // Strategy 4 : <p> tags fallback
       var pParts = [];
-      var pMatch = res.match(/<p[^>]*>([^<]{20,})<\/p>/gs);
+      var pMatch = res.match(/<p[^>]*>([\s\S]{20,}?)<\/p>/g);
       if (pMatch) {
         for (var pj = 0; pj < pMatch.length; pj++) {
           pParts.push(pMatch[pj]);
