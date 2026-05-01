@@ -8,15 +8,14 @@
       "name": "AnimeSama",
       "lang": "fr",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": true,
       "jsUrl": "src/manga/anime_sama.js",
       "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Domain rotates often (.fr -> .org -> .si -> .to). Fallback list embedded. CF bypass via Dart interceptor (hasCloudflare=true).",
-      "sha256": "9c662f42b81324f3bb17f75661bf530cc74c2ddeacdee57fbfbd7a4f8711e39a"
+      "note": "v2.2.0: BASE_URL hardcoded to anime-sama.to (mangas_origines pattern). CF bypass via Dart interceptor (hasCloudflare=true). If domain rotates, update BASE_URL constant only."
     },
     {
       "id": "mangadex",
