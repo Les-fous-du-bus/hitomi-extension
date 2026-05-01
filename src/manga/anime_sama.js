@@ -39,7 +39,18 @@
  *     paragraphe descendant — peut casser si la structure HTML evolue.
  *
  * @author @khun — Extension Strategist
- * @version 2.0.0
+ * @version 2.1.0
+ *
+ * Fix v2.1.0 (2026-04-29):
+ *  - hasCloudflare = true : Dart interceptor already handles bypass (confirmed
+ *    device), but the flag must be set so the app knows to route through it.
+ *  - _getBaseUrl() health check now rejects Cloudflare challenge pages
+ *    (cf-mitigated header body, "Just a moment", "cf_chl_opt" markers) and
+ *    requires a positive title marker (anime-sama in <title>).
+ *    Without this, a CF-blocked domain resolved as "live" and all subsequent
+ *    calls received HTML challenge pages instead of real content.
+ *  - getMangaDetail: fallback to og:title/og:image if h3/h1 or first img miss.
+ *  - Image URL Referer header: use computed base (not hardcoded domain).
  */
 
 const CANDIDATE_DOMAINS = [
@@ -81,7 +92,9 @@ class DefaultExtension extends MProvider {
     return false;
   }
   get hasCloudflare() {
-    return false;
+    // CF WAF is active on anime-sama domains. The Dart interceptor handles
+    // the challenge — setting this flag true routes all fetches through it.
+    return true;
   }
 
   // Resolution paresseuse + cache memoire pour la duree du runtime JS.
@@ -97,14 +110,22 @@ class DefaultExtension extends MProvider {
           const body = await fetchv2(`${domain}/`, {
             headers: { ...HEADERS_BASE, Referer: `${domain}/` },
           });
-          // fetchv2 retourne directement le body (string). Heuristique de
-          // sante : page d'accueil legitime > 500 chars de HTML.
-          if (typeof body === "string" && body.length > 500) {
-            this._resolvedBase = domain;
-            return domain;
-          }
+          if (typeof body !== "string" || body.length < 500) continue;
+          // Reject Cloudflare challenge pages — they are large HTML but not
+          // real content. Three known CF markers:
+          const bodyLc = body.toLowerCase();
+          if (
+            bodyLc.includes("cf-mitigated") ||
+            bodyLc.includes("just a moment") ||
+            bodyLc.includes("cf_chl_opt")
+          ) continue;
+          // Require a positive marker — real anime-sama pages contain their
+          // name in <title>. Avoids accepting generic CDN error pages.
+          if (!bodyLc.includes("anime-sama")) continue;
+          this._resolvedBase = domain;
+          return domain;
         } catch (_) {
-          // Domaine mort, on essaie le suivant
+          // Dead domain, try next
         }
       }
       throw new Error(
@@ -239,21 +260,35 @@ class DefaultExtension extends MProvider {
     const html = await this._fetchHtml(url, `/catalogue/${slug}/`);
     const doc = new DOMParser().parseFromString(html, "text/html");
 
-    // Titre : h3 (architecture connue) ou h1 fallback.
+    // Titre : h3 (architecture connue), h1, ou og:title fallback.
     const titleEl =
       doc.querySelector("h3") || doc.querySelector("h1");
-    const title = (titleEl?.textContent || "").trim();
+    let title = (titleEl?.textContent || "").trim();
+    if (!title) {
+      const ogTitle = doc.querySelector("meta[property='og:title']");
+      title = (ogTitle?.getAttribute("content") || "").trim();
+    }
 
-    // Cover : premier <img> non data: dans la page (le header en porte un
-    // grand). On evite #coverOeuvre car non confirme sur la version actuelle.
+    // Cover : #coverOeuvre ou premier <img> non data: dans la page.
+    // Fallback og:image pour les pages ou le layout change.
     let imageUrl = "";
-    const imgs = doc.querySelectorAll("img");
-    for (let i = 0; i < imgs.length; i++) {
-      const candidate = this._extractImgSrc(imgs[i], base);
-      if (candidate) {
-        imageUrl = candidate;
-        break;
+    const coverEl = doc.querySelector("#coverOeuvre");
+    if (coverEl) {
+      imageUrl = this._extractImgSrc(coverEl, base);
+    }
+    if (!imageUrl) {
+      const imgs = doc.querySelectorAll("img");
+      for (let i = 0; i < imgs.length; i++) {
+        const candidate = this._extractImgSrc(imgs[i], base);
+        if (candidate) {
+          imageUrl = candidate;
+          break;
+        }
       }
+    }
+    if (!imageUrl) {
+      const ogImage = doc.querySelector("meta[property='og:image']");
+      imageUrl = this._absoluteUrl(base, ogImage?.getAttribute("content") || "");
     }
 
     // Synopsis : le bloc apparait apres un <h2>Synopsis</h2>. On cherche
