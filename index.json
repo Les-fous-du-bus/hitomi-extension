@@ -318,15 +318,15 @@
       "name": "NovelFrance",
       "lang": "fr",
       "space": "light_novel",
-      "version": 7,
+      "version": 8,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/massnovel.js",
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "v7: strategy 4 regex flag /s removed (QuickJS compat) — use [\\s\\S] instead. Fixes empty content on old chapters in QuickJS runtime.",
-      "sha256": "703fd1836bc3a288961beab7359083d4af8e434351f8ee1038348b9d69553900"
+      "note": "v8: unescapeRsc single-pass regex replaces naive sequential replace — fixes JSON.parse failure on RSC payloads with French-dialogue escaped quotes (e.g. Shadow Slave ch2506).",
+      "sha256": "aaa34b0fd34eb22ef71e06609153c36a474ec36b6a27dadd3bb9ef4220683922"
     },
     {
       "id": "chireads",

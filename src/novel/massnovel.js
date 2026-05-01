@@ -25,7 +25,7 @@
  *   Plus de regex greedy = plus de fuite JSON dans les titres.
  *
  * @author @khun — Extension Strategist
- * @version 4.0.1
+ * @version 4.0.2
  */
 
 var BASE_URL = "https://novelfrance.fr";
@@ -65,15 +65,21 @@ function decodeHtml(str) {
     .replace(/&#39;/g, "'");
 }
 
-// Unescape RSC double-escaped strings.
-// RSC payloads encode \" as \\\" and newlines as \\n.
+// Unescape RSC double-escaped strings in a single pass.
+// RSC payloads encode \" as \\\" and \\ as \\\\.
+// A naive sequential replace mis-handles \\\" (literal backslash + quote):
+//   wrong order turns \\" into stray backslash before "  → JSON.parse fails.
+// Single-pass regex processes each escape sequence atomically.
 function unescapeRsc(str) {
   if (!str) return "";
-  return str
-    .replace(/\\n/g, "\n")
-    .replace(/\\t/g, "\t")
-    .replace(/\\"/g, '"')
-    .replace(/\\\\/g, "\\");
+  return str.replace(/\\([\s\S])/g, function(m, c) {
+    if (c === '"')  return '"';
+    if (c === '\\') return '\\';
+    if (c === 'n')  return '\n';
+    if (c === 't')  return '\t';
+    if (c === 'r')  return '\r';
+    return c;
+  });
 }
 
 var MATURE_GENRES = ["adulte", "ecchi", "smut", "mature", "adult"];
@@ -248,9 +254,8 @@ class DefaultExtension extends MProvider {
             }
           }
           var rawArr = htmlRes.substring(arrStart, arrEnd + 1);
-          // Unescape RSC : remplace \" (backslash + guillemet) par guillemet seul.
-          // Dans rawArr, les backslashes sont de vrais caracteres backslash.
-          var jsonArr = rawArr.replace(/\\"/g, '"');
+          // Unescape RSC via single-pass function (handles \\" correctly).
+          var jsonArr = unescapeRsc(rawArr);
           try {
             var parsed = JSON.parse(jsonArr);
             for (var pi = 0; pi < parsed.length; pi++) {
@@ -350,7 +355,8 @@ class DefaultExtension extends MProvider {
             }
           }
           var rawPara = res.substring(paraArrStart, paraArrEnd + 1);
-          var jsonPara = rawPara.replace(/\\"/g, '"');
+          // Unescape RSC via single-pass function (handles \\" correctly).
+          var jsonPara = unescapeRsc(rawPara);
           try {
             var parsedPara = JSON.parse(jsonPara);
             for (var pp = 0; pp < parsedPara.length; pp++) {
