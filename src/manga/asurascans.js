@@ -15,7 +15,12 @@
  *   - Pages lecture: Next.js RSC payload __next_f.push (inchange)
  *
  * @author @khun — Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
+ *
+ * Fix v1.0.2 (2026-04-29): replace dotAll /s flag with [\s\S] equivalents —
+ * QuickJS (Flutter JS runtime) does not support the /s flag, causing all regex
+ * that span newlines (title h1, img src, description, status, author) to return
+ * null, leaving getMangaDetail with empty fields and a blank detail page.
  */
 
 var BASE_URL = "https://asurascans.com";
@@ -120,26 +125,26 @@ class DefaultExtension extends MProvider {
       }
 
       // Title: priority Astro island > h1 font-semibold > h1 generic > <title>
-      var titleMatch = res.match(/<h1[^>]*class="[^"]*font-semibold[^"]*"[^>]*>\s*([^<]+?)\s*<\/h1>/s) ||
-                        res.match(/<h1[^>]*>([^<]+)<\/h1>/s) ||
+      var titleMatch = res.match(/<h1[^>]*class="[^"]*font-semibold[^"]*"[^>]*>[\s\S]*?([^<]+?)[\s\S]*?<\/h1>/) ||
+                        res.match(/<h1[^>]*>([^<]+)<\/h1>/) ||
                         res.match(/<title>([^<|]+)(?:\s*\|[^<]*)?<\/title>/);
       var title = astroTitle || (titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown");
 
       // Cover: mobile cover img id="mobile-cover-img" or img alt="<Title>" pointing to covers/
-      var imgMatch = res.match(/<img[^>]*id="mobile-cover-img"[^>]*src="([^"]+)"/s) ||
-                     res.match(/<img[^>]*src="(https:\/\/cdn\.asurascans\.com\/[^"]*covers\/[^"]+)"/s) ||
-                     res.match(/<img[^>]*alt="poster"[^>]*src="([^"]+)"/s);
+      var imgMatch = res.match(/<img[^>]*id="mobile-cover-img"[^>]*src="([^"]+)"/) ||
+                     res.match(/<img[^>]*src="(https:\/\/cdn\.asurascans\.com\/[^"]*covers\/[^"]+)"/) ||
+                     res.match(/<img[^>]*alt="poster"[^>]*src="([^"]+)"/);
       var imageUrl = imgMatch ? imgMatch[1] : "";
 
       // Description: priority Astro DescriptionModal > meta description > inline span
       var descMatch = res.match(/<meta[^>]*name="description"[^>]*content="([^"]+)"/);
-      if (!descMatch) descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>(.*?)<\/span>/s);
+      if (!descMatch) descMatch = res.match(/<span class="font-medium text-sm[^"]*"[^>]*>([\s\S]*?)<\/span>/);
       var description = astroDescription || (descMatch ? stripTags(descMatch[1]).trim() : "");
 
       // Status
       var status = "unknown";
-      var statusMatch = res.match(/Status<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s) ||
-                         res.match(/>Status<\/[^>]+>\s*<[^>]*>\s*([A-Za-z]+)/s);
+      var statusMatch = res.match(/Status<\/h3>[\s\S]*?<h3[^>]*>([\s\S]*?)<\/h3>/) ||
+                         res.match(/>Status<\/[^>]+>\s*<[^>]*>\s*([A-Za-z]+)/);
       if (statusMatch) {
         var st = stripTags(statusMatch[1]).trim().toLowerCase();
         if (st === "ongoing") status = "ongoing";
@@ -150,8 +155,8 @@ class DefaultExtension extends MProvider {
 
       // Author
       var authors = [];
-      var authorMatch = res.match(/Author<\/h3>[^]*?<h3[^>]*>(.*?)<\/h3>/s) ||
-                         res.match(/>Author<\/[^>]+>\s*<[^>]*>\s*([^<]+)/s);
+      var authorMatch = res.match(/Author<\/h3>[\s\S]*?<h3[^>]*>([\s\S]*?)<\/h3>/) ||
+                         res.match(/>Author<\/[^>]+>\s*<[^>]*>\s*([^<]+)/);
       if (authorMatch) {
         var authorText = stripTags(authorMatch[1]).trim();
         if (authorText && authorText.toLowerCase() !== "n/a") authors.push(authorText);
@@ -159,7 +164,7 @@ class DefaultExtension extends MProvider {
 
       // Genres
       var genres = [];
-      var genreLinks = res.match(/<a[^>]*href="\/comics\?genres=[^"]+"[^>]*>(.*?)<\/a>/gs);
+      var genreLinks = res.match(/<a[^>]*href="\/comics\?genres=[^"]+"[^>]*>([\s\S]*?)<\/a>/g);
       if (genreLinks) {
         for (var i = 0; i < genreLinks.length; i++) {
           var g = stripTags(genreLinks[i]).trim();
@@ -189,7 +194,7 @@ class DefaultExtension extends MProvider {
 
       var chapters = [];
       // 2026-04-19: chapter anchors <a href="/comics/<slug>/chapter/<N>">
-      var linkMatches = res.match(/<a[^>]*href="(\/?comics\/[^"]+\/chapter\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/gs);
+      var linkMatches = res.match(/<a[^>]*href="(\/?comics\/[^"]+\/chapter\/\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/g);
       if (!linkMatches) return [];
 
       var seen = {};
@@ -291,11 +296,11 @@ class DefaultExtension extends MProvider {
 
       // Strategie 3 : legacy Next.js __next_f.push (au cas ou retour en arriere)
       if (fallback.length === 0) {
-        var scriptMatches = res.match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/gs);
+        var scriptMatches = res.match(/self\.__next_f\.push\(\[[\s\S]*?"([\s\S]*?)"\]/g);
         if (scriptMatches) {
           var allScriptData = "";
           for (var i2 = 0; i2 < scriptMatches.length; i2++) {
-            var content = scriptMatches[i2].match(/self\.__next_f\.push\(\[.*?"(.*?)"\]/s);
+            var content = scriptMatches[i2].match(/self\.__next_f\.push\(\[[\s\S]*?"([\s\S]*?)"\]/);
             if (content) allScriptData += content[1];
           }
           var pagesMatch = allScriptData.match(/\\"pages\\":(\[.*?\])/) ||

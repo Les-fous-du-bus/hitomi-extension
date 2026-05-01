@@ -8,15 +8,15 @@
       "name": "AnimeSama",
       "lang": "fr",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/manga/anime_sama.js",
       "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Domain rotates often (.fr -> .org -> .si -> .to). Fallback list embedded.",
-      "sha256": "4a4d0c76c195dd17dae6eb9d4da5c28d42b8a6e6a4c364fd05604c81c6808310"
+      "note": "Domain rotates often (.fr -> .org -> .si -> .to). Fallback list embedded. CF bypass via Dart interceptor (hasCloudflare=true).",
+      "sha256": "9c662f42b81324f3bb17f75661bf530cc74c2ddeacdee57fbfbd7a4f8711e39a"
     },
     {
       "id": "mangadex",
@@ -94,15 +94,15 @@
       "name": "Asura Scans",
       "lang": "en",
       "space": "manga",
-      "version": 5,
+      "version": 6,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/asurascans.js",
       "iconUrl": "https://asurascans.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Astro migration v5 : DescriptionModal astro-island fallback for title/desc, getPageList Astro RSC.",
-      "sha256": "e0a3b6152d481a9dd354b28a74cacb7006d23be1db8988c6f2308986bd5e1833"
+      "note": "v6: QuickJS compat fix — replaced /s dotAll regexes with [\\s\\S] in getMangaDetail (title/img/desc/status/author) and getChapterList. The /s flag is unsupported in Flutter QuickJS runtime, causing blank detail pages.",
+      "sha256": "f20ab68ea9ea4e4f758595f0f20d344d42c99555b30ba799cf11722a89666bde"
     },
     {
       "id": "mangas_origines",
