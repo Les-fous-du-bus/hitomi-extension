@@ -15,7 +15,8 @@
       "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "v2.2.0: BASE_URL hardcoded to anime-sama.to (mangas_origines pattern). CF bypass via Dart interceptor (hasCloudflare=true). If domain rotates, update BASE_URL constant only."
+      "note": "v2.2.0: BASE_URL hardcoded to anime-sama.to (mangas_origines pattern). CF bypass via Dart interceptor (hasCloudflare=true). If domain rotates, update BASE_URL constant only.",
+      "sha256": "d52395700ffdb30bc9e093b5349f1d1520c030b5bf94057fef989b7a1ddad0fd"
     },
     {
       "id": "mangadex",
@@ -42,8 +43,8 @@
       "jsUrl": "src/manga/manga_plus.js",
       "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
       "status": "dormant",
-      "obsolescenceRisk": "high",
-      "note": "API returns protobuf, needs decoder",
+      "obsolescenceRisk": "critical",
+      "note": "API returns protobuf binary — JSON.parse fails. Fixing requires a protobuf decoder in QuickJS (high effort). Deferred.",
       "sha256": "74265f8a61a10317afb65e8235e8cc93b52605d779dd34dacd500a9a1fcb47a2"
     },
     {
@@ -53,11 +54,12 @@
       "space": "manga",
       "version": 1,
       "mature": false,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/manga/comick.js",
-      "iconUrl": "https://comick.io/favicon.ico",
-      "status": "active",
-      "obsolescenceRisk": "low",
+      "iconUrl": "https://comick.dev/favicon.ico",
+      "status": "dead",
+      "obsolescenceRisk": "critical",
+      "note": "api.comick.fun DNS dead. comick.io redirects to comick.dev (CF 403). api.comick.dev also CF-blocked. Full remap to comick.dev API required — high effort.",
       "sha256": "970dea20debf5cd1fb735bfd395bef0af25a79d615f0d71cc32999d82797534c"
     },
     {
@@ -150,14 +152,15 @@
       "name": "PantheonScan",
       "lang": "fr",
       "space": "manga",
-      "version": 1,
+      "version": 2.1,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/pantheon_scan.js",
       "iconUrl": "https://pantheon-scan.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "c91f7314a9b9d6342f3f669948ca248491b64529cd3d12016fb278f66c1761d6"
+      "note": "v2.1: scheme validation + ReDoS pre-slicing. imageUrl/chapUrl reject non-http(s) schemes. getMangaDetail anchors each dotAll pattern to a 3-10KB window to prevent backtracking on 300KB+ Madara pages.",
+      "sha256": "15123d2cb4397f13b4289e63044c78eb634bcb9093bf6d71e30064a573e1a506"
     },
     {
       "id": "manga_scantrad",
@@ -304,14 +307,15 @@
       "name": "LightNovelFR",
       "lang": "fr",
       "space": "light_novel",
-      "version": 3,
+      "version": 4.11,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/novel/light_novel_fr.js",
-      "iconUrl": "https://www.lightnovelfr.com/favicon.ico",
+      "iconUrl": "https://lightnovelfr.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "88ba1aa4c3db3dacde2003ede0520aa467ff87d977708c31be913895241f5957"
+      "note": "v4.1: ReDoS hardening + OOM guard for large novels. parseChapter ads-strip uses {0,5000}? bound to prevent catastrophic backtrack. parseNovelAndChapters fallback UL search bounded to 500KB window anchored on 'eplister' substring. v4.11: edge-case fix anchorIdx >= 0 (eplister at offset 0).",
+      "sha256": "f5f6c1eff4c002a3f220c0caf23a7a10fa763dcb41bb2ea71a356f9b5467d7a6"
     },
     {
       "id": "massnovel",
@@ -340,6 +344,7 @@
       "iconUrl": "https://chireads.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "Popular (swiper) works. Latest via /category/translatedtales/page/N — HTML article elements may require JS rendering. Needs in-app verification.",
       "sha256": "ae875e02bd850df632f9fab2e998a55bdeeec877e7355798f1d584cfbf3552ee"
     },
     {
@@ -352,9 +357,9 @@
       "cloudflare": false,
       "jsUrl": "src/novel/novhell.js",
       "iconUrl": "https://novhell.org/favicon.ico",
-      "status": "broken",
+      "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Small site (~7 novels). Homepage parser refreshed 2026-04-19 but total count below 10-item threshold; marked broken pending content growth.",
+      "note": "Live site returns 200, figure selector finds 11 items. Small catalog (~7 novels). Status upgraded from broken to active — figure[href+img] selector confirmed matching live DOM 2026-05-10.",
       "sha256": "6a6f243f56d2a9812b3696b970ec27873b25e199c26ba3624a2a2b85098a823e"
     },
     {
@@ -448,11 +453,12 @@
       "space": "light_novel",
       "version": 1,
       "mature": true,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/novel/scribblehub.js",
       "iconUrl": "https://www.scribblehub.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
+      "note": "CF 403 on HEAD without UA. Requires cloudflare: true for app WebView bypass.",
       "sha256": "289a074cb3211e243ed781e7a71ca9d7221267fec52180b680873a26df5662e8"
     },
     {
@@ -467,6 +473,7 @@
       "iconUrl": "https://novelfire.net/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "Requires full query params on /search-adv URL (ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top). Stripped URL returns a different page with 0 results.",
       "sha256": "e0e52f242183a8d1908292ef6eee8f1c41b851c36fe8891e0ee55c7d4cfafca5"
     },
     {
@@ -481,6 +488,7 @@
       "iconUrl": "https://lnmtl.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "CF present (server: cloudflare, HTTP 200) but no challenge triggered in testing. Monitor.",
       "sha256": "0baca721f4b37a00bf8d267935132bab697ff89254dc1c7bac9b5f50ff546157"
     },
     {
@@ -532,11 +540,12 @@
       "space": "light_novel",
       "version": 1,
       "mature": true,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/novel/novelbin.js",
       "iconUrl": "https://novelbin.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "CF 403 confirmed (cf-ray present). cloudflare: true required for app WebView bypass.",
       "sha256": "885076f85c9b947048c45a0a55fdba764e622d95e26e50b6666de3b65cab6367"
     },
     {
@@ -546,11 +555,12 @@
       "space": "light_novel",
       "version": 1,
       "mature": true,
-      "cloudflare": false,
+      "cloudflare": true,
       "jsUrl": "src/novel/novelfull.js",
       "iconUrl": "https://novelfull.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "novelfull.com CF 403 + novelfull.me CF 526 (SSL error). cloudflare: true required. Monitor domain stability.",
       "sha256": "115422aef3330a1ff95874ad0c094517668a4899e78ea724ded683df855636f5"
     }
   ]

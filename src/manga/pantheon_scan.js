@@ -10,7 +10,7 @@
  *         sauf si le bridge supporte POST ou si le site rend les chapitres inline.
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 2.1.0
  */
 
 var BASE_URL = "https://pantheon-scan.com";
@@ -74,27 +74,44 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, {});
 
-      var titleMatch = res.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>(.*?)<\/h1>/s) ||
-                        res.match(/<div class="post-title"[^>]*>[^]*?<h1[^>]*>(.*?)<\/h1>/s) ||
-                        res.match(/<h1[^>]*>(.*?)<\/h1>/s);
+      // ReDoS pre-slicing : borner la fenetre HTML autour de l'ancre avant d'appliquer
+      // les patterns dotAll (/s) qui peuvent backtracker sur des pages Madara de 300KB+.
+      // Chaque bloc utilise son propre ancre pour minimiser la fenetre de recherche.
+
+      var titleAnchor = res.indexOf("post-title");
+      var titleWindow = titleAnchor > 0 ? res.substring(Math.max(0, titleAnchor - 50), titleAnchor + 5000) : res;
+      var titleMatch = titleWindow.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>(.*?)<\/h1>/s) ||
+                        titleWindow.match(/<div class="post-title"[^>]*>[^]*?<h1[^>]*>(.*?)<\/h1>/s) ||
+                        titleWindow.match(/<h1[^>]*>(.*?)<\/h1>/s);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
 
       // Pantheon uses unquoted attributes: src=url or data-src=url
-      var coverMatch = res.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)="([^"]+)"/s) ||
-                        res.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)=([^\s>]+)/s);
+      var coverAnchor = res.indexOf("summary_image");
+      // back-offset 20 chars to include the opening <div tag before the class attribute
+      var coverWindow = coverAnchor > 0 ? res.substring(Math.max(0, coverAnchor - 20), coverAnchor + 3000) : res;
+      var coverMatch = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)="([^"]+)"/s) ||
+                        coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)=([^\s>]+)/s);
       var imageUrl = coverMatch ? coverMatch[1].replace(/['"]/g, "") : "";
       // The default lazy image is a placeholder, use data-src instead
       if (imageUrl.indexOf("dflazy.jpg") !== -1 || imageUrl.indexOf("data:image") !== -1) {
-        var dataSrc = res.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*data-src=["']?([^\s>"']+)/s);
+        var dataSrc = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*data-src=["']?([^\s>"']+)/s);
         if (dataSrc) imageUrl = dataSrc[1];
       }
+      // Scheme validation : rejeter toute URL qui n'est pas http(s) (ex: javascript:)
+      if (imageUrl && !imageUrl.startsWith("https://") && !imageUrl.startsWith("http://")) imageUrl = "";
 
-      var descMatch = res.match(/<div class="summary__content"[^>]*>(.*?)<\/div>/s);
+      var descAnchor = res.indexOf("summary__content");
+      // back-offset 20 chars to include the opening <div tag before the class attribute
+      var descWindow = descAnchor > 0 ? res.substring(Math.max(0, descAnchor - 20), descAnchor + 10000) : res;
+      var descMatch = descWindow.match(/<div class="summary__content"[^>]*>(.*?)<\/div>/s);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
       var genres = [];
-      var genreMatch = res.match(/<div class="?genres-content"?[^>]*>(.*?)<\/div>/s) ||
-                       res.match(/Genre[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
+      var genreAnchor = res.indexOf("genres-content");
+      // back-offset 20 chars to include the opening <div tag before the class attribute
+      var genreWindow = genreAnchor > 0 ? res.substring(Math.max(0, genreAnchor - 20), genreAnchor + 5000) : res;
+      var genreMatch = genreWindow.match(/<div class="?genres-content"?[^>]*>(.*?)<\/div>/s) ||
+                       genreWindow.match(/Genre[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
       if (genreMatch) {
         var genreLinks = genreMatch[1].match(/<a[^>]*>(.*?)<\/a>/gs);
         if (genreLinks) {
@@ -106,17 +123,21 @@ class DefaultExtension extends MProvider {
       }
 
       var authors = [];
-      var authorMatch = res.match(/Author[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
-                        res.match(/Auteur[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
-                        res.match(/<div class="?author-content"?[^>]*>(.*?)<\/div>/s);
+      var authorAnchor = res.indexOf("author-content");
+      var authorWindow = authorAnchor > 0 ? res.substring(Math.max(0, authorAnchor - 200), authorAnchor + 3000) : res;
+      var authorMatch = authorWindow.match(/Author[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
+                        authorWindow.match(/Auteur[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
+                        authorWindow.match(/<div class="?author-content"?[^>]*>(.*?)<\/div>/s);
       if (authorMatch) {
         var authorText = stripTags(authorMatch[1]).trim();
         if (authorText && authorText !== "Updating") authors.push(authorText);
       }
 
       var status = "unknown";
-      var statusMatch = res.match(/Status[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s) ||
-                        res.match(/Statut[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
+      var statusAnchor = res.indexOf("summary-content");
+      var statusWindow = statusAnchor > 0 ? res.substring(Math.max(0, statusAnchor - 200), statusAnchor + 3000) : res;
+      var statusMatch = statusWindow.match(/Status[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s) ||
+                        statusWindow.match(/Statut[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
       if (statusMatch) {
         var st = stripTags(statusMatch[1]).trim().toLowerCase();
         if (st.indexOf("ongoing") !== -1 || st.indexOf("en cours") !== -1) status = "ongoing";
@@ -182,6 +203,8 @@ class DefaultExtension extends MProvider {
         if (!linkMatch) continue;
 
         var chapUrl = linkMatch[1].replace(/['"]/g, "");
+        // Scheme validation : rejeter toute URL qui n'est pas http(s) (ex: javascript:)
+        if (chapUrl && !chapUrl.startsWith("https://") && !chapUrl.startsWith("http://")) continue;
         var chapTitle = stripTags(linkMatch[2]).trim();
 
         var dateMatch = ch.match(/class="chapter-release-date"[^>]*>[^]*?<i[^>]*>(.*?)<\/i>/s) ||
@@ -278,19 +301,21 @@ class DefaultExtension extends MProvider {
   _parseMadaraList(html) {
     var list = [];
 
-    var itemMatches = html.match(/<div class="(?:page-item-detail|c-tabs-item__content)"[^>]*>(.*?)<\/div>\s*<\/div>\s*<\/div>/gs);
+    // Use flexible class match — Pantheon adds trailing spaces: class="page-item-detail manga  "
+    var itemMatches = html.match(/<div[^>]+class="[^"]*page-item-detail[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g);
     if (!itemMatches) {
-      itemMatches = html.match(/<div class="(?:page-item-detail|c-tabs-item__content)"[^>]*>[^]*?(?=<div class="(?:page-item-detail|c-tabs-item__content)"|$)/g);
+      itemMatches = html.match(/<div[^>]+class="[^"]*c-tabs-item__content[^"]*"[^>]*>[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/g);
     }
 
     if (itemMatches) {
       for (var i = 0; i < itemMatches.length; i++) {
         var item = itemMatches[i];
 
-        // Pantheon uses unquoted href: href=https://... >
-        var nameMatch = item.match(/<(?:h3|h4|h5)[^>]*class="[^"]*post-title[^"]*"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s) ||
-                        item.match(/class="post-title"[^>]*>[^]*?<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s) ||
-                        item.match(/class="?post-title"?[^>]*>[^]*?<a[^>]*href=([^\s>]+)[^>]*>(.*?)<\/a>/s);
+        // Pantheon may use unquoted href: href=https://... title=... >
+        // Match quoted first, then unquoted fallback
+        var nameMatch = item.match(/<(?:h3|h4|h5)[^>]*class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
+                        item.match(/class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
+                        item.match(/class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href=([^\s>"']+)[^>]*>([\s\S]*?)<\/a>/i);
         if (!nameMatch) continue;
 
         var mangaUrl = nameMatch[1].replace(/['"]/g, "");
