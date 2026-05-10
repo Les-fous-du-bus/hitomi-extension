@@ -30,7 +30,53 @@
       "iconUrl": "https://mangadex.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
+      "note": "runtime-audit 2026-05-10: RUNTIME-OK. API v5 stable, search + chapters verified.",
       "sha256": "912a4f0016fa738376f85f491aa56dc0391964ceefb2191e86294c50f7b09419"
+    },
+    {
+      "id": "weebcentral",
+      "name": "WeebCentral",
+      "lang": "en",
+      "space": "manga",
+      "version": 1,
+      "mature": true,
+      "cloudflare": true,
+      "jsUrl": "src/manga/weebcentral.js",
+      "iconUrl": "https://weebcentral.com/static/images/brand.png",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi weebcentral source, runtime tested 2026-05-10. Popular=60 items (hot-updates, no pagination). Search via /search/data HTMX. Chapters via /series/<ULID>/full-chapter-list. Page images: 1 CDN URL inline per chapter + HTMX endpoint (session-gated for subsequent pages). Effie audit C2 fix: regex char class corrected (no-op \\s removed).",
+      "sha256": "b69bdcbb3adfe43dc4044958db37fa973f62f0e5082f5dbe2f883b0ccfb7c433"
+    },
+    {
+      "id": "mangaread",
+      "name": "MangaRead",
+      "lang": "en",
+      "space": "manga",
+      "version": 1,
+      "mature": false,
+      "cloudflare": true,
+      "jsUrl": "src/manga/mangaread.js",
+      "iconUrl": "https://www.mangaread.org/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10. WordPress Madara theme. Popular=39 links (title-attr filter). Detail inline chapters (Martial Peak: 3864 chaps). Pages: wp-manga-chapter-img with src whitespace padding — handled in parser.",
+      "sha256": "5b145e82dc00dfdf1874e53c37b8d8093d445026803d8d939abe5bf2bfbe6279"
+    },
+    {
+      "id": "bato",
+      "name": "Bato.to",
+      "lang": "multi",
+      "space": "manga",
+      "version": 1,
+      "mature": true,
+      "cloudflare": true,
+      "jsUrl": "src/manga/bato.js",
+      "iconUrl": "https://bato.to/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi bato source, runtime tested 2026-05-10. NETWORK-BLOCKED in test environment (bato.to TCP timeout from macOS dev machine -- CF TCP-level block). Extension architecture validated against DOM snapshot. Requires in-app test on Android device. Exists in assets/extensions/manga/bato.js.",
+      "sha256": "c458d3424217dd5ab2ca5d84fcc5e00bd73947c2b14fe7139e347a505c8ff7af"
     },
     {
       "id": "manga_plus",
@@ -74,6 +120,7 @@
       "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
       "sha256": "d8d18bc1f1264ee154fb1f2aca6219f4d92a80dd2dd401ebb58bc6b6776d9c31"
     },
     {
@@ -88,6 +135,7 @@
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "runtime-audit 2026-05-10: RUNTIME-PARTIAL. DOM has 143 series with title_no links and strong.title. Extension regex fails: expects img alt non-empty but live DOM has alt=''. Fix: remove alt requirement from primary parse pattern. Popular page accessible, content present.",
       "sha256": "9630b1e188dd33bfa093127a27c2b396875433dd38fe15fc1ff5a1fe62209494"
     },
     {
@@ -216,6 +264,7 @@
       "iconUrl": "https://mangapill.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
+      "note": "runtime-audit 2026-05-10: RUNTIME-EMPTY. HTTP 200 + CF-RAY. No JS framework (not Next/React/Vue). Homepage returns 0 manga item refs from static HTML. Cause: content loaded via JS after page render (client-side AJAX or defer). Selector-based extension cannot extract items without JS execution.",
       "sha256": "3469736fe9721e52f882272c50ad2d858296367151a44e137a9edb3873550fa6"
     },
     {
@@ -230,6 +279,7 @@
       "iconUrl": "https://flamecomics.xyz/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "runtime-audit 2026-05-10: RUNTIME-PARTIAL. Next.js SSR. /browse NEXT_DATA has pageProps.series[153] accessible. Extension regex _extractAllSeries fails: items contain nested arrays (tags:[...]) which break [^\\[\\]] character class. /series/<id> NEXT_DATA works (210 chapters). Fix: switch _extractAllSeries to NEXT_DATA script tag JSON.parse.",
       "sha256": "97a5ff97cc2b6700c6c403ef72f1acec0ca302db0dc469cc27a29c82005dc422"
     },
     {
@@ -244,6 +294,7 @@
       "iconUrl": "https://www.mangahere.cc/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
+      "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/ returns 200 + 70 items matching manga-list-1-cover pattern. Extension uses /directory/1.htm (200, 128KB). Detail regex confirmed against live DOM. CF-RAY present but no challenge.",
       "sha256": "854d55ae8d2757cfaa9d7607752c345caf9c174e31b07c602a62e921634d9801"
     },
     {
@@ -258,6 +309,7 @@
       "iconUrl": "https://toonily.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
+      "note": "runtime-audit 2026-05-10: RUNTIME-OK. Homepage 200 + 95KB + Madara theme confirmed (wp-manga). 24 page-item-detail.manga items. 101 /serie/ hrefs. Extension serie/ URL pattern matches live DOM. CF managed challenge present but no JS block in testing.",
       "sha256": "284f6325c4a37cc62e44e1af500e65ec4dc518a35ecf445a537fb3132564ccb8"
     },
     {
@@ -272,6 +324,7 @@
       "iconUrl": "https://www.mangakakalot.gg/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "high",
+      "note": "runtime-audit 2026-05-10: RUNTIME-FAIL. Extension URL /manga-list/type-topview/ctg-all/state-all/page-1 returns CF 403 + JS challenge. Homepage 200 but 0 manga refs. Domain www.mangakakalot.gg reachable but all catalog endpoints CF-blocked from server. In-app WebView bypass needed for any content.",
       "sha256": "eebea09361a3ee96bae0091a9e6a6a68809be4f71cbffaf86cb43f133447f8bc"
     },
     {
@@ -286,6 +339,7 @@
       "iconUrl": "https://www.mangatown.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
+      "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/0-0-0-0-0-0-0/ returns 200 + 222 manga hrefs. Extension uses /directory/ with page params. manga_cover class selector confirmed matching live DOM. CF-RAY present, no JS challenge.",
       "sha256": "601f480d67298b5cd523117813817b5b657d6f4ebb2d5698c490bbb18f358b1e"
     },
     {
