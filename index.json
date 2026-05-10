@@ -128,15 +128,15 @@
       "name": "Webtoons",
       "lang": "multi",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/webtoons.js",
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-audit 2026-05-10: RUNTIME-PARTIAL. DOM has 143 series with title_no links and strong.title. Extension regex fails: expects img alt non-empty but live DOM has alt=''. Fix: remove alt requirement from primary parse pattern. Popular page accessible, content present.",
-      "sha256": "9630b1e188dd33bfa093127a27c2b396875433dd38fe15fc1ff5a1fe62209494"
+      "note": "v3 (round 4 fix 2026-05-10): dropped alt='[^]*' requirement from primary parse pattern. Live DOM has alt='' on all series imgs which broke v2 regex. Fix verified: 143 series parsed.",
+      "sha256": "cdd76b211da9da3ac1fdf9e918a48ae19fa44628b4b83e9cc80538816d2b0139"
     },
     {
       "id": "asurascans",
@@ -272,15 +272,15 @@
       "name": "Flame Comics",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/flamecomics.js",
       "iconUrl": "https://flamecomics.xyz/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-audit 2026-05-10: RUNTIME-PARTIAL. Next.js SSR. /browse NEXT_DATA has pageProps.series[153] accessible. Extension regex _extractAllSeries fails: items contain nested arrays (tags:[...]) which break [^\\[\\]] character class. /series/<id> NEXT_DATA works (210 chapters). Fix: switch _extractAllSeries to NEXT_DATA script tag JSON.parse.",
-      "sha256": "97a5ff97cc2b6700c6c403ef72f1acec0ca302db0dc469cc27a29c82005dc422"
+      "note": "v2 (round 4 fix 2026-05-10): _extractAllSeries switched from regex with [^\\[\\]] character class to JSON.parse on __NEXT_DATA__ script tag. Previous regex broke on nested arrays (tags:[]). Fix verified: 153 series parsed via pageProps.series. Effie hardening: 2MB cap on JSON.parse + series_id /^\\d+$/ validation against CDN path traversal.",
+      "sha256": "84566561231b2c882b036c1ac0597ee27a41c82965a0158cd4beb5948377595c"
     },
     {
       "id": "mangahere",

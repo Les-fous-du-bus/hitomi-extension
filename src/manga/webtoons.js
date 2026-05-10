@@ -276,7 +276,7 @@ class DefaultExtension extends MProvider {
     // 2026-04-19: originals grid uses
     //   <a href="...list?title_no=N"> ... <img src alt=""> ... <strong class="title">Title</strong>
     // Tested on /fr/originals -> 97 matches
-    var pat = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*alt="[^"]*">[\s\S]*?<strong class="title">([^<]+)<\/strong>/g;
+    var pat = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<strong class="title">([^<]+)<\/strong>/g;
     var m;
     while ((m = pat.exec(html)) !== null) {
       var url = m[1];

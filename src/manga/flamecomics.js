@@ -55,23 +55,26 @@ class DefaultExtension extends MProvider {
   }
 
   _extractAllSeries(html) {
-    // Browse page has all series in one JSON blob
-    var allMatches = [];
-    var regex = /"series":\[(\{[^[\]]*\}(?:,\{[^[\]]*\})*)\]/g;
-    var match;
-    while ((match = regex.exec(html)) !== null) {
-      try {
-        var items = JSON.parse("[" + match[1] + "]");
-        for (var i = 0; i < items.length; i++) {
-          if (items[i].series_id && items[i].title) {
-            allMatches.push(items[i]);
-          }
-        }
-      } catch (e) {
-        // skip malformed
+    // Next.js SSR : pageProps.series is in __NEXT_DATA__ script tag.
+    // Previous regex approach used [^[\]] which broke on nested arrays (e.g. tags:[]).
+    var m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) return [];
+    // Memory cap (effie C1): refuse to parse __NEXT_DATA__ above 2MB to bound JSON.parse cost.
+    if (m[1].length > 2000000) return [];
+    try {
+      var data = JSON.parse(m[1]);
+      var series = data && data.props && data.props.pageProps && data.props.pageProps.series;
+      if (!Array.isArray(series)) return [];
+      var out = [];
+      for (var i = 0; i < series.length; i++) {
+        var s = series[i];
+        // series_id validation (effie C2): only accept numeric IDs to prevent path traversal in CDN URL build.
+        if (s && s.title && s.series_id != null && /^\d+$/.test(String(s.series_id))) out.push(s);
       }
+      return out;
+    } catch (e) {
+      return [];
     }
-    return allMatches;
   }
 
   _seriesToManga(s) {
