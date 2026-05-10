@@ -616,6 +616,51 @@
       "obsolescenceRisk": "medium",
       "note": "novelfull.com CF 403 + novelfull.me CF 526 (SSL error). cloudflare: true required. Monitor domain stability.",
       "sha256": "115422aef3330a1ff95874ad0c094517668a4899e78ea724ded683df855636f5"
+    },
+    {
+      "id": "mangakatana",
+      "name": "MangaKatana",
+      "lang": "en",
+      "space": "manga",
+      "version": 1,
+      "mature": true,
+      "cloudflare": true,
+      "jsUrl": "src/manga/mangakatana.js",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=mangakatana.com&sz=64",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi mangakatana source, runtime tested 2026-05-10. Popular: 88 unique series via /page/N?filter=1&order=views (deduplication required). Chapter images via var ytaw=['url',...] in inline script. CDN tokens are session-scoped. CF managed: no JS challenge in server-side test.",
+      "sha256": "bd7734dc4023a4d416ee8559d31882e432ee07859aa2b835c672c3d01c6e2e14"
+    },
+    {
+      "id": "mangabuddy",
+      "name": "MangaBuddy",
+      "lang": "en",
+      "space": "manga",
+      "version": 1,
+      "mature": true,
+      "cloudflare": true,
+      "jsUrl": "src/manga/mangabuddy.js",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=mangabuddy.com&sz=64",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10. Popular: 41+ unique series via /popular (React SSR). Chapter images via var chapImages='url1,url2,...' comma-separated string in inline script. Cover CDN: res.mbbcdn.com. Image CDN: sN.mbcdnsa<letter>.org (rotating subdomain per chapter).",
+      "sha256": "c2470d249d39cce19c56139359f61c8da2fb1338acf4029c12e6a6cec33c3049"
+    },
+    {
+      "id": "wuxiaworld",
+      "name": "WuxiaWorld",
+      "lang": "en",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": true,
+      "jsUrl": "src/novel/wuxiaworld.js",
+      "iconUrl": "https://www.google.com/s2/favicons?domain=wuxiaworld.com&sz=64",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1: ported from Mangayomi wuxiaworld source, runtime tested 2026-05-10. Catalog via REST JSON API (/api/novels?orderBy=totalviews): 243 novels, 10 per page verified. BLOCKER: isFree=false on all novels -- chapter content reads may require user auth token. Catalog + detail = public. Chapter content = access-dependent.",
+      "sha256": "cc34eb5466ca5299ffa9bc9be88d0b37ac3a22f387797b16c38a348aad5d2468"
     }
   ]
 }
