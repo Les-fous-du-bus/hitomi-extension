@@ -53,15 +53,15 @@
       "name": "MangaRead",
       "lang": "en",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": true,
       "jsUrl": "src/manga/mangaread.js",
       "iconUrl": "https://www.mangaread.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-fix 2026-05-13: imageUrl key alignment in getPageList (url -> imageUrl). v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10.",
-      "sha256": "ab393bac9a8a4263b4d93f5fb9ec5b25dbcaa11514ff392f4a899f009dea4d06"
+      "note": "v3: harness-validated 2026-05-13 (tools/test-runtime.js 6/6 PASS). Fixed chapter shape (title/number/dateUpload-ms), added data-src fallback for list cover lazyload. List imageUrl-empty soft warning on Madara lazy-load variants \u2014 chapters/pages OK.",
+      "sha256": "abddb96a2123ef9b415b411021ba49ce9d5ddd1ecb390d24f9aba12ed6a1b29d"
     },
     {
       "id": "bato",
@@ -90,7 +90,7 @@
       "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
       "status": "dormant",
       "obsolescenceRisk": "critical",
-      "note": "API returns protobuf binary — JSON.parse fails. Fixing requires a protobuf decoder in QuickJS (high effort). Deferred.",
+      "note": "API returns protobuf binary \u2014 JSON.parse fails. Fixing requires a protobuf decoder in QuickJS (high effort). Deferred.",
       "sha256": "74265f8a61a10317afb65e8235e8cc93b52605d779dd34dacd500a9a1fcb47a2"
     },
     {
@@ -105,7 +105,7 @@
       "iconUrl": "https://comick.dev/favicon.ico",
       "status": "dead",
       "obsolescenceRisk": "critical",
-      "note": "api.comick.fun DNS dead. comick.io redirects to comick.dev (CF 403). api.comick.dev also CF-blocked. Full remap to comick.dev API required — high effort.",
+      "note": "api.comick.fun DNS dead. comick.io redirects to comick.dev (CF 403). api.comick.dev also CF-blocked. Full remap to comick.dev API required \u2014 high effort.",
       "sha256": "970dea20debf5cd1fb735bfd395bef0af25a79d615f0d71cc32999d82797534c"
     },
     {
@@ -120,7 +120,7 @@
       "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
+      "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL \u2014 CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
       "sha256": "d8d18bc1f1264ee154fb1f2aca6219f4d92a80dd2dd401ebb58bc6b6776d9c31"
     },
     {
@@ -150,7 +150,7 @@
       "iconUrl": "https://asurascans.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "v6: QuickJS compat fix — replaced /s dotAll regexes with [\\s\\S] in getMangaDetail (title/img/desc/status/author) and getChapterList. The /s flag is unsupported in Flutter QuickJS runtime, causing blank detail pages.",
+      "note": "v6: QuickJS compat fix \u2014 replaced /s dotAll regexes with [\\s\\S] in getMangaDetail (title/img/desc/status/author) and getChapterList. The /s flag is unsupported in Flutter QuickJS runtime, causing blank detail pages.",
       "sha256": "f20ab68ea9ea4e4f758595f0f20d344d42c99555b30ba799cf11722a89666bde"
     },
     {
@@ -383,7 +383,7 @@
       "iconUrl": "https://novelfrance.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "v8: unescapeRsc single-pass regex replaces naive sequential replace — fixes JSON.parse failure on RSC payloads with French-dialogue escaped quotes (e.g. Shadow Slave ch2506).",
+      "note": "v8: unescapeRsc single-pass regex replaces naive sequential replace \u2014 fixes JSON.parse failure on RSC payloads with French-dialogue escaped quotes (e.g. Shadow Slave ch2506).",
       "sha256": "aaa34b0fd34eb22ef71e06609153c36a474ec36b6a27dadd3bb9ef4220683922"
     },
     {
@@ -398,7 +398,7 @@
       "iconUrl": "https://chireads.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "Popular (swiper) works. Latest via /category/translatedtales/page/N — HTML article elements may require JS rendering. Needs in-app verification.",
+      "note": "Popular (swiper) works. Latest via /category/translatedtales/page/N \u2014 HTML article elements may require JS rendering. Needs in-app verification.",
       "sha256": "ae875e02bd850df632f9fab2e998a55bdeeec877e7355798f1d584cfbf3552ee"
     },
     {
@@ -413,7 +413,7 @@
       "iconUrl": "https://novhell.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "high",
-      "note": "Live site returns 200, figure selector finds 11 items. Small catalog (~7 novels). Status upgraded from broken to active — figure[href+img] selector confirmed matching live DOM 2026-05-10.",
+      "note": "Live site returns 200, figure selector finds 11 items. Small catalog (~7 novels). Status upgraded from broken to active \u2014 figure[href+img] selector confirmed matching live DOM 2026-05-10.",
       "sha256": "6a6f243f56d2a9812b3696b970ec27873b25e199c26ba3624a2a2b85098a823e"
     },
     {

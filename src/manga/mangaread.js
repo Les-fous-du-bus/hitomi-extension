@@ -28,9 +28,11 @@
  *
  * v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10
  * v2: runtime-fix 2026-05-13: imageUrl key alignment in getPageList (url -> imageUrl)
+ * v3: runtime-fix 2026-05-13 (harness-validated): chapter shape (title/number/dateUpload-ms),
+ *     list imageUrl via data-src fallback for Madara lazy-loaded covers
  *
  * @author @khun -- Extension Strategist
- * @version 2
+ * @version 3
  */
 
 var BASE_URL = "https://www.mangaread.org";
@@ -85,10 +87,13 @@ function parseMadaraList(html) {
     var url = titleUrlMatch[1];
     var title = decodeHtml(titleUrlMatch[2].trim());
 
-    // Cover image: prefer .item-thumb img or img.wp-post-image
-    var imgMatch = block.match(/class="item-thumb[^"]*"[\s\S]{0,200}?src="([^"]+)"/);
-    if (!imgMatch) imgMatch = block.match(/src="(https?:\/\/www\.mangaread\.org\/wp-content\/[^"]+\.(jpg|png|webp))"/);
-    var imageUrl = imgMatch ? imgMatch[1] : "";
+    // Cover image: Madara theme lazy-loads with data-src (Lazy Load plugin)
+    // and falls back to src for non-lazy renders. Try data-src first.
+    var imgMatch = block.match(/class="item-thumb[^"]*"[\s\S]{0,400}?data-src="([^"]+)"/);
+    if (!imgMatch) imgMatch = block.match(/class="item-thumb[^"]*"[\s\S]{0,400}?src="([^"]+)"/);
+    if (!imgMatch) imgMatch = block.match(/data-src="(https?:\/\/www\.mangaread\.org\/wp-content\/[^"]+\.(jpg|png|webp|jpeg))"/);
+    if (!imgMatch) imgMatch = block.match(/src="(https?:\/\/www\.mangaread\.org\/wp-content\/[^"]+\.(jpg|png|webp|jpeg))"/);
+    var imageUrl = imgMatch ? imgMatch[1].trim() : "";
 
     // Mature detection via badge or genre
     var blockLower = block.toLowerCase();
@@ -257,6 +262,30 @@ class DefaultExtension extends MProvider {
       // Madara inline chapter list: li.wp-manga-chapter a[href]
       // Structure: <li class="wp-manga-chapter"><a href="URL">Chapter N</a>
       //            <span class="chapter-release-date"><i>DD.MM.YYYY</i></span></li>
+      // Extract chapter number from name "Chapter 12" / "Chapter 12.5" / "Ch. 7"
+      function extractChapNum(s) {
+        var mm = s.match(/(?:chapter|chap|ch\.?|ep\.?)\s*([\d]+(?:\.[\d]+)?)/i);
+        if (mm) return parseFloat(mm[1]);
+        // Fallback: any leading number in the string
+        var lead = s.match(/([\d]+(?:\.[\d]+)?)/);
+        return lead ? parseFloat(lead[1]) : 0;
+      }
+
+      // Parse "DD.MM.YYYY" -> ms timestamp. Returns 0 on parse failure.
+      function parseMadaraDate(s) {
+        if (!s) return 0;
+        var trimmed = s.trim();
+        var m1 = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (m1) {
+          var d = new Date(Date.UTC(parseInt(m1[3], 10), parseInt(m1[2], 10) - 1, parseInt(m1[1], 10)));
+          var t = d.getTime();
+          if (!isNaN(t)) return t;
+        }
+        // ISO-like "YYYY-MM-DD" fallback
+        var t2 = Date.parse(trimmed);
+        return isNaN(t2) ? 0 : t2;
+      }
+
       var chapPattern = /class="wp-manga-chapter[\s\S]{0,400}?href="(https?:\/\/www\.mangaread\.org\/manga\/[^"]+\/)"[^>]*>\s*([\s\S]{2,80}?)\s*<\/a>[\s\S]{0,200}?<i>([\s\S]{0,50}?)<\/i>/g;
       var m;
       var seen = {};
@@ -266,7 +295,12 @@ class DefaultExtension extends MProvider {
         seen[chapUrl] = true;
         var name = decodeHtml(m[2].trim().replace(/[\n\r\t]+/g, " "));
         var dateStr = m[3].trim();
-        chapters.push({ name: name, url: chapUrl, dateUpload: dateStr });
+        chapters.push({
+          title: name,
+          url: chapUrl,
+          number: extractChapNum(name),
+          dateUpload: parseMadaraDate(dateStr),
+        });
       }
 
       // Fallback: simpler pattern without date
@@ -277,12 +311,18 @@ class DefaultExtension extends MProvider {
         while ((sm = simplePat.exec(html)) !== null) {
           if (!seenSimple[sm[1]]) {
             seenSimple[sm[1]] = true;
-            chapters.push({ name: decodeHtml(sm[2].trim()), url: sm[1], dateUpload: "" });
+            var simpleName = decodeHtml(sm[2].trim());
+            chapters.push({
+              title: simpleName,
+              url: sm[1],
+              number: extractChapNum(simpleName),
+              dateUpload: 0,
+            });
           }
         }
       }
 
-      // Reverse to oldest-first
+      // Reverse to oldest-first (cf. project_chapter_urls_oldest_first memory)
       chapters.reverse();
       for (var i = 0; i < chapters.length; i++) {
         chapters[i].index = i;
