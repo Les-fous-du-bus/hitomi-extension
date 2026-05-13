@@ -30,9 +30,10 @@
  *   Selector audit required if ytaw pattern changes.
  *
  * v1: ported from Mangayomi mangakatana source, runtime tested 2026-05-10
+ * v2: runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge)
  *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://mangakatana.com";
@@ -212,9 +213,9 @@ function parseChapterImages(html) {
 
 // ---------- Hitomi Extension Interface ----------
 
-function getPopular(page) {
+async function getPopular(page) {
   var url = BASE_URL + "/page/" + page + "?filter=1&order=views";
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = deduplicateByUrl(parseMangaList(html));
   return JSON.stringify({
     list: list,
@@ -222,9 +223,9 @@ function getPopular(page) {
   });
 }
 
-function getLatest(page) {
+async function getLatest(page) {
   var url = BASE_URL + "/page/" + page;
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = deduplicateByUrl(parseMangaList(html));
   return JSON.stringify({
     list: list,
@@ -232,9 +233,9 @@ function getLatest(page) {
   });
 }
 
-function search(query, page) {
+async function search(query, page) {
   var url = BASE_URL + "/?search=" + encodeURIComponent(query) + "&search_by=book_name";
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = deduplicateByUrl(parseMangaList(html));
   return JSON.stringify({
     list: list,
@@ -242,20 +243,20 @@ function search(query, page) {
   });
 }
 
-function getMangaDetail(mangaUrl) {
-  var html = sendRequest(mangaUrl);
+async function getMangaDetail(mangaUrl) {
+  var html = await fetchv2(mangaUrl, {});
   var detail = parseMangaDetail(html, mangaUrl);
   return JSON.stringify(detail);
 }
 
-function getChapterList(mangaUrl) {
-  var html = sendRequest(mangaUrl);
+async function getChapterList(mangaUrl) {
+  var html = await fetchv2(mangaUrl, {});
   var detail = parseMangaDetail(html, mangaUrl);
   return JSON.stringify(detail.chapters);
 }
 
-function getPageList(chapterUrl) {
-  var html = sendRequest(chapterUrl);
+async function getPageList(chapterUrl) {
+  var html = await fetchv2(chapterUrl, {});
   var images = parseChapterImages(html);
   if (images.length === 0) {
     return JSON.stringify({ error: "No images found in ytaw variable. CF bypass or page structure changed." });

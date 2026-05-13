@@ -31,9 +31,10 @@
  * Obsolescence risk: MEDIUM -- React SSR, CDN subdomain rotation possible.
  *
  * v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10
+ * v2: runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge)
  *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://mangabuddy.com";
@@ -197,11 +198,11 @@ function parseChapterImages(html) {
 
 // ---------- Hitomi Extension Interface ----------
 
-function getPopular(page) {
+async function getPopular(page) {
   // MangaBuddy popular page does not paginate via query param in static HTML
   // page=1 only; for pages > 1, try /popular?page=N (may not work)
   var url = page === 1 ? BASE_URL + "/popular" : BASE_URL + "/popular?page=" + page;
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = parseCatalogPage(html);
   return JSON.stringify({
     list: list,
@@ -209,9 +210,9 @@ function getPopular(page) {
   });
 }
 
-function getLatest(page) {
+async function getLatest(page) {
   var url = page === 1 ? BASE_URL + "/latest" : BASE_URL + "/latest?page=" + page;
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = parseCatalogPage(html);
   return JSON.stringify({
     list: list,
@@ -219,9 +220,9 @@ function getLatest(page) {
   });
 }
 
-function search(query, page) {
+async function search(query, page) {
   var url = BASE_URL + "/search?q=" + encodeURIComponent(query);
-  var html = sendRequest(url);
+  var html = await fetchv2(url, {});
   var list = parseCatalogPage(html);
   return JSON.stringify({
     list: list,
@@ -229,20 +230,20 @@ function search(query, page) {
   });
 }
 
-function getMangaDetail(mangaUrl) {
-  var html = sendRequest(mangaUrl);
+async function getMangaDetail(mangaUrl) {
+  var html = await fetchv2(mangaUrl, {});
   var detail = parseMangaDetail(html, mangaUrl);
   return JSON.stringify(detail);
 }
 
-function getChapterList(mangaUrl) {
-  var html = sendRequest(mangaUrl);
+async function getChapterList(mangaUrl) {
+  var html = await fetchv2(mangaUrl, {});
   var detail = parseMangaDetail(html, mangaUrl);
   return JSON.stringify(detail.chapters);
 }
 
-function getPageList(chapterUrl) {
-  var html = sendRequest(chapterUrl);
+async function getPageList(chapterUrl) {
+  var html = await fetchv2(chapterUrl, {});
   var images = parseChapterImages(html);
   if (images.length === 0) {
     return JSON.stringify({ error: "No chapImages var found. CF bypass may be required or page structure changed." });

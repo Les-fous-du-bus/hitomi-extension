@@ -21,9 +21,10 @@
  *   Selector audit required if /hot-updates or /search/data return 404.
  *
  * v1: ported from Mangayomi weebcentral source, runtime tested 2026-05-10
+ * v2: runtime-fix 2026-05-13: title key alignment (name->title), chapter number regex extraction, imageUrl key alignment (url->imageUrl)
  *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://weebcentral.com";
@@ -335,7 +336,10 @@ class DefaultExtension extends MProvider {
         var dateMatch = ctx.match(/datetime=\"([^\"]+)\"|(\d{4}-\d{2}-\d{2})/);
         var date = dateMatch ? (dateMatch[1] || dateMatch[2]) : "";
 
-        chapters.push({ name: name, url: chapUrl, dateUpload: date, index: index });
+        // Extract chapter number from name via regex; fallback to 0 if no match
+        var chapNumMatch = name.match(/Chapter\s+(\d+(?:\.\d+)?)/i);
+        var chapNumber = chapNumMatch ? parseFloat(chapNumMatch[1]) : 0;
+        chapters.push({ title: name, url: chapUrl, number: chapNumber, dateUpload: date, index: index });
         index++;
       }
 
@@ -375,7 +379,7 @@ class DefaultExtension extends MProvider {
         var imgUrl = m[0];
         if (!seen[imgUrl]) {
           seen[imgUrl] = true;
-          pages.push({ index: pages.length, url: imgUrl });
+          pages.push({ index: pages.length, imageUrl: imgUrl });
         }
       }
 
@@ -385,7 +389,7 @@ class DefaultExtension extends MProvider {
         var imgUrl = m[1];
         if (!seen[imgUrl] && !imgUrl.includes("compsci88.com/cover")) {
           seen[imgUrl] = true;
-          pages.push({ index: pages.length, url: imgUrl });
+          pages.push({ index: pages.length, imageUrl: imgUrl });
         }
       }
 
@@ -404,7 +408,7 @@ class DefaultExtension extends MProvider {
             var imgM = imgPattern.exec(imgHtml);
             while (imgM !== null) {
               var iu = imgM[0];
-              if (!seen[iu]) { seen[iu] = true; pages.push({ index: pages.length, url: iu }); }
+              if (!seen[iu]) { seen[iu] = true; pages.push({ index: pages.length, imageUrl: iu }); }
               imgM = imgPattern.exec(imgHtml);
             }
           } catch (_) {}

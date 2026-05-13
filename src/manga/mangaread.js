@@ -27,9 +27,10 @@
  * Obsolescence risk: MEDIUM -- Madara theme is stable but domain could change.
  *
  * v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10
+ * v2: runtime-fix 2026-05-13: imageUrl key alignment in getPageList (url -> imageUrl)
  *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://www.mangaread.org";
@@ -314,7 +315,7 @@ class DefaultExtension extends MProvider {
         var imgUrl = m[1].trim();
         if (imgUrl && !imgUrl.includes("data:image") && !seen[imgUrl]) {
           seen[imgUrl] = true;
-          pages.push({ index: pages.length, url: imgUrl });
+          pages.push({ index: pages.length, imageUrl: imgUrl });
         }
       }
 
@@ -331,7 +332,7 @@ class DefaultExtension extends MProvider {
             var iu = fm[1].trim();
             if (!seen[iu] && !iu.includes("data:image")) {
               seen[iu] = true;
-              pages.push({ index: pages.length, url: iu });
+              pages.push({ index: pages.length, imageUrl: iu });
             }
           }
         }

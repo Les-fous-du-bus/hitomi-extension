@@ -38,30 +38,30 @@
       "name": "WeebCentral",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": true,
       "cloudflare": true,
       "jsUrl": "src/manga/weebcentral.js",
       "iconUrl": "https://weebcentral.com/static/images/brand.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v1: ported from Mangayomi weebcentral source, runtime tested 2026-05-10. Popular=60 items (hot-updates, no pagination). Search via /search/data HTMX. Chapters via /series/<ULID>/full-chapter-list. Page images: 1 CDN URL inline per chapter + HTMX endpoint (session-gated for subsequent pages). Effie audit C2 fix: regex char class corrected (no-op \\s removed).",
-      "sha256": "b69bdcbb3adfe43dc4044958db37fa973f62f0e5082f5dbe2f883b0ccfb7c433"
+      "note": "runtime-fix 2026-05-13: title + imageUrl key alignment + chapter number regex extraction. v1: ported from Mangayomi weebcentral source, runtime tested 2026-05-10.",
+      "sha256": "af3933d8a67c80aeee9cb24a55b9e5a74811b51637ad089517ac73f0f791565f"
     },
     {
       "id": "mangaread",
       "name": "MangaRead",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": true,
       "jsUrl": "src/manga/mangaread.js",
       "iconUrl": "https://www.mangaread.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10. WordPress Madara theme. Popular=39 links (title-attr filter). Detail inline chapters (Martial Peak: 3864 chaps). Pages: wp-manga-chapter-img with src whitespace padding — handled in parser.",
-      "sha256": "5b145e82dc00dfdf1874e53c37b8d8093d445026803d8d939abe5bf2bfbe6279"
+      "note": "runtime-fix 2026-05-13: imageUrl key alignment in getPageList (url -> imageUrl). v1: ported from Mangayomi MangaRead source, runtime tested 2026-05-10.",
+      "sha256": "ab393bac9a8a4263b4d93f5fb9ec5b25dbcaa11514ff392f4a899f009dea4d06"
     },
     {
       "id": "bato",
@@ -622,30 +622,30 @@
       "name": "MangaKatana",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": true,
       "cloudflare": true,
       "jsUrl": "src/manga/mangakatana.js",
       "iconUrl": "https://www.google.com/s2/favicons?domain=mangakatana.com&sz=64",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v1: ported from Mangayomi mangakatana source, runtime tested 2026-05-10. Popular: 88 unique series via /page/N?filter=1&order=views (deduplication required). Chapter images via var ytaw=['url',...] in inline script. CDN tokens are session-scoped. CF managed: no JS challenge in server-side test.",
-      "sha256": "bd7734dc4023a4d416ee8559d31882e432ee07859aa2b835c672c3d01c6e2e14"
+      "note": "runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge). v1: ported from Mangayomi mangakatana source, runtime tested 2026-05-10.",
+      "sha256": "37e377152db98fe81bacbe80ec7d93592cc3f98130b8a6f1c7673bb7b923a160"
     },
     {
       "id": "mangabuddy",
       "name": "MangaBuddy",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": true,
       "cloudflare": true,
       "jsUrl": "src/manga/mangabuddy.js",
       "iconUrl": "https://www.google.com/s2/favicons?domain=mangabuddy.com&sz=64",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10. Popular: 41+ unique series via /popular (React SSR). Chapter images via var chapImages='url1,url2,...' comma-separated string in inline script. Cover CDN: res.mbbcdn.com. Image CDN: sN.mbcdnsa<letter>.org (rotating subdomain per chapter).",
-      "sha256": "c2470d249d39cce19c56139359f61c8da2fb1338acf4029c12e6a6cec33c3049"
+      "note": "runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge). v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10.",
+      "sha256": "34a208d73e121a0e6b49963a536e7a27b8d7bb15245311f0e81f9c1a517a936f"
     },
     {
       "id": "wuxiaworld",
