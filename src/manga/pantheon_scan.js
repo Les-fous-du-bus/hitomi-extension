@@ -10,7 +10,7 @@
  *         sauf si le bridge supporte POST ou si le site rend les chapitres inline.
  *
  * @author @khun — Extension Strategist
- * @version 3.1.0
+ * @version 3.2.0
  *
  * Fix v3.0.0 (2026-05-15):
  *  - getPopular / getLatestUpdates / search: URLs changed from
@@ -29,6 +29,13 @@
  *    uses unquoted HTML attributes (class=post-title, href=https://...).
  *    Old nameMatch patterns required quoted href="..." and matched nothing.
  *    Fix: add unquoted class/href patterns to nameMatch.
+ *
+ * Fix v3.2.0 (2026-05-15):
+ *  - getChapterList: Madara /ajax/chapters/ endpoint requires HTTP POST, not GET.
+ *    fetchv2 call was missing method: "POST". The inline manga page HTML only contains
+ *    wp-manga-chapter in CSS selectors (3 occurrences), never in the chapter list DOM
+ *    (which is loaded lazily). Only the POST to /ajax/chapters/ returns the chapter HTML.
+ *    Fix: add method: "POST" to the fetchv2 call for the ajax/chapters/ endpoint.
  */
 
 var BASE_URL = "https://pantheon-scan.com";
@@ -197,11 +204,14 @@ class DefaultExtension extends MProvider {
 
       var chapterHtml = "";
 
-      // Try ajax/chapters/ endpoint
+      // Try ajax/chapters/ endpoint — Madara requires POST (GET returns empty/error).
       if (!chapterHtml || chapterHtml.indexOf("wp-manga-chapter") === -1) {
         try {
           var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
-          var newRes = await fetchv2(trailingUrl + "ajax/chapters/", { "Referer": fullUrl });
+          var newRes = await fetchv2(trailingUrl + "ajax/chapters/", {
+            method: "POST",
+            headers: { "Referer": fullUrl, "X-Requested-With": "XMLHttpRequest" }
+          });
           if (newRes && newRes.indexOf("wp-manga-chapter") !== -1) {
             chapterHtml = newRes;
           }
