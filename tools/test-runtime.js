@@ -6,8 +6,10 @@
 // real source, and validates the return shape against what manga_models.dart
 // expects.
 //
-// Usage: node tools/test-runtime.js <ext_id> [--query <search-term>]
+// Usage: node tools/test-runtime.js <ext_id> [--query <search-term>] [--chapter <url>] [--manga <url>]
 // Example: node tools/test-runtime.js mangaread --query "martial peak"
+// --chapter <url>  : override the chapter URL used for getPageList (bypass DRM-locked samples)
+// --manga <url>    : override the manga URL used for getMangaDetail/getChapterList
 //
 // Exit codes:
 //   0 = all methods PASS
@@ -21,11 +23,15 @@ const vm = require('vm');
 const args = process.argv.slice(2);
 const extId = args[0];
 if (!extId) {
-  console.error('usage: node tools/test-runtime.js <ext_id> [--query <term>]');
+  console.error('usage: node tools/test-runtime.js <ext_id> [--query <term>] [--chapter <url>] [--manga <url>]');
   process.exit(2);
 }
 const queryIdx = args.indexOf('--query');
 const userQuery = queryIdx >= 0 ? args[queryIdx + 1] : null;
+const chapterIdx = args.indexOf('--chapter');
+const overrideChapterUrl = chapterIdx >= 0 ? args[chapterIdx + 1] : null;
+const mangaIdx = args.indexOf('--manga');
+const overrideMangaUrl = mangaIdx >= 0 ? args[mangaIdx + 1] : null;
 
 // Resolve ext source path
 const extPath = path.resolve(__dirname, '..', 'src', 'manga', `${extId}.js`);
@@ -225,13 +231,13 @@ async function runStep(name, fn) {
 (async () => {
   console.log(`\n[harness] Running ${extId}.js against live source\n`);
 
-  let firstMangaUrl = null;
-  let firstChapterUrl = null;
+  let firstMangaUrl = overrideMangaUrl || null;
+  let firstChapterUrl = overrideChapterUrl || null;
 
   await runStep('getPopular(1)', async () => {
     const r = await ext.getPopular(1);
     const v = validateList(r, 'getPopular');
-    firstMangaUrl = v.sample.url;
+    if (!firstMangaUrl) firstMangaUrl = v.sample.url;
     return v;
   });
 
@@ -257,7 +263,7 @@ async function runStep(name, fn) {
     await runStep('getChapterList(first)', async () => {
       const list = await ext.getChapterList(firstMangaUrl);
       const v = validateChapters(list);
-      firstChapterUrl = v.first.url;
+      if (!firstChapterUrl) firstChapterUrl = v.first.url;
       return v;
     });
   } else {
