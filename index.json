@@ -53,15 +53,15 @@
       "name": "MangaRead",
       "lang": "en",
       "space": "manga",
-      "version": 3,
+      "version": 4,
       "mature": false,
       "cloudflare": true,
       "jsUrl": "src/manga/mangaread.js",
       "iconUrl": "https://www.mangaread.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v3: harness-validated 2026-05-13 (tools/test-runtime.js 6/6 PASS). Fixed chapter shape (title/number/dateUpload-ms), added data-src fallback for list cover lazyload. List imageUrl-empty soft warning on Madara lazy-load variants \u2014 chapters/pages OK.",
-      "sha256": "abddb96a2123ef9b415b411021ba49ce9d5ddd1ecb390d24f9aba12ed6a1b29d"
+      "note": "v4: harness 6/6 PASS with real imageUrls (2026-05-15). Bumped itemPattern {0,2000} -> {0,5000} (real blocks ~2470 chars; previous primary silently dead -> fallback returned no covers). Added parseSearchResults for c-tabs-item__content (search uses different markup than catalogue). Harness now FAILS on majority-empty imageUrl.",
+      "sha256": "1cc08cabcfa4fcb18037c018634f0cb4f79889c628fa0a31dc91d06c46018601"
     },
     {
       "id": "bato",

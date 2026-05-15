@@ -30,9 +30,12 @@
  * v2: runtime-fix 2026-05-13: imageUrl key alignment in getPageList (url -> imageUrl)
  * v3: runtime-fix 2026-05-13 (harness-validated): chapter shape (title/number/dateUpload-ms),
  *     list imageUrl via data-src fallback for Madara lazy-loaded covers
+ * v4: runtime-fix 2026-05-15: bump itemPattern {0,2000} -> {0,5000} (real blocks
+ *     measure ~2470 chars). Previous primary pattern silently dead -> fallback
+ *     returned titles without imageUrl -> Discover with no covers.
  *
  * @author @khun -- Extension Strategist
- * @version 3
+ * @version 4
  */
 
 var BASE_URL = "https://www.mangaread.org";
@@ -72,7 +75,10 @@ function parseMadaraList(html) {
 
   // Each item: <div class="page-item-detail manga ...">
   // Contains: .post-title a[href][title] and img[src]
-  var itemPattern = /class="page-item-detail manga[^"]*"[\s\S]{0,2000}?(?=class="page-item-detail manga|<footer|$)/g;
+  // mangaread.org blocks measure ~2400-2600 chars between page-item-detail anchors.
+  // {0,2000} was too tight -> lookahead failed -> primary pattern silently dead ->
+  // fallback returned titles without imageUrl (Discover with no covers).
+  var itemPattern = /class="page-item-detail manga[^"]*"[\s\S]{0,5000}?(?=class="page-item-detail manga|<footer|$)/g;
   var m;
   while ((m = itemPattern.exec(html)) !== null) {
     var block = m[0].substring(0, 1500);
@@ -126,6 +132,39 @@ function parseMadaraList(html) {
   return { list: list, hasNextPage: hasNextPage };
 }
 
+/**
+ * Parse mangaread.org search results. WordPress search uses a different
+ * markup than the catalogue: `.row.c-tabs-item__content` -> `.tab-thumb img`
+ * + `.post-title h3 a`. Returns the same shape as parseMadaraList.
+ */
+function parseSearchResults(html) {
+  var list = [];
+  var seen = {};
+  // Search blocks measure ~4700-5300 chars (long descriptions inline). {0,8000}
+  // covers worst case while staying non-greedy.
+  var blockPattern = /class="row c-tabs-item__content"[\s\S]{0,8000}?(?=class="row c-tabs-item__content"|<footer|$)/g;
+  var m;
+  while ((m = blockPattern.exec(html)) !== null) {
+    var block = m[0];
+    var titleUrlMatch = block.match(/<h3[^>]*>\s*<a\s+href="(https?:\/\/www\.mangaread\.org\/manga\/[^"]+\/)"[^>]*>([^<]{2,200})<\/a>/);
+    if (!titleUrlMatch) {
+      titleUrlMatch = block.match(/class="tab-thumb[\s\S]{0,300}?href="(https?:\/\/www\.mangaread\.org\/manga\/[^"]+\/)"[^>]*title="([^"]{2,200})"/);
+    }
+    if (!titleUrlMatch) continue;
+    var url = titleUrlMatch[1];
+    if (seen[url]) continue;
+    seen[url] = true;
+    var title = decodeHtml(titleUrlMatch[2].trim().replace(/[\n\r\t]+/g, " "));
+    var imgMatch = block.match(/class="tab-thumb[\s\S]{0,500}?(?:data-src|src)="\s*(https?:\/\/[^\s"]+)/);
+    var imageUrl = imgMatch ? imgMatch[1].trim() : "";
+    list.push({ title: title, url: url, imageUrl: imageUrl, isMature: false });
+  }
+  var hasNextPage = html.includes('class="next page-numbers"') ||
+    html.includes('rel="next"') ||
+    html.includes('aria-label="Next page"');
+  return { list: list, hasNextPage: hasNextPage };
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "MangaRead"; }
   get lang() { return "en"; }
@@ -170,7 +209,7 @@ class DefaultExtension extends MProvider {
       var q = encodeURIComponent((query || "").trim());
       var url = BASE_URL + "/page/" + page + "/?s=" + q + "&post_type=wp-manga";
       var html = await fetchv2(url, this._headers());
-      return parseMadaraList(html);
+      return parseSearchResults(html);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }

@@ -107,12 +107,17 @@ function validateList(result, methodName) {
   check(typeof result.hasNextPage === 'boolean' || result.hasNextPage === undefined, `${methodName}.hasNextPage must be bool`);
   check(result.list.length > 0, `${methodName}.list is empty`);
   const warnings = [];
+  // imageUrl vide = Discover sans cover -> casse l'UI visuelle.
+  // On compte les items avec imageUrl vide; >50% du sample = FAIL.
+  let emptyCovers = 0;
   for (const item of result.list.slice(0, 3)) {
     check(typeof item.title === 'string' && item.title.length > 0, `${methodName} item.title invalid: ${JSON.stringify(item)}`);
     check(typeof item.url === 'string' && item.url.length > 0, `${methodName} item.url invalid`);
     check(typeof item.imageUrl === 'string', `${methodName} item.imageUrl missing or not string`);
-    if (item.imageUrl.length === 0) warnings.push('imageUrl-empty');
+    if (item.imageUrl.length === 0) emptyCovers++;
   }
+  check(emptyCovers < 2, `${methodName} returns covers but ${emptyCovers}/3 items have empty imageUrl (Discover would show no covers)`);
+  if (emptyCovers > 0) warnings.push(`imageUrl-empty:${emptyCovers}/3`);
   return { count: result.list.length, sample: result.list[0], warn: warnings.length ? [...new Set(warnings)] : undefined };
 }
 
