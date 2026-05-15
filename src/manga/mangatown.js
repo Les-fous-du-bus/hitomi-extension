@@ -11,7 +11,12 @@
  * to extract the number of pages, then builds image URLs from the pattern.
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * 2026-05-15 fix:
+ *  - getLatestUpdates now uses /latest/<page>.htm (was /directory/?latest
+ *    which silently fell back to popular order; Popular and Latest returned
+ *    identical first item).
  */
 
 var BASE_URL = "https://www.mangatown.com";
@@ -83,8 +88,9 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/directory/0-0-0-0-0-0-0/?latest";
-      if (page > 1) url = BASE_URL + "/directory/" + page + ".htm?latest";
+      // /latest/<page>.htm — distinct ordering from /directory/.
+      // The ?latest query param on /directory/ was silently ignored upstream.
+      var url = BASE_URL + "/latest/" + page + ".htm";
       var res = await fetchv2(url, this._getHeaders());
       return this._parseMangaList(res);
     } catch (e) {

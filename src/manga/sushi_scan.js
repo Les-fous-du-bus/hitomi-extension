@@ -7,8 +7,17 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * 2026-05-15 fix:
+ *  - Extension declared isMature=true (sushi_scan hosts pornhwa/smut alongside SFW).
+ *  - getMangaDetail derives per-item isMature from the genres list. The
+ *    catalogue tiles do not surface genres, so listings rely on a title
+ *    heuristic only. Once a user opens a manga detail page, isMature is
+ *    accurate and Hitomi can persist the flag.
  */
+
+var MATURE_GENRES_RE = /\b(adulte|adult|smut|pornhwa|pornwha|hentai|erotique|ero|mature|ecchi|yaoi|yuri|18\+)\b/i;
 
 var BASE_URL = "https://sushiscan.fr";
 var UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
@@ -38,7 +47,7 @@ class DefaultExtension extends MProvider {
   get lang() { return "fr"; }
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
-  get isMature() { return false; }
+  get isMature() { return true; }
 
   async getPopular(page) {
     try {
@@ -121,6 +130,11 @@ class DefaultExtension extends MProvider {
         else if (/cancel|abandon|dropped/i.test(st)) status = "abandoned";
       }
 
+      var isMature = false;
+      for (var gi = 0; gi < genres.length; gi++) {
+        if (MATURE_GENRES_RE.test(genres[gi])) { isMature = true; break; }
+      }
+
       return {
         title: decodeHtml(title),
         url: url,
@@ -129,7 +143,7 @@ class DefaultExtension extends MProvider {
         status: status,
         genres: genres,
         authors: authors,
-        isMature: false,
+        isMature: isMature,
       };
     } catch (e) {
       return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
@@ -276,11 +290,15 @@ class DefaultExtension extends MProvider {
         var imageUrl = imgMatch ? imgMatch[1] : "";
 
         if (title) {
+          // Listing markup carries no genre chip per tile. Title-only
+          // heuristic — low recall but zero false positives. Real flag
+          // comes from getMangaDetail once user opens the manga.
+          var titleMature = MATURE_GENRES_RE.test(title);
           list.push({
             title: decodeHtml(title),
             url: mangaUrl,
             imageUrl: imageUrl,
-            isMature: false,
+            isMature: titleMature,
           });
         }
       }

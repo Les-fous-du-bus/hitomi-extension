@@ -7,7 +7,13 @@
  * Mature : false
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * 2026-05-15 fix:
+ *  - getPopular now uses /search?q=&type=manga&page=N (50 items, paginated)
+ *    instead of homepage (only 10 featured tiles)
+ *  - getLatestUpdates now uses /chapters?page=N (116 manga recent)
+ *  - parser keyed by manga ID, works on both /search and /chapters markup
  */
 
 var BASE_URL = "https://mangapill.com";
@@ -38,7 +44,7 @@ class DefaultExtension extends MProvider {
 
   async getPopular(page) {
     try {
-      var url = BASE_URL;
+      var url = BASE_URL + "/search?q=&type=manga&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
       return this._parseMangaGrid(res);
     } catch (e) {
@@ -48,7 +54,7 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL;
+      var url = BASE_URL + "/chapters?page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
       return this._parseMangaGrid(res);
     } catch (e) {
@@ -237,53 +243,40 @@ class DefaultExtension extends MProvider {
     ];
   }
 
+  // ID-keyed parser. Both /search (manga grid) and /chapters (recent updates)
+  // expose:
+  //   - <a href="/manga/<id>/<slug>" ...><div ...font-black|font-bold...>Title</div></a>
+  //   - data-src="https://cdn.../file/mangapill/i/<id>[.jpeg|?...]"
+  // Match title and image by manga id, decoupled from the surrounding markup.
   _parseMangaGrid(html) {
-    var list = [];
+    var titlePattern = /<a[^>]*href="\/manga\/(\d+)\/([^"]+)"[^>]*>\s*<div[^>]*(?:font-black|font-bold)[^>]*>([^<]+)<\/div>/gs;
+    var imgPattern = /data-src="(https:\/\/[^"]*\/file\/mangapill\/i\/(\d+)[^"]*)"/gs;
 
-    // MangaPill lists manga in a grid with this structure (multiline):
-    // <a href="/manga/ID/slug" class="mb-2">
-    //   <div class="mt-3 font-black leading-tight line-clamp-2">Title</div>
-    // </a>
-    // With image nearby:
-    // <a href="/manga/ID/slug" class="relative block">
-    //   <figure><img data-src="https://cdn..."/></figure>
-    // </a>
-
-    // Step 1: Extract all manga URLs with titles
-    var titlePattern = /<a[^>]*href="(\/manga\/\d+\/[^"]*)"[^>]*class="mb-2"[^>]*>\s*<div[^>]*>(.*?)<\/div>/gs;
+    var titles = {};
+    var images = {};
     var match;
-    var seen = {};
-    var mangaMap = {};
-
     while ((match = titlePattern.exec(html)) !== null) {
-      var path = match[1];
-      if (seen[path]) continue;
-      seen[path] = true;
-      mangaMap[path] = {
-        title: decodeHtml(stripTags(match[2]).trim()),
-        url: BASE_URL + path,
-        imageUrl: "",
-        isMature: false,
-      };
+      var id = match[1];
+      if (titles[id]) continue;
+      var t = decodeHtml(stripTags(match[3]).trim());
+      if (t) titles[id] = { title: t, slug: match[2] };
     }
-
-    // Step 2: Extract all image URLs associated with manga links
-    var imgPattern = /<a[^>]*href="(\/manga\/\d+\/[^"]*)"[^>]*class="relative block"[^>]*>[\s\S]*?data-src="([^"]+)"/g;
     while ((match = imgPattern.exec(html)) !== null) {
-      var imgPath = match[1];
-      if (mangaMap[imgPath]) {
-        mangaMap[imgPath].imageUrl = match[2];
-      }
+      var iid = match[2];
+      if (!images[iid]) images[iid] = match[1];
     }
 
-    // Build list
-    for (var key in mangaMap) {
-      list.push(mangaMap[key]);
+    var list = [];
+    for (var id2 in titles) {
+      list.push({
+        title: titles[id2].title,
+        url: BASE_URL + "/manga/" + id2 + "/" + titles[id2].slug,
+        imageUrl: images[id2] || "",
+        isMature: false,
+      });
     }
 
-    // Check for next page
     var hasNextPage = html.indexOf('rel="next"') !== -1;
-
     return { list: list, hasNextPage: hasNextPage };
   }
 }

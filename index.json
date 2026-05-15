@@ -172,14 +172,15 @@
       "name": "SushiScan",
       "lang": "fr",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/sushi_scan.js",
       "iconUrl": "https://sushiscan.fr/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "sha256": "b1f1ddcb439d83182fbe81357db34dd04a695772e25f066a5f6db443a514457a"
+      "note": "v3 2026-05-15: extension declared isMature=true (pornhwa/smut alongside SFW). getMangaDetail derives per-item isMature from genres. Listing uses title heuristic (zero false positives, low recall).",
+      "sha256": "db60248fb81ab8c95c430215572de6a27a52be5b900ffea5ac5b6838b7ded528"
     },
     {
       "id": "lelmanga",
@@ -257,15 +258,15 @@
       "name": "MangaPill",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/mangapill.js",
       "iconUrl": "https://mangapill.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "runtime-audit 2026-05-10: RUNTIME-EMPTY. HTTP 200 + CF-RAY. No JS framework (not Next/React/Vue). Homepage returns 0 manga item refs from static HTML. Cause: content loaded via JS after page render (client-side AJAX or defer). Selector-based extension cannot extract items without JS execution.",
-      "sha256": "3469736fe9721e52f882272c50ad2d858296367151a44e137a9edb3873550fa6"
+      "note": "v2 2026-05-15: getPopular now uses /search?type=manga (50 paginated items) instead of homepage (only 10 featured). getLatestUpdates uses /chapters (116 items). ID-keyed parser handles both markups. Harness 6/6 PASS strict.",
+      "sha256": "c10732a9bf5cb8ee9fe5efb92cf5650082977a8d4878cc4b2be3a1cc19d0f68e"
     },
     {
       "id": "flamecomics",
@@ -332,15 +333,15 @@
       "name": "MangaTown",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/mangatown.js",
       "iconUrl": "https://www.mangatown.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/0-0-0-0-0-0-0/ returns 200 + 222 manga hrefs. Extension uses /directory/ with page params. manga_cover class selector confirmed matching live DOM. CF-RAY present, no JS challenge.",
-      "sha256": "601f480d67298b5cd523117813817b5b657d6f4ebb2d5698c490bbb18f358b1e"
+      "note": "v2 2026-05-15: getLatestUpdates uses /latest/<page>.htm (distinct from popular). ?latest query on /directory/ was silently ignored upstream, so Popular and Latest returned identical first item. Harness 6/6 PASS strict.",
+      "sha256": "7c8372d624d249aa5de32bc83f344ecc27fdcb2e77891db7fca01ce441149f20"
     },
     {
       "id": "royal_road",
