@@ -287,15 +287,15 @@
       "name": "MangaHere",
       "lang": "en",
       "space": "manga",
-      "version": 1,
+      "version": 2,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/mangahere.js",
       "iconUrl": "https://www.mangahere.cc/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/ returns 200 + 70 items matching manga-list-1-cover pattern. Extension uses /directory/1.htm (200, 128KB). Detail regex confirmed against live DOM. CF-RAY present but no challenge.",
-      "sha256": "854d55ae8d2757cfaa9d7607752c345caf9c174e31b07c602a62e921634d9801"
+      "note": "v2 fix 2026-05-15: tile parser anchored on <a> directly wrapping <img class=manga-list-1-cover>. Previous greedy regex captured genre menu and used 'Action' as title for the first tile in Discover. Harness 6/6 PASS strict.",
+      "sha256": "031eb70b7c7f554ee9db861fe6d24f65677793cde7115425c7f64679880ee2de"
     },
     {
       "id": "toonily",

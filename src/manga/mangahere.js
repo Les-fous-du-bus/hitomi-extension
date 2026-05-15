@@ -7,7 +7,7 @@
  * Mature : true (has adult content toggle)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
  *
  * LIVE AUDIT 2026-04-19 (@khun)
  * - Probed https://www.mangahere.cc/directory/1.htm?latest (mobile UA)
@@ -373,78 +373,40 @@ class DefaultExtension extends MProvider {
   }
 
   _parseDirectoryList(html) {
-    var list = [];
-
-    // Directory items in <ul class="manga-list-1-list">
-    // <li><a href="/manga/slug/" title="Title">
-    //   <img class="manga-list-1-cover" src="..." alt="Title">
-    // </a><p class="manga-list-1-item-title"><a href="/manga/slug/" title="Title">Title</a></p></li>
-    var itemMatches = html.match(/<li>.*?<a[^>]*href="(\/manga\/[^"]*\/)"[^>]*title="([^"]*)"[^>]*>.*?<img[^>]*class="manga-list-1-cover"[^>]*src="([^"]*)"[^>]*>/gs);
-    if (itemMatches) {
-      var seen = {};
-      for (var i = 0; i < itemMatches.length; i++) {
-        var m = itemMatches[i];
-        var hrefMatch = m.match(/href="(\/manga\/[^"]*\/)"/);
-        var titleMatch = m.match(/title="([^"]*)"/);
-        var imgMatch = m.match(/src="([^"]*fmcdn[^"]*)"/);
-        if (!imgMatch) imgMatch = m.match(/src="([^"]*)"/);
-
-        if (hrefMatch && titleMatch) {
-          var mangaUrl = BASE_URL + hrefMatch[1];
-          if (seen[mangaUrl]) continue;
-          seen[mangaUrl] = true;
-
-          list.push({
-            title: decodeHtml(titleMatch[1]),
-            url: mangaUrl,
-            imageUrl: imgMatch ? imgMatch[1] : "",
-            isMature: true,
-          });
-        }
-      }
-    }
-
-    // Check next page
-    var hasNextPage = html.indexOf("pager-list-left") !== -1 && list.length > 0;
-
-    return { list: list, hasNextPage: hasNextPage };
+    return this._parseTileList(html, "manga-list-1-cover");
   }
 
   _parseSearchResults(html) {
+    return this._parseTileList(html, "manga-list-4-cover");
+  }
+
+  // Anchor on the <a> that DIRECTLY wraps the cover <img>.
+  // Previous regex started at first <li> in the doc and reused captured chunk
+  // to extract title — the genre menu sits before the first tile, so the
+  // chunk's first title="..." was a genre label ("Action"), not the manga.
+  _parseTileList(html, coverClass) {
     var list = [];
-
-    // Search results in <ul class="manga-list-4-list">
-    // <li><a href="/manga/slug/" title="Title">
-    //   <img class="manga-list-4-cover" src="...">
-    // </a><p class="manga-list-4-item-title"><a href="/manga/slug/">Title</a></p></li>
-    var itemMatches = html.match(/<li>.*?<a[^>]*href="(\/manga\/[^"]*\/)"[^>]*title="([^"]*)"[^>]*>.*?<img[^>]*class="manga-list-4-cover"[^>]*src="([^"]*)"[^>]*>/gs);
-    if (itemMatches) {
-      var seen = {};
-      for (var i = 0; i < itemMatches.length; i++) {
-        var m = itemMatches[i];
-        var hrefMatch = m.match(/href="(\/manga\/[^"]*\/)"/);
-        var titleMatch = m.match(/title="([^"]*)"/);
-        var imgMatch = m.match(/src="([^"]*fmcdn[^"]*)"/);
-        if (!imgMatch) imgMatch = m.match(/class="manga-list-4-cover"[^>]*src="([^"]*)"/);
-
-        if (hrefMatch && titleMatch) {
-          var mangaUrl = BASE_URL + hrefMatch[1];
-          if (seen[mangaUrl]) continue;
-          seen[mangaUrl] = true;
-
-          list.push({
-            title: decodeHtml(titleMatch[1]),
-            url: mangaUrl,
-            imageUrl: imgMatch ? imgMatch[1] : "",
-            isMature: true,
-          });
-        }
-      }
+    var pattern = new RegExp(
+      '<a[^>]*href="(\\/manga\\/[^"]+\\/)"[^>]*title="([^"]+)"[^>]*>\\s*<img[^>]*class="' +
+        coverClass +
+        '"[^>]*src="([^"]+)"',
+      "gs"
+    );
+    var seen = {};
+    var match;
+    while ((match = pattern.exec(html)) !== null) {
+      var mangaUrl = BASE_URL + match[1];
+      if (seen[mangaUrl]) continue;
+      seen[mangaUrl] = true;
+      list.push({
+        title: decodeHtml(match[2]),
+        url: mangaUrl,
+        imageUrl: match[3],
+        isMature: true,
+      });
     }
 
-    // Check next page
     var hasNextPage = html.indexOf("pager-list-left") !== -1 && list.length > 0;
-
     return { list: list, hasNextPage: hasNextPage };
   }
 }
