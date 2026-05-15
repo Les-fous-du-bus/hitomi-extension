@@ -19,7 +19,15 @@
  *     Working endpoint: /fr/search?keyword=... (no /originals). Still uses strong.title.
  *
  * @author @khun — Extension Strategist
- * @version 4.0.0
+ * @version 4.1.0
+ *
+ * Fix v4.1.0 (2026-05-15):
+ *  - getPageList: <div id="_imageList"> uses lazy (.*?)</div> which stops at first
+ *    nested </div> before reaching the img tags. Section-based match fails.
+ *    Fix: slice from id="_imageList" to end of HTML, then match
+ *    <img class="_images"> data-url attributes. This distinguishes chapter images
+ *    from thumbnail images (class="_thumbnailImages") which are also present and
+ *    caused the fallback to return 237 items including episode nav thumbnails.
  */
 
 var BASE_URL = "https://www.webtoons.com";
@@ -219,42 +227,37 @@ class DefaultExtension extends MProvider {
   async getPageList(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      // Webtoons viewer requires Referer to serve full page HTML.
+      var referer = BASE_URL + "/" + LANG_CODE + "/";
+      var res = await fetchv2(fullUrl, { "Referer": referer });
 
       var pages = [];
 
-      // Find the image list div and extract data-url attributes
-      var imageSection = res.match(/<div id="_imageList"[^>]*>(.*?)<\/div>/s);
-      if (imageSection) {
-        var imgMatches = imageSection[1].match(/data-url="([^"]+)"/g);
-        if (imgMatches) {
-          for (var i = 0; i < imgMatches.length; i++) {
-            var urlMatch = imgMatches[i].match(/data-url="([^"]+)"/);
-            if (urlMatch) {
-              pages.push({
-                index: i,
-                imageUrl: urlMatch[1],
-                headers: { "Referer": BASE_URL },
-              });
-            }
-          }
-        }
-      }
+      // The _imageList div contains nested divs; a lazy (.*?)</div> match stops
+      // at the first nested closing tag. Instead, slice from the id anchor to the
+      // end of the document then match only chapter images (class _images).
+      // Thumbnail images have class _thumbnailImages and must be excluded.
+      var imageListIdx = res.indexOf('id="_imageList"');
+      var searchHtml = imageListIdx >= 0 ? res.substring(imageListIdx) : res;
 
-      // Fallback: match img tags with src in image list
+      // Primary: img with class _images (chapter images, not nav thumbnails)
+      var chapterImgPat = /<img[^>]*class="[^"]*_images[^"]*"[^>]*data-url="([^"]+)"/g;
+      var altChapterImgPat = /data-url="([^"]+)"[^>]*class="[^"]*_images[^"]*"/g;
+      var m;
+      while ((m = chapterImgPat.exec(searchHtml)) !== null) {
+        pages.push({
+          index: pages.length,
+          imageUrl: m[1],
+          headers: { "Referer": BASE_URL },
+        });
+      }
       if (pages.length === 0) {
-        var allImgs = res.match(/<img[^>]*data-url="([^"]+)"[^>]*>/g);
-        if (allImgs) {
-          for (var j = 0; j < allImgs.length; j++) {
-            var srcMatch = allImgs[j].match(/data-url="([^"]+)"/);
-            if (srcMatch && srcMatch[1].indexOf("webtoon") !== -1) {
-              pages.push({
-                index: j,
-                imageUrl: srcMatch[1],
-                headers: { "Referer": BASE_URL },
-              });
-            }
-          }
+        while ((m = altChapterImgPat.exec(searchHtml)) !== null) {
+          pages.push({
+            index: pages.length,
+            imageUrl: m[1],
+            headers: { "Referer": BASE_URL },
+          });
         }
       }
 
