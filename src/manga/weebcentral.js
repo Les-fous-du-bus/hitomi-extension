@@ -126,40 +126,39 @@ function parseArticleList(html) {
 
 /**
  * Parse series items from Full Display search results.
- * Structure differs from article cards: uses <a href="/series/ULID/slug"> with img and title span/h3.
+ * Structure: outer <article class="bg-base-300"> block contains:
+ *   - <a href="https://weebcentral.com/series/ULID/slug"> (cover link)
+ *   - <img alt="<Title> cover"> (cover image with title in alt attribute)
+ *   - compsci88 fallback CDN image
+ * Title alt and cover src appear BEFORE the href in the HTML.
+ * Split on article blocks instead of scanning forward from href.
  */
 function parseSearchList(html) {
   var list = [];
-
-  // Full Display mode uses: <a href="https://weebcentral.com/series/ULID/slug">
-  // followed by title and cover in child elements.
-  var linkPattern = /href=\"(https?:\/\/weebcentral\.com\/series\/[0-9A-Z]{26}\/[^\"]+)\"/g;
-  var titlePattern;
-  var m;
   var seen = {};
 
-  while ((m = linkPattern.exec(html)) !== null) {
-    var seriesUrl = m[1];
+  // Split on outer article blocks (class="bg-base-300").
+  var parts = html.split("<article class=\"bg-base-300");
+  for (var i = 1; i < parts.length; i++) {
+    var block = parts[i];
+
+    // Series URL: first /series/ULID/slug href in this block
+    var urlMatch = block.match(/href=\"(https?:\/\/weebcentral\.com\/series\/[0-9A-Z]{26}\/[^\"]+)\"/);
+    if (!urlMatch) continue;
+    var seriesUrl = urlMatch[1];
     if (seen[seriesUrl]) continue;
     seen[seriesUrl] = true;
 
-    // Extract surrounding context (~600 chars after href)
-    var ctx = html.substring(m.index, m.index + 600);
-
-    // Title: data-tip or alt attribute or span/h3 text
+    // Title: alt attribute pattern: alt="<Title> cover"
     var title = "";
-    var dataTip = ctx.match(/data-tip=\"([^\"]{2,100})\"/);
-    if (dataTip) {
-      title = decodeHtml(dataTip[1]);
-    } else {
-      var altMatch = ctx.match(/alt=\"([^\"]{2,100}) cover\"/);
-      if (altMatch) title = decodeHtml(altMatch[1]);
-    }
+    var altMatch = block.match(/alt=\"([^\"]{2,150}) cover\"/);
+    if (altMatch) title = decodeHtml(altMatch[1]);
     if (!title) continue;
 
-    // Cover: compsci88 CDN preferred
-    var imgMatch = ctx.match(/src=\"(https?:\/\/temp\.compsci88\.com\/cover\/[^\"]+)\"/);
-    if (!imgMatch) imgMatch = ctx.match(/src=\"(https?:\/\/[^\"]+\.(jpg|png|webp|avif))\"/);
+    // Cover: compsci88 fallback CDN (jpg, always available)
+    var imgMatch = block.match(/src=\"(https?:\/\/temp\.compsci88\.com\/cover\/fallback\/[^\"]+)\"/);
+    if (!imgMatch) imgMatch = block.match(/src=\"(https?:\/\/temp\.compsci88\.com\/cover\/[^\"]+)\"/);
+    if (!imgMatch) imgMatch = block.match(/src=\"(https?:\/\/[^\"]+\.(jpg|png|webp|avif))\"/);
     var imageUrl = imgMatch ? imgMatch[1] : "";
 
     list.push({ title: title, url: seriesUrl, imageUrl: imageUrl, isMature: false });

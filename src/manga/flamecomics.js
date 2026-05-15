@@ -7,7 +7,17 @@
  * Mature : false
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 3.0.0
+ *
+ * Fix v3.0.0 (2026-05-15):
+ *  - getLatestUpdates: homepage __NEXT_DATA__ pageProps changed structure.
+ *    series array is now under latestEntries.blocks[0].series, not pageProps.series.
+ *    Similarly popularEntries.blocks[0].series for a dedicated popular list from homepage.
+ *  - getLatestUpdates uses latestEntries block; getPopular keeps /browse (still has .series).
+ *  - getMangaDetail: series detail page pageProps.series is a dict, not [{...}].
+ *    Fixed _extractSeriesDetail to read dict directly.
+ *  - _extractSeriesJson (used by getChapterList) unchanged -- chapters page still uses
+ *    "chapters":[ JSON embedded in RSC payload, not __NEXT_DATA__.
  */
 
 var BASE_URL = "https://flamecomics.xyz";
@@ -54,27 +64,63 @@ class DefaultExtension extends MProvider {
     }
   }
 
+  // Extract series array from pageProps.series (used by /browse page).
   _extractAllSeries(html) {
-    // Next.js SSR : pageProps.series is in __NEXT_DATA__ script tag.
-    // Previous regex approach used [^[\]] which broke on nested arrays (e.g. tags:[]).
     var m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
     if (!m) return [];
-    // Memory cap (effie C1): refuse to parse __NEXT_DATA__ above 2MB to bound JSON.parse cost.
     if (m[1].length > 2000000) return [];
     try {
       var data = JSON.parse(m[1]);
       var series = data && data.props && data.props.pageProps && data.props.pageProps.series;
       if (!Array.isArray(series)) return [];
-      var out = [];
-      for (var i = 0; i < series.length; i++) {
-        var s = series[i];
-        // series_id validation (effie C2): only accept numeric IDs to prevent path traversal in CDN URL build.
-        if (s && s.title && s.series_id != null && /^\d+$/.test(String(s.series_id))) out.push(s);
-      }
-      return out;
+      return this._filterValidSeries(series);
     } catch (e) {
       return [];
     }
+  }
+
+  // Extract series array from a named entry block (popularEntries / latestEntries).
+  // Structure: pageProps.<entryKey>.blocks[0].series (array).
+  _extractEntryBlockSeries(html, entryKey) {
+    var m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) return [];
+    if (m[1].length > 2000000) return [];
+    try {
+      var data = JSON.parse(m[1]);
+      var entry = data && data.props && data.props.pageProps && data.props.pageProps[entryKey];
+      if (!entry || !Array.isArray(entry.blocks) || entry.blocks.length === 0) return [];
+      var series = entry.blocks[0].series;
+      if (!Array.isArray(series)) return [];
+      return this._filterValidSeries(series);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  // Extract detail from pageProps.series dict (series detail page).
+  _extractSeriesDetail(html) {
+    var m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
+    if (!m) return null;
+    if (m[1].length > 2000000) return null;
+    try {
+      var data = JSON.parse(m[1]);
+      var s = data && data.props && data.props.pageProps && data.props.pageProps.series;
+      if (!s || typeof s !== "object" || Array.isArray(s)) return null;
+      if (!s.series_id || !/^\d+$/.test(String(s.series_id))) return null;
+      return s;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  _filterValidSeries(seriesArr) {
+    var out = [];
+    for (var i = 0; i < seriesArr.length; i++) {
+      var s = seriesArr[i];
+      // series_id validation (effie C2): only accept numeric IDs to prevent path traversal in CDN URL build.
+      if (s && s.title && s.series_id != null && /^\d+$/.test(String(s.series_id))) out.push(s);
+    }
+    return out;
   }
 
   _seriesToManga(s) {
@@ -120,13 +166,12 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
+      // Homepage pageProps.latestEntries.blocks[0].series contains recently updated series.
+      // pageProps.series is empty on the homepage -- only /browse has it.
       var res = await fetchv2(BASE_URL, { "Referer": BASE_URL });
-      var seriesList = this._extractAllSeries(res);
+      var seriesList = this._extractEntryBlockSeries(res, "latestEntries");
 
-      // Sort by last_edit descending (most recently updated)
-      seriesList.sort(function(a, b) { return (b.last_edit || 0) - (a.last_edit || 0); });
-
-      // Deduplicate
+      // Deduplicate by series_id (order from server is already by recency)
       var seen = {};
       var unique = [];
       for (var i = 0; i < seriesList.length; i++) {
@@ -174,13 +219,12 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
-      // Extract series JSON
-      var seriesData = this._extractSeriesJson(res);
-      if (!seriesData || seriesData.length === 0) {
+      // Series detail page: pageProps.series is a dict (not an array).
+      var s = this._extractSeriesDetail(res);
+      if (!s) {
         return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
       }
 
-      var s = seriesData[0];
       var coverExt = s.cover || "thumbnail.png";
       var imageUrl = CDN_URL + "/uploads/images/series/" + s.series_id + "/" + coverExt;
       if (s.last_edit) imageUrl += "?" + s.last_edit;

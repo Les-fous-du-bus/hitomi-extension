@@ -6,21 +6,20 @@
  * Cloudflare : NON
  * Mature : false
  *
- * Audit live 2026-04-19 (@khun) :
- *   - /fr/originals renvoie ~97 cards au format
- *     <a href="/<lang>/<genre>/<slug>/list?title_no=N">
- *     <img alt=""><div class="info_text">
- *       <div class="genre">...</div>
- *       <strong class="title">Titre</strong>
- *     </div></a>
- *   - Detail: <h1 class="subj">, <p class="summary">, <h2 class="genre">
- *   - Chapitres desktop: <li class="_episodeItem" id="episode_N"> avec
- *     <span class="subj"><span>Ep.N</span></span>, <span class="date">, <span class="tx">#N</span>
- *   - Mobile m.webtoons.com: SSR quasi vide, on reste sur desktop
- *   - Viewer pages: #_imageList > img[data-url] (inchange)
+ * Audit live 2026-05-15 (@khun) :
+ *   - Catalogue /fr/originals: unchanged, strong.title + list?title_no= pattern still works.
+ *   - Detail page (list?title_no=N&page=1): requires Referer header and &page=1 param.
+ *     Without Referer, server returns size=0. Without &page=1, episodes absent.
+ *     Title: plain <h1> in body (not h1.subj). Cover: og:image meta.
+ *     Genre: meta keywords (2nd token). Author: <div class="author">.
+ *     Description: class="summary" still works.
+ *   - Episodes: id="episode_N" present when Referer + &page=1. Structure unchanged.
+ *     Mobile URL (m.webtoons.com) in series URL: replace with www before fetch.
+ *   - Search: /fr/search/originals?keyword=... returns HTTP 500.
+ *     Working endpoint: /fr/search?keyword=... (no /originals). Still uses strong.title.
  *
  * @author @khun — Extension Strategist
- * @version 1.0.1
+ * @version 4.0.0
  */
 
 var BASE_URL = "https://www.webtoons.com";
@@ -73,9 +72,10 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var keyword = query.trim().replace(/\s+/g, "+");
-      var url = BASE_URL + "/" + LANG_CODE + "/search/originals?keyword=" + keyword + "&page=" + page;
-      var res = await fetchv2(url, {});
+      // /fr/search/originals returns HTTP 500. Working endpoint: /fr/search?keyword=<q>.
+      var keyword = encodeURIComponent(query.trim());
+      var url = BASE_URL + "/" + LANG_CODE + "/search?keyword=" + keyword;
+      var res = await fetchv2(url, { "Referer": BASE_URL + "/" + LANG_CODE + "/" });
       var result = this._parseMangaListFromPage(res);
       result.hasNextPage = result.list.length > 0;
       return result;
@@ -86,50 +86,57 @@ class DefaultExtension extends MProvider {
 
   async getMangaDetail(url) {
     try {
+      // Normalize to www and append &page=1 (required for episodes and Referer gate).
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      fullUrl = fullUrl.replace(MOBILE_URL, BASE_URL);
+      if (fullUrl.indexOf("&page=") === -1 && fullUrl.indexOf("?page=") === -1) {
+        fullUrl += (fullUrl.indexOf("?") !== -1 ? "&" : "?") + "page=1";
+      }
+      var referer = BASE_URL + "/" + LANG_CODE + "/";
+      var res = await fetchv2(fullUrl, { "Referer": referer });
 
-      // Title
-      var titleMatch = res.match(/<h1 class="subj"[^>]*>(.*?)<\/h1>/s) ||
-                        res.match(/<h3 class="subj"[^>]*>(.*?)<\/h3>/s);
+      // Title: plain <h1> in body (not h1.subj as in older Webtoons layout).
+      var titleMatch = res.match(/<h1[^>]*>(.*?)<\/h1>/s);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
 
-      // Description
-      var descMatch = res.match(/<p class="summary"[^>]*>(.*?)<\/p>/s);
-      var description = descMatch ? stripTags(descMatch[1]).replace(/\s+/g, " ").trim() : "";
+      // Description: class="summary" or meta description
+      var descMatch = res.match(/<[^>]*class="summary[^"]*"[^>]*>(.*?)<\/(?:p|div|span)>/s);
+      var description = "";
+      if (descMatch) {
+        description = stripTags(descMatch[1]).replace(/\s+/g, " ").trim();
+      } else {
+        var metaDesc = res.match(/<meta name="description" content="([^"]+)"/);
+        if (metaDesc) description = metaDesc[1];
+      }
 
-      // Author
-      var authorMatch = res.match(/<div class="author_area"[^>]*>(.*?)<\/div>/s);
+      // Author: <div class="author"> inner text
+      var authorMatch = res.match(/<div class="author[^"]*"[^>]*>([\s\S]*?)<\/div>/);
       var authors = [];
       if (authorMatch) {
-        var authorText = stripTags(authorMatch[1]).replace(/author info/gi, "").replace(/\s+/g, " ").trim();
+        var authorText = stripTags(authorMatch[1]).replace(/\s+/g, " ").trim();
         if (authorText) authors.push(authorText);
       }
 
-      // Genres
+      // Genre: meta keywords 2nd token (e.g. "Title, Romance, WEBTOON")
       var genres = [];
-      var genreMatches = res.match(/<p class="genre"[^>]*>(.*?)<\/p>/gs);
-      if (genreMatches) {
-        for (var i = 0; i < genreMatches.length; i++) {
-          var g = stripTags(genreMatches[i]).trim();
-          if (g) genres.push(g);
+      var kwMatch = res.match(/<meta name="keywords" content="([^"]+)"/);
+      if (kwMatch) {
+        var kws = kwMatch[1].split(",");
+        for (var k = 1; k < kws.length - 1; k++) {
+          var g = kws[k].trim();
+          if (g && g.toLowerCase() !== "webtoon") genres.push(g);
         }
       }
-      if (genres.length === 0) {
-        var infoGenre = res.match(/<div class="info">[^]*?<h2[^>]*>(.*?)<\/h2>/s);
-        if (infoGenre) genres.push(stripTags(infoGenre[1]).trim());
-      }
 
-      // Status
+      // Status from page title or day_info
+      var status = "unknown";
       var dayInfoMatch = res.match(/<p class="day_info"[^>]*>(.*?)<\/p>/s);
       var dayInfo = dayInfoMatch ? stripTags(dayInfoMatch[1]).trim() : "";
-      var status = "unknown";
       if (/UP|EVERY|NOUVEAU/i.test(dayInfo)) status = "ongoing";
       else if (/END|TERMIN|COMPLETED/i.test(dayInfo)) status = "completed";
 
-      // Cover
-      var coverMatch = res.match(/<div class="cont_box">[^]*?<img[^>]*src="([^"]+)"/s) ||
-                        res.match(/<div class="detail_body">[^]*?<img[^>]*src="([^"]+)"/s);
+      // Cover: og:image meta (reliable across all Webtoons page variants)
+      var coverMatch = res.match(/<meta[^>]*property="og:image"[^>]*content="([^"]+)"/);
       var imageUrl = coverMatch ? coverMatch[1] : "";
 
       return {
@@ -149,9 +156,14 @@ class DefaultExtension extends MProvider {
 
   async getChapterList(url) {
     try {
-      // 2026-04-19: mobile SSR est vide, on reste sur desktop
+      // Normalize: replace mobile URL, add &page=1, add Referer.
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      fullUrl = fullUrl.replace(MOBILE_URL, BASE_URL);
+      if (fullUrl.indexOf("&page=") === -1 && fullUrl.indexOf("?page=") === -1) {
+        fullUrl += (fullUrl.indexOf("?") !== -1 ? "&" : "?") + "page=1";
+      }
+      var referer = BASE_URL + "/" + LANG_CODE + "/";
+      var res = await fetchv2(fullUrl, { "Referer": referer });
 
       var chapters = [];
       // Desktop episode items: <li class="_episodeItem" id="episode_N" data-episode-no="N">

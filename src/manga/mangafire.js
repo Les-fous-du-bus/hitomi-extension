@@ -1,13 +1,22 @@
 /**
  * MangaFire — Extension Hitomi Reader
  * Source : https://mangafire.to
- * Methode : HTML scraping (regex)
+ * Methode : HTML scraping (regex) + AJAX endpoints
  * Langue : multi (FR prioritaire)
- * Cloudflare : NON
+ * Cloudflare : NON on /filter with no keyword; CF 403 with keyword param
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 2.0.0
+ *
+ * Fix v2.0.0 (2026-05-15):
+ *  - getChapterList: manga ID extraction regex /\.(\w+)(?:\?|$|\/)/ matched "to"
+ *    from "mangafire.to" instead of the actual slug ID (e.g. "dkw").
+ *    Replaced with /\/manga\/[^.]+\.(\w+)(?:[/?#]|$)/ anchored to /manga/ path.
+ *  - search: /filter?keyword=... returns CF 403 when keyword param is non-empty.
+ *    Fallback: fetch /filter?sort=trending (popular, no keyword) and filter client-side
+ *    by title match. Same approach as flamecomics. Covers Discover search adequately.
+ *    Note: CF-gated keyword search may work in-app via WebView bypass -- monitor.
  */
 
 const BASE_URL = "https://mangafire.to";
@@ -59,10 +68,21 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var q = query.trim().replace(/\s+/g, "+");
-      var url = BASE_URL + "/filter?keyword=" + q + "&language=" + LANG + "&page=" + page;
+      // /filter?keyword=<q> triggers CF 403 from server-side (Turnstile required).
+      // Fallback: fetch popular list and filter by title client-side.
+      // In-app WebView bypass may allow the direct keyword URL to work.
+      var url = BASE_URL + "/filter?keyword=&language=" + LANG + "&sort=trending&page=1";
       var res = await fetchv2(url, {});
-      return this._parseMangaList(res);
+      var result = this._parseMangaList(res);
+      if (!query || !query.trim()) return result;
+      var q = query.trim().toLowerCase();
+      var filtered = [];
+      for (var i = 0; i < result.list.length; i++) {
+        if (result.list[i].title && result.list[i].title.toLowerCase().indexOf(q) !== -1) {
+          filtered.push(result.list[i]);
+        }
+      }
+      return { list: filtered, hasNextPage: false };
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -130,11 +150,10 @@ class DefaultExtension extends MProvider {
   async getChapterList(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      // Extract manga ID from URL (e.g., /manga/one-piece.12345 -> 12345)
-      var idMatch = fullUrl.match(/\.(\w+)(?:\?|$|\/)/);
-      if (!idMatch) {
-        idMatch = fullUrl.match(/\.(\w+)$/);
-      }
+      // Extract manga ID from URL: /manga/<slug>.<id>
+      // e.g. /manga/one-piecee.dkw -> "dkw"
+      // Previous regex /\.(\w+)(?:\?|$|\/)/ matched "to" from "mangafire.to".
+      var idMatch = fullUrl.match(/\/manga\/[^.]+\.(\w+)(?:[/?#]|$)/);
       if (!idMatch) return [];
       var mangaId = idMatch[1];
 

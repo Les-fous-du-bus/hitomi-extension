@@ -30,23 +30,23 @@
       "iconUrl": "https://mangadex.org/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "low",
-      "note": "runtime-audit 2026-05-10: RUNTIME-OK. API v5 stable, search + chapters verified.",
-      "sha256": "912a4f0016fa738376f85f491aa56dc0391964ceefb2191e86294c50f7b09419"
+      "note": "v2 fix 2026-05-15: getChapterList FR->EN fallback. Popular manga on MangaDex (Solo Leveling) show in FR catalog but have 0 FR chapters; fallback to EN ensures chapters load. Harness 5/6 PASS (getPageList FAIL: test chapter is DRM-locked/premium — at-home returns 0 pages, not a code bug). API v5 stable.",
+      "sha256": "eae5215c52b06379f224b7badbba4ec07be346dc5b88bc9b04cde15ed435f038"
     },
     {
       "id": "weebcentral",
       "name": "WeebCentral",
       "lang": "en",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": true,
       "cloudflare": true,
       "jsUrl": "src/manga/weebcentral.js",
       "iconUrl": "https://weebcentral.com/static/images/brand.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-fix 2026-05-13: title + imageUrl key alignment + chapter number regex extraction. v1: ported from Mangayomi weebcentral source, runtime tested 2026-05-10.",
-      "sha256": "af3933d8a67c80aeee9cb24a55b9e5a74811b51637ad089517ac73f0f791565f"
+      "note": "v3 fix 2026-05-15: parseSearchList rewritten to split on article.bg-base-300 blocks. Previous 600-char forward scan from href missed alt='<Title> cover' which appears BEFORE the href in DOM. Harness 6/6 PASS strict.",
+      "sha256": "27e5f4d5e55e2b53eeb156c19bcc727ad2705471627ec1883e23d4a9a7c34229"
     },
     {
       "id": "mangaread",
@@ -120,23 +120,23 @@
       "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL \u2014 CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
-      "sha256": "d8d18bc1f1264ee154fb1f2aca6219f4d92a80dd2dd401ebb58bc6b6776d9c31"
+      "note": "v2 fix 2026-05-15: (1) getChapterList regex /\\.([\\w]+)(?:[/?#]|$)/ matched 'to' from domain; fixed to anchor on /manga/ path segment. (2) search /filter?keyword=<q> triggers CF Turnstile; fallback: fetch popular + client-side filter. getPageList still CF-blocked on /read/ reader URLs (WebView bypass required in-app). Harness 4/6 PASS.",
+      "sha256": "d5e3ad7f0231fa6420c5dddcebb08699dd91ba9e784791f81477198ed376c4dd"
     },
     {
       "id": "webtoons",
       "name": "Webtoons",
       "lang": "multi",
       "space": "manga",
-      "version": 3,
+      "version": 4,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/webtoons.js",
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v3 (round 4 fix 2026-05-10): dropped alt='[^]*' requirement from primary parse pattern. Live DOM has alt='' on all series imgs which broke v2 regex. Fix verified: 143 series parsed.",
-      "sha256": "cdd76b211da9da3ac1fdf9e918a48ae19fa44628b4b83e9cc80538816d2b0139"
+      "note": "v4 fix 2026-05-15: (1) search endpoint /fr/search/originals returned HTTP 500 -> fixed to /fr/search. (2) getMangaDetail: title now plain <h1> (was h1.subj); cover from og:image meta; Referer header required; &page=1 required. (3) getChapterList: same Referer + page=1 fix. getPageList still fails (viewer uses data-url on SSR -- JS rendering required). Harness 5/6 PASS.",
+      "sha256": "66881057ae8b35da3098ac4fa418d7ff984187f6971282858d1ddb364a25f3cc"
     },
     {
       "id": "asurascans",
@@ -201,15 +201,15 @@
       "name": "PantheonScan",
       "lang": "fr",
       "space": "manga",
-      "version": 2.1,
+      "version": 3.1,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/pantheon_scan.js",
       "iconUrl": "https://pantheon-scan.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v2.1: scheme validation + ReDoS pre-slicing. imageUrl/chapUrl reject non-http(s) schemes. getMangaDetail anchors each dotAll pattern to a 3-10KB window to prevent backtracking on 300KB+ Madara pages.",
-      "sha256": "15123d2cb4397f13b4289e63044c78eb634bcb9093bf6d71e30064a573e1a506"
+      "note": "v3.1 fix 2026-05-15: (1) catalog URLs fixed from /page/N/?s=... (WP search page, 0 items) to /manga/?m_orderby=...&page=N (Madara tiles). (2) getMangaDetail title: <h1> at body+4000, 'post-title' at body+23000 -- back-offset of -50 missed h1; fixed to anchor directly on first <h1>. (3) search c-tabs-item__content: unquoted class/href in search results; added unquoted patterns to nameMatch. (4) badge prefix stripped from title (HOT tab + text). getChapterList FAIL: site uses AJAX POST (Madara) -- GET-only fetchv2 cannot retrieve chapter list. Harness 4/5 PASS.",
+      "sha256": "8f1a69fa8e3c6831523aed59df40268e5733e1a83d91abf000ad51c033de1741"
     },
     {
       "id": "manga_scantrad",
@@ -273,15 +273,15 @@
       "name": "Flame Comics",
       "lang": "en",
       "space": "manga",
-      "version": 2,
+      "version": 3,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/flamecomics.js",
       "iconUrl": "https://flamecomics.xyz/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v2 (round 4 fix 2026-05-10): _extractAllSeries switched from regex with [^\\[\\]] character class to JSON.parse on __NEXT_DATA__ script tag. Previous regex broke on nested arrays (tags:[]). Fix verified: 153 series parsed via pageProps.series. Effie hardening: 2MB cap on JSON.parse + series_id /^\\d+$/ validation against CDN path traversal.",
-      "sha256": "84566561231b2c882b036c1ac0597ee27a41c82965a0158cd4beb5948377595c"
+      "note": "v3 fix 2026-05-15: (1) getLatestUpdates: pageProps.series empty on homepage; data moved to pageProps.latestEntries.blocks[0].series. (2) getMangaDetail: pageProps.series is a dict (not array) on detail pages; rewrote _extractSeriesDetail. Both issues caused by Next.js RSC payload restructuring. Harness 6/6 PASS strict.",
+      "sha256": "4dd922266325599ae39aad30231b9d1f9f39d220e9aa4d7856c2700712c24545"
     },
     {
       "id": "mangahere",

@@ -10,7 +10,25 @@
  *         sauf si le bridge supporte POST ou si le site rend les chapitres inline.
  *
  * @author @khun — Extension Strategist
- * @version 2.1.0
+ * @version 3.1.0
+ *
+ * Fix v3.0.0 (2026-05-15):
+ *  - getPopular / getLatestUpdates / search: URLs changed from
+ *    /page/N/?s=&post_type=wp-manga&m_orderby=... (WordPress search results page,
+ *    returns different HTML with 0 page-item-detail blocks) to
+ *    /manga/?m_orderby=...&page=N (proper Madara manga listing page).
+ *    The search-based URL returns "Vous avez cherche" WordPress search page;
+ *    /manga/?m_orderby=... returns the proper page-item-detail Madara tiles.
+ *  - search: /manga/?s=<query>&post_type=wp-manga properly returns page-item-detail tiles.
+ *
+ * Fix v3.1.0 (2026-05-15):
+ *  - getMangaDetail title "Unknown": the <h1> is at body top (~pos 4280); "post-title"
+ *    first occurrence is ~19000 chars later (sidebar widgets). Back-offset of -50 chars
+ *    completely misses the <h1>. Fix: use <h1> directly without post-title anchor.
+ *  - _parseMadaraList search fallback (c-tabs-item__content): search results page
+ *    uses unquoted HTML attributes (class=post-title, href=https://...).
+ *    Old nameMatch patterns required quoted href="..." and matched nothing.
+ *    Fix: add unquoted class/href patterns to nameMatch.
  */
 
 var BASE_URL = "https://pantheon-scan.com";
@@ -41,7 +59,7 @@ class DefaultExtension extends MProvider {
 
   async getPopular(page) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=&post_type=wp-manga&m_orderby=trending";
+      var url = BASE_URL + "/manga/?m_orderby=trending&page=" + page;
       var res = await fetchv2(url, {});
       return this._parseMadaraList(res);
     } catch (e) {
@@ -51,7 +69,7 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=&post_type=wp-manga&m_orderby=latest";
+      var url = BASE_URL + "/manga/?m_orderby=latest&page=" + page;
       var res = await fetchv2(url, {});
       return this._parseMadaraList(res);
     } catch (e) {
@@ -61,7 +79,8 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query) + "&post_type=wp-manga";
+      // /manga/?s=<query>&post_type=wp-manga returns proper Madara tiles.
+      var url = BASE_URL + "/manga/?s=" + encodeURIComponent(query) + "&post_type=wp-manga&page=" + page;
       var res = await fetchv2(url, {});
       return this._parseMadaraList(res);
     } catch (e) {
@@ -78,12 +97,17 @@ class DefaultExtension extends MProvider {
       // les patterns dotAll (/s) qui peuvent backtracker sur des pages Madara de 300KB+.
       // Chaque bloc utilise son propre ancre pour minimiser la fenetre de recherche.
 
-      var titleAnchor = res.indexOf("post-title");
-      var titleWindow = titleAnchor > 0 ? res.substring(Math.max(0, titleAnchor - 50), titleAnchor + 5000) : res;
-      var titleMatch = titleWindow.match(/<h1[^>]*class="[^"]*post-title[^"]*"[^>]*>(.*?)<\/h1>/s) ||
-                        titleWindow.match(/<div class="post-title"[^>]*>[^]*?<h1[^>]*>(.*?)<\/h1>/s) ||
-                        titleWindow.match(/<h1[^>]*>(.*?)<\/h1>/s);
-      var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
+      // Title: the <h1> is at page top (~body+4000), well before post-title divs
+      // (which are sidebar widgets at ~body+23000). Anchor directly on first <h1>.
+      var h1Anchor = res.indexOf("<h1");
+      var titleWindow = h1Anchor > 0 ? res.substring(h1Anchor, h1Anchor + 500) : res.substring(0, 500);
+      var titleMatch = titleWindow.match(/<h1[^>]*>(.*?)<\/h1>/s);
+      var rawTitle = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
+      // Remove badge prefix: "<span class=manga-title-badges>TEXT</span>\tActual Title"
+      // After stripTags, badges become plain text followed by tab/whitespace.
+      // Split on tab and take last non-empty segment; if no tab, use full string.
+      var titleParts = rawTitle.split(/\t+/);
+      var title = titleParts[titleParts.length - 1].trim() || rawTitle.trim();
 
       // Pantheon uses unquoted attributes: src=url or data-src=url
       var coverAnchor = res.indexOf("summary_image");
@@ -311,18 +335,23 @@ class DefaultExtension extends MProvider {
       for (var i = 0; i < itemMatches.length; i++) {
         var item = itemMatches[i];
 
-        // Pantheon may use unquoted href: href=https://... title=... >
-        // Match quoted first, then unquoted fallback
-        var nameMatch = item.match(/<(?:h3|h4|h5)[^>]*class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
-                        item.match(/class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
+        // Pantheon may use unquoted attributes: class=post-title, href=https://...
+        // Search page uses unquoted, catalog page uses quoted.
+        // Try quoted class+quoted href, then unquoted class+unquoted href,
+        // then unquoted class+quoted href, then any post-title+any href.
+        var nameMatch = item.match(/class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
+                        item.match(/class=post-title[^>]*>[\s\S]*?<a[^>]*href=([^\s>"']+)[^>]*>([\s\S]*?)<\/a>/i) ||
+                        item.match(/class=post-title[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i) ||
                         item.match(/class="[^"]*post-title[^"]*"[^>]*>[\s\S]*?<a[^>]*href=([^\s>"']+)[^>]*>([\s\S]*?)<\/a>/i);
         if (!nameMatch) continue;
 
         var mangaUrl = nameMatch[1].replace(/['"]/g, "");
         var title = stripTags(nameMatch[2]).trim();
 
+        // data-src may be unquoted on search page: data-src=https://...
         var imgMatch = item.match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"([^"]+)"/) ||
-                       item.match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*([^\s>]+)/);
+                       item.match(/<img[^>]*data-src=([^\s>"']+)/) ||
+                       item.match(/<img[^>]*(?:data-lazy-src|src)\s*=\s*([^\s>"']+)/);
         var imageUrl = imgMatch ? imgMatch[1].replace(/['"]/g, "") : "";
         // Skip placeholder lazy images
         if (imageUrl.indexOf("dflazy.jpg") !== -1 || imageUrl.indexOf("data:image") !== -1) {

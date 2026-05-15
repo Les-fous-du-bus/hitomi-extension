@@ -7,7 +7,14 @@
  * Mature : partiel (filtré par contentRating)
  *
  * @author @khun — Extension Strategist
- * @version 1.0.0
+ * @version 2.0.0
+ *
+ * Fix v2.0.0 (2026-05-15):
+ *  - getChapterList: when FR feed returns 0 chapters, fall back to EN.
+ *    Many popular manga (e.g. Solo Leveling) have no FR translation on MangaDex
+ *    but the getPopular endpoint filters by availableTranslatedLanguage[]=fr.
+ *    Result: detail page opens but chapter list is empty.
+ *    Fix: try FR first; if total=0, retry with EN.
  */
 
 const BASE_API = "https://api.mangadex.org";
@@ -252,16 +259,27 @@ class DefaultExtension extends MProvider {
 
   async getChapterList(url) {
     const mangaId = url.split("/manga/")[1].split("?")[0];
+
+    // Try FR first; fall back to EN when FR has no translations.
+    const langCandidates = [LANG, "en"];
+    for (const lang of langCandidates) {
+      const chapters = await this._fetchChaptersForLang(mangaId, lang);
+      if (chapters.length > 0) return chapters;
+    }
+    return [];
+  }
+
+  async _fetchChaptersForLang(mangaId, lang) {
     const chapters = [];
     let offset = 0;
     const limit = 100;
     let total = 1;
 
-    // Pagination complète des chapitres (peut être > 100)
+    // Pagination complete (may exceed 100 chapters).
     while (offset < total) {
       const chapUrl =
         `${BASE_API}/manga/${mangaId}/feed` +
-        `?translatedLanguage[]=${LANG}` +
+        `?translatedLanguage[]=${lang}` +
         `&limit=${limit}&offset=${offset}` +
         `&order[chapter]=desc&order[volume]=desc` +
         `&includes[]=scanlation_group`;
@@ -272,6 +290,7 @@ class DefaultExtension extends MProvider {
       if (json.result !== "ok") break;
 
       total = json.total || 0;
+      if (total === 0) return [];
 
       for (const ch of json.data || []) {
         const a = ch.attributes || {};
@@ -279,7 +298,7 @@ class DefaultExtension extends MProvider {
         const chapNum = a.chapter || "";
         const chapTitle = a.title || "";
         const displayTitle =
-          `${vol}Ch.${chapNum}${chapTitle ? " — " + chapTitle : ""}`.trim();
+          `${vol}Ch.${chapNum}${chapTitle ? " -- " + chapTitle : ""}`.trim();
 
         chapters.push({
           title: displayTitle || `Chapitre ${chapNum}`,
