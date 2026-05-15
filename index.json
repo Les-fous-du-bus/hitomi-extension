@@ -128,15 +128,15 @@
       "name": "Webtoons",
       "lang": "multi",
       "space": "manga",
-      "version": 5,
+      "version": 6,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/webtoons.js",
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v5 (file v4.1.0) 2026-05-15: getPageList fix — slice from id=_imageList + match class=_images. Previous regex broke on nested div. 123 images returned. Index sha regen.",
-      "sha256": "db40086c6b11f5c32f977c0f1225d6833f3f0b4d62c86eebd2a066a9a400feb4"
+      "note": "v6 2026-05-15: QuickJS compat — /s dotAll flag remplace par [\\s\\S]*? + drop /s sur titleMatch, descMatch, dayInfoMatch. Avant : regex silencieusement null in-app -> detail page vide. Harness 6/6 PASS.",
+      "sha256": "58652a8c91e6c24a5608356a16f14b897063f19b5b1cbb4b35faae11e7a986a5"
     },
     {
       "id": "asurascans",
@@ -201,15 +201,15 @@
       "name": "PantheonScan",
       "lang": "fr",
       "space": "manga",
-      "version": 4,
+      "version": 5,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/pantheon_scan.js",
       "iconUrl": "https://pantheon-scan.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v4 (file v3.2.0) 2026-05-15: getChapterList POST manquant ajoute (Madara ajax/chapters). Bridge fetchv2 supporte POST quand method specifie. 203 chapitres retournes. Harness 6/6 PASS.",
-      "sha256": "33d64e9f56ba7c4e516bc0a12f989456744a14c994522255027cbc56423ea729"
+      "note": "v5 2026-05-15: QuickJS compat — 28 regex /s dotAll converties en [\\s\\S]*? + drop /s. POST AJAX /ajax/chapters/ deja en place v4. Harness 6/6 PASS.",
+      "sha256": "19f34669a2c8041cce26be7fbffb1658ef76d92a62a54f0120e984ad362cb8ff"
     },
     {
       "id": "manga_scantrad",

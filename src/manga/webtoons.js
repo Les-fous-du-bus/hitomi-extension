@@ -104,11 +104,11 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, { "Referer": referer });
 
       // Title: plain <h1> in body (not h1.subj as in older Webtoons layout).
-      var titleMatch = res.match(/<h1[^>]*>(.*?)<\/h1>/s);
+      var titleMatch = res.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
 
       // Description: class="summary" or meta description
-      var descMatch = res.match(/<[^>]*class="summary[^"]*"[^>]*>(.*?)<\/(?:p|div|span)>/s);
+      var descMatch = res.match(/<[^>]*class="summary[^"]*"[^>]*>([\s\S]*?)<\/(?:p|div|span)>/);
       var description = "";
       if (descMatch) {
         description = stripTags(descMatch[1]).replace(/\s+/g, " ").trim();
@@ -138,7 +138,7 @@ class DefaultExtension extends MProvider {
 
       // Status from page title or day_info
       var status = "unknown";
-      var dayInfoMatch = res.match(/<p class="day_info"[^>]*>(.*?)<\/p>/s);
+      var dayInfoMatch = res.match(/<p class="day_info"[^>]*>([\s\S]*?)<\/p>/);
       var dayInfo = dayInfoMatch ? stripTags(dayInfoMatch[1]).trim() : "";
       if (/UP|EVERY|NOUVEAU/i.test(dayInfo)) status = "ongoing";
       else if (/END|TERMIN|COMPLETED/i.test(dayInfo)) status = "completed";

@@ -31,10 +31,10 @@
  *    Fix: add unquoted class/href patterns to nameMatch.
  *
  * Fix v3.2.0 (2026-05-15):
- *  - getChapterList: Madara /ajax/chapters/ endpoint requires HTTP POST, not GET.
+ *  - getChapterList: Madara /ajax/chapter/ endpoint requires HTTP POST, not GET.
  *    fetchv2 call was missing method: "POST". The inline manga page HTML only contains
  *    wp-manga-chapter in CSS selectors (3 occurrences), never in the chapter list DOM
- *    (which is loaded lazily). Only the POST to /ajax/chapters/ returns the chapter HTML.
+ *    (which is loaded lazily). Only the POST to /ajax/chapter/ returns the chapter HTML.
  *    Fix: add method: "POST" to the fetchv2 call for the ajax/chapters/ endpoint.
  */
 
@@ -101,17 +101,17 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, {});
 
       // ReDoS pre-slicing : borner la fenetre HTML autour de l'ancre avant d'appliquer
-      // les patterns dotAll (/s) qui peuvent backtracker sur des pages Madara de 300KB+.
+      // les patterns dotAll (/) qui peuvent backtracker sur des pages Madara de 300KB+.
       // Chaque bloc utilise son propre ancre pour minimiser la fenetre de recherche.
 
       // Title: the <h1> is at page top (~body+4000), well before post-title divs
       // (which are sidebar widgets at ~body+23000). Anchor directly on first <h1>.
       var h1Anchor = res.indexOf("<h1");
       var titleWindow = h1Anchor > 0 ? res.substring(h1Anchor, h1Anchor + 500) : res.substring(0, 500);
-      var titleMatch = titleWindow.match(/<h1[^>]*>(.*?)<\/h1>/s);
+      var titleMatch = titleWindow.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
       var rawTitle = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
-      // Remove badge prefix: "<span class=manga-title-badges>TEXT</span>\tActual Title"
-      // After stripTags, badges become plain text followed by tab/whitespace.
+      // Remove badge prefix: "<span class=manga-title-badges>TEXT</pan>\tActual Title"
+      // After stripTags, badges become plain text followed by tab/whitepace.
       // Split on tab and take last non-empty segment; if no tab, use full string.
       var titleParts = rawTitle.split(/\t+/);
       var title = titleParts[titleParts.length - 1].trim() || rawTitle.trim();
@@ -120,12 +120,12 @@ class DefaultExtension extends MProvider {
       var coverAnchor = res.indexOf("summary_image");
       // back-offset 20 chars to include the opening <div tag before the class attribute
       var coverWindow = coverAnchor > 0 ? res.substring(Math.max(0, coverAnchor - 20), coverAnchor + 3000) : res;
-      var coverMatch = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)="([^"]+)"/s) ||
-                        coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)=([^\s>]+)/s);
+      var coverMatch = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)="([^"]+)"/) ||
+                        coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*(?:data-src|src)=([^\s>]+)/);
       var imageUrl = coverMatch ? coverMatch[1].replace(/['"]/g, "") : "";
       // The default lazy image is a placeholder, use data-src instead
       if (imageUrl.indexOf("dflazy.jpg") !== -1 || imageUrl.indexOf("data:image") !== -1) {
-        var dataSrc = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*data-src=["']?([^\s>"']+)/s);
+        var dataSrc = coverWindow.match(/<div class="?summary_image"?[^>]*>[^]*?<img[^>]*data-src=["']?([^\s>"']+)/);
         if (dataSrc) imageUrl = dataSrc[1];
       }
       // Scheme validation : rejeter toute URL qui n'est pas http(s) (ex: javascript:)
@@ -134,17 +134,17 @@ class DefaultExtension extends MProvider {
       var descAnchor = res.indexOf("summary__content");
       // back-offset 20 chars to include the opening <div tag before the class attribute
       var descWindow = descAnchor > 0 ? res.substring(Math.max(0, descAnchor - 20), descAnchor + 10000) : res;
-      var descMatch = descWindow.match(/<div class="summary__content"[^>]*>(.*?)<\/div>/s);
+      var descMatch = descWindow.match(/<div class="summary__content"[^>]*>([\s\S]*?)<\/div>/);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
       var genres = [];
       var genreAnchor = res.indexOf("genres-content");
       // back-offset 20 chars to include the opening <div tag before the class attribute
       var genreWindow = genreAnchor > 0 ? res.substring(Math.max(0, genreAnchor - 20), genreAnchor + 5000) : res;
-      var genreMatch = genreWindow.match(/<div class="?genres-content"?[^>]*>(.*?)<\/div>/s) ||
-                       genreWindow.match(/Genre[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
+      var genreMatch = genreWindow.match(/<div class="?genres-content"?[^>]*>([\s\S]*?)<\/div>/) ||
+                       genreWindow.match(/Genre[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>([\s\S]*?)<\/div>/);
       if (genreMatch) {
-        var genreLinks = genreMatch[1].match(/<a[^>]*>(.*?)<\/a>/gs);
+        var genreLinks = genreMatch[1].match(/<a[^>]*>([\s\S]*?)<\/a>/g);
         if (genreLinks) {
           for (var i = 0; i < genreLinks.length; i++) {
             var g = stripTags(genreLinks[i]).trim();
@@ -156,9 +156,9 @@ class DefaultExtension extends MProvider {
       var authors = [];
       var authorAnchor = res.indexOf("author-content");
       var authorWindow = authorAnchor > 0 ? res.substring(Math.max(0, authorAnchor - 200), authorAnchor + 3000) : res;
-      var authorMatch = authorWindow.match(/Author[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
-                        authorWindow.match(/Auteur[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>(.*?)<\/div>/s) ||
-                        authorWindow.match(/<div class="?author-content"?[^>]*>(.*?)<\/div>/s);
+      var authorMatch = authorWindow.match(/Author[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>([\s\S]*?)<\/div>/) ||
+                        authorWindow.match(/Auteur[^<]*<\/h5>[^]*?<div class="?(?:summary-content|author-content)"?[^>]*>([\s\S]*?)<\/div>/) ||
+                        authorWindow.match(/<div class="?author-content"?[^>]*>([\s\S]*?)<\/div>/);
       if (authorMatch) {
         var authorText = stripTags(authorMatch[1]).trim();
         if (authorText && authorText !== "Updating") authors.push(authorText);
@@ -167,8 +167,8 @@ class DefaultExtension extends MProvider {
       var status = "unknown";
       var statusAnchor = res.indexOf("summary-content");
       var statusWindow = statusAnchor > 0 ? res.substring(Math.max(0, statusAnchor - 200), statusAnchor + 3000) : res;
-      var statusMatch = statusWindow.match(/Status[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s) ||
-                        statusWindow.match(/Statut[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>(.*?)<\/div>/s);
+      var statusMatch = statusWindow.match(/Status[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>([\s\S]*?)<\/div>/) ||
+                        statusWindow.match(/Statut[^<]*<\/h5>[^]*?<div class="?summary-content"?[^>]*>([\s\S]*?)<\/div>/);
       if (statusMatch) {
         var st = stripTags(statusMatch[1]).trim().toLowerCase();
         if (st.indexOf("ongoing") !== -1 || st.indexOf("en cours") !== -1) status = "ongoing";
@@ -204,7 +204,7 @@ class DefaultExtension extends MProvider {
 
       var chapterHtml = "";
 
-      // Try ajax/chapters/ endpoint — Madara requires POST (GET returns empty/error).
+      // Try ajax/chapter/ endpoint — Madara requires POST (GET returns empty/error).
       if (!chapterHtml || chapterHtml.indexOf("wp-manga-chapter") === -1) {
         try {
           var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
@@ -225,15 +225,15 @@ class DefaultExtension extends MProvider {
       }
 
       var chapters = [];
-      var chapterMatches = chapterHtml.match(/<li class="wp-manga-chapter[^"]*"[^>]*>[^]*?<\/li>/gs);
+      var chapterMatches = chapterHtml.match(/<li class="wp-manga-chapter[^"]*"[^>]*>[^]*?<\/li>/g);
       if (!chapterMatches) return [];
 
       var total = chapterMatches.length;
       for (var i = 0; i < chapterMatches.length; i++) {
         var ch = chapterMatches[i];
 
-        var linkMatch = ch.match(/<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/s) ||
-                        ch.match(/<a[^>]*href=([^\s>]+)[^>]*>(.*?)<\/a>/s);
+        var linkMatch = ch.match(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/) ||
+                        ch.match(/<a[^>]*href=([^\s>]+)[^>]*>([\s\S]*?)<\/a>/);
         if (!linkMatch) continue;
 
         var chapUrl = linkMatch[1].replace(/['"]/g, "");
@@ -241,8 +241,8 @@ class DefaultExtension extends MProvider {
         if (chapUrl && !chapUrl.startsWith("https://") && !chapUrl.startsWith("http://")) continue;
         var chapTitle = stripTags(linkMatch[2]).trim();
 
-        var dateMatch = ch.match(/class="chapter-release-date"[^>]*>[^]*?<i[^>]*>(.*?)<\/i>/s) ||
-                        ch.match(/class="chapter-release-date"[^>]*>(.*?)<\/span>/s);
+        var dateMatch = ch.match(/class="chapter-release-date"[^>]*>[^]*?<i[^>]*>([\s\S]*?)<\/i>/) ||
+                        ch.match(/class="chapter-release-date"[^>]*>([\s\S]*?)<\/span>/);
         var dateUpload = Date.now();
         if (dateMatch) {
           var dateText = stripTags(dateMatch[1]).trim();
@@ -276,20 +276,20 @@ class DefaultExtension extends MProvider {
 
       var pages = [];
       // Extract reading-content block first
-      var readingContent = res.match(/<div class="?reading-content"?[^>]*>(.*?)<\/div>\s*<\/div>/s);
+      var readingContent = res.match(/<div class="?reading-content"?[^>]*>([\s\S]*?)<\/div>\s*<\/div>/);
       var contentHtml = readingContent ? readingContent[1] : res;
 
       // Match img tags with wp-manga-chapter-img class
-      var imgMatches = contentHtml.match(/<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?[^>]*class="?[^"]*wp-manga-chapter-img[^"]*"?/gs);
+      var imgMatches = contentHtml.match(/<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?[^>]*class="?[^"]*wp-manga-chapter-img[^"]*"?/g);
       if (!imgMatches) {
         // Fallback: all img in reading-content
         if (readingContent) {
-          imgMatches = readingContent[1].match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"?([^\s"'>]+)"?/gs);
+          imgMatches = readingContent[1].match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"?([^\s"'>]+)"?/g);
         }
       }
       if (!imgMatches) {
         // page-break fallback
-        imgMatches = res.match(/<div class="?page-break[^"]*"?[^>]*>[^]*?<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?/gs);
+        imgMatches = res.match(/<div class="?page-break[^"]*"?[^>]*>[^]*?<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?/g);
       }
 
       if (imgMatches) {
