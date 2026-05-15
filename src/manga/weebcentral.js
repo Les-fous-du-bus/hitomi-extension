@@ -24,7 +24,12 @@
  * v2: runtime-fix 2026-05-13: title key alignment (name->title), chapter number regex extraction, imageUrl key alignment (url->imageUrl)
  *
  * @author @khun -- Extension Strategist
- * @version 2
+ * @version 4
+ *
+ * v4 fix 2026-05-15 (Yan bug report) : getPageList retournait 1 image car
+ * l'endpoint HTMX /chapters/<id>/images necessite une session pour le mode
+ * paginated. Le mode long_strip (&reading_style=long_strip) renvoie TOUTES
+ * les pages sans session — 32+ images pour un chapitre standard.
  */
 
 var BASE_URL = "https://weebcentral.com";
@@ -365,54 +370,56 @@ class DefaultExtension extends MProvider {
 
       var pages = [];
 
-      // WeebCentral chapter pages: images are partially embedded in HTML (first visible page)
-      // and loaded via HTMX /chapters/<ULID>/images?is_prev=False&current_page=N for subsequent pages.
-      // The HTMX images endpoint requires a valid session (redirects to 400 without cookie).
-      // Strategy: extract all image URLs present in the chapter HTML (CDN embed pattern).
+      // WeebCentral sert le chapitre via 2 modes :
+      //  - paginated (defaut) : HTMX charge /chapters/<id>/images?current_page=N une page
+      //    a la fois — requiert un cookie session pour les pages > 1.
+      //  - long_strip : meme endpoint avec &reading_style=long_strip — retourne TOUTES
+      //    les pages sans session. Decouvert 2026-05-15 apres bug report Yan.
       //
-      // Known CDN pattern: https://<cdn>.us/manga/<slug>/<chapter>-<page>.png
+      // CDN pattern : https://temp.compsci88.com/manga/<slug>/<chapter>-<page>.png
       var imgPattern = /https?:\/\/[^"\s'<>]+\/manga\/[^"\s'<>]+\/[^"\s'<>]+\.(jpg|png|webp|avif)/g;
-      var m;
       var seen = {};
-      while ((m = imgPattern.exec(html)) !== null) {
-        var imgUrl = m[0];
-        if (!seen[imgUrl]) {
-          seen[imgUrl] = true;
-          pages.push({ index: pages.length, imageUrl: imgUrl });
-        }
+      var m;
+
+      var chapUlid = fullUrl.match(/\/chapters\/([0-9A-Z]{26})/);
+      if (chapUlid) {
+        try {
+          var imgHeaders = this._headers();
+          imgHeaders["HX-Request"] = "true";
+          imgHeaders["Referer"] = fullUrl;
+          var imgHtml = await fetchv2(
+            BASE_URL + "/chapters/" + chapUlid[1] + "/images?is_prev=False&current_page=1&reading_style=long_strip",
+            imgHeaders
+          );
+          while ((m = imgPattern.exec(imgHtml)) !== null) {
+            var iu = m[0];
+            if (!seen[iu]) { seen[iu] = true; pages.push({ index: pages.length, imageUrl: iu }); }
+          }
+        } catch (_) {}
       }
 
-      // Also check data-src and srcset attributes
-      var srcPattern = /(?:data-src|srcset)=\"(https?:\/\/[^\"]+\.(jpg|png|webp|avif))[^\"]*\"/g;
-      while ((m = srcPattern.exec(html)) !== null) {
-        var imgUrl = m[1];
-        if (!seen[imgUrl] && !imgUrl.includes("compsci88.com/cover")) {
-          seen[imgUrl] = true;
-          pages.push({ index: pages.length, imageUrl: imgUrl });
-        }
-      }
-
-      // Fallback: try the HTMX images endpoint for page 1
-      // This may fail without session, but attempt regardless.
+      // Fallback : si l'endpoint long_strip echoue, extrait au moins l'image
+      // embarquee dans le HTML du chapitre (1 image, mieux que vide).
       if (pages.length === 0) {
-        var chapUlid = fullUrl.match(/\/chapters\/([0-9A-Z]{26})/);
-        if (chapUlid) {
-          try {
-            var imgHeaders = this._headers();
-            imgHeaders["HX-Request"] = "true";
-            var imgHtml = await fetchv2(
-              BASE_URL + "/chapters/" + chapUlid[1] + "/images?is_prev=False&current_page=1",
-              imgHeaders
-            );
-            var imgM = imgPattern.exec(imgHtml);
-            while (imgM !== null) {
-              var iu = imgM[0];
-              if (!seen[iu]) { seen[iu] = true; pages.push({ index: pages.length, imageUrl: iu }); }
-              imgM = imgPattern.exec(imgHtml);
-            }
-          } catch (_) {}
+        while ((m = imgPattern.exec(html)) !== null) {
+          var imgUrl = m[0];
+          if (!seen[imgUrl]) {
+            seen[imgUrl] = true;
+            pages.push({ index: pages.length, imageUrl: imgUrl });
+          }
         }
       }
+
+      // Tri par page number extrait du nom de fichier `<chap>-<page>.png` pour
+      // garantir l'ordre 001, 002, ... — le HTMX endpoint ne renvoie pas
+      // forcement les images dans l'ordre.
+      pages.sort(function(a, b) {
+        var ma = a.imageUrl.match(/-(\d{3})\.[^.]+$/);
+        var mb = b.imageUrl.match(/-(\d{3})\.[^.]+$/);
+        if (!ma || !mb) return 0;
+        return parseInt(ma[1], 10) - parseInt(mb[1], 10);
+      });
+      for (var i = 0; i < pages.length; i++) pages[i].index = i;
 
       return pages;
     } catch (e) {

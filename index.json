@@ -38,15 +38,15 @@
       "name": "WeebCentral",
       "lang": "en",
       "space": "manga",
-      "version": 3,
+      "version": 4,
       "mature": true,
       "cloudflare": true,
       "jsUrl": "src/manga/weebcentral.js",
       "iconUrl": "https://weebcentral.com/static/images/brand.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v3 fix 2026-05-15: parseSearchList rewritten to split on article.bg-base-300 blocks. Previous 600-char forward scan from href missed alt='<Title> cover' which appears BEFORE the href in DOM. Harness 6/6 PASS strict.",
-      "sha256": "27e5f4d5e55e2b53eeb156c19bcc727ad2705471627ec1883e23d4a9a7c34229"
+      "note": "v4 fix 2026-05-15 (Yan bug report): getPageList retournait 1 image (chapitre vide in-app). Le mode paginated necessite une session, le mode long_strip (&reading_style=long_strip) ne la requiert pas. 89 pages retournees sur chapitre test, ordre garanti par tri sur le numero de page. Harness 6/6 PASS.",
+      "sha256": "5a98db6da3d2d07a7f3179065fc59c8c2208993c4d923234ded90d3d9f45ef0c"
     },
     {
       "id": "mangaread",
@@ -128,15 +128,15 @@
       "name": "Webtoons",
       "lang": "multi",
       "space": "manga",
-      "version": 4,
+      "version": 5,
       "mature": false,
       "cloudflare": false,
       "jsUrl": "src/manga/webtoons.js",
       "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v4 fix 2026-05-15: (1) search endpoint /fr/search/originals returned HTTP 500 -> fixed to /fr/search. (2) getMangaDetail: title now plain <h1> (was h1.subj); cover from og:image meta; Referer header required; &page=1 required. (3) getChapterList: same Referer + page=1 fix. getPageList still fails (viewer uses data-url on SSR -- JS rendering required). Harness 5/6 PASS.",
-      "sha256": "66881057ae8b35da3098ac4fa418d7ff984187f6971282858d1ddb364a25f3cc"
+      "note": "v5 (file v4.1.0) 2026-05-15: getPageList fix — slice from id=_imageList + match class=_images. Previous regex broke on nested div. 123 images returned. Index sha regen.",
+      "sha256": "db40086c6b11f5c32f977c0f1225d6833f3f0b4d62c86eebd2a066a9a400feb4"
     },
     {
       "id": "asurascans",
@@ -201,15 +201,15 @@
       "name": "PantheonScan",
       "lang": "fr",
       "space": "manga",
-      "version": 3.1,
+      "version": 4,
       "mature": true,
       "cloudflare": false,
       "jsUrl": "src/manga/pantheon_scan.js",
       "iconUrl": "https://pantheon-scan.com/favicon.ico",
       "status": "active",
       "obsolescenceRisk": "medium",
-      "note": "v3.1 fix 2026-05-15: (1) catalog URLs fixed from /page/N/?s=... (WP search page, 0 items) to /manga/?m_orderby=...&page=N (Madara tiles). (2) getMangaDetail title: <h1> at body+4000, 'post-title' at body+23000 -- back-offset of -50 missed h1; fixed to anchor directly on first <h1>. (3) search c-tabs-item__content: unquoted class/href in search results; added unquoted patterns to nameMatch. (4) badge prefix stripped from title (HOT tab + text). getChapterList FAIL: site uses AJAX POST (Madara) -- GET-only fetchv2 cannot retrieve chapter list. Harness 4/5 PASS.",
-      "sha256": "8f1a69fa8e3c6831523aed59df40268e5733e1a83d91abf000ad51c033de1741"
+      "note": "v4 (file v3.2.0) 2026-05-15: getChapterList POST manquant ajoute (Madara ajax/chapters). Bridge fetchv2 supporte POST quand method specifie. 203 chapitres retournes. Harness 6/6 PASS.",
+      "sha256": "33d64e9f56ba7c4e516bc0a12f989456744a14c994522255027cbc56423ea729"
     },
     {
       "id": "manga_scantrad",
