@@ -32,9 +32,13 @@
  *
  * v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10
  * v2: runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge)
+ * v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined
+ *     in QuickJS runtime. Methods now return objects (not JSON.stringify strings). Field names
+ *     aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates,
+ *     getPageList returns [{index,imageUrl}] objects (not plain string array).
  *
  * @author @khun -- Extension Strategist
- * @version 2
+ * @version 3
  */
 
 var BASE_URL = "https://mangabuddy.com";
@@ -72,6 +76,7 @@ function slugFromUrl(url) {
  * Parse MangaBuddy catalog page (popular/latest).
  * Server-side renders: href="/slug" + img src=mbbcdn.com/thumb/<slug>.png
  * Exclusion list: nav slugs that are not manga titles.
+ * Field imageUrl (not cover) -- matches MProvider MangaItem contract.
  */
 var NAV_SLUGS = {
   "manga-list": true, "discussions": true, "search": true, "home": true,
@@ -109,13 +114,13 @@ function parseCatalogPage(html) {
     seen[url] = true;
 
     // Match cover from coverMap (slug may match filename without extension)
-    var cover = coverMap[slug] || COVER_CDN + slug + ".png";
+    var imageUrl = coverMap[slug] || COVER_CDN + slug + ".png";
 
     // Title: derive from slug (capitalized words)
     var titleRaw = slug.replace(/-/g, " ");
     var title = titleRaw.charAt(0).toUpperCase() + titleRaw.slice(1);
 
-    list.push({ title: title, url: url, cover: cover });
+    list.push({ title: title, url: url, imageUrl: imageUrl });
   }
 
   return list;
@@ -125,6 +130,7 @@ function parseCatalogPage(html) {
  * Parse manga detail page.
  * og:title gives the real title. og:image gives cover.
  * Chapters: href="/<slug>/chapter-N" pattern.
+ * Returns imageUrl (not cover) -- MProvider MangaDetail contract.
  */
 function parseMangaDetail(html, mangaUrl) {
   var slug = slugFromUrl(mangaUrl);
@@ -135,13 +141,13 @@ function parseMangaDetail(html, mangaUrl) {
   // Strip " - MangaBuddy" suffix if present
   var title = decodeHtml(rawTitle.replace(/\s*-\s*MangaBuddy\s*$/i, "").trim());
 
-  // Cover
+  // Cover (imageUrl -- MProvider MangaDetail contract)
   var coverM = html.match(/<meta property="og:image" content="([^"]+)"/);
-  var cover = coverM ? coverM[1] : COVER_CDN + slug + ".png";
+  var imageUrl = coverM ? coverM[1] : COVER_CDN + slug + ".png";
 
   // Synopsis
   var descM = html.match(/<meta name="description" content="([^"]{5,2000})"/);
-  var synopsis = descM ? decodeHtml(descM[1]) : "";
+  var description = descM ? decodeHtml(descM[1]) : "";
 
   // Author (look for "Author" label)
   var authorM = html.match(/Author[^<]*<\/[^>]+>\s*<[^>]*>([^<]{2,80})</i);
@@ -176,13 +182,23 @@ function parseMangaDetail(html, mangaUrl) {
   // Sort descending by number (newest first)
   chapters.sort(function(a, b) { return b.number - a.number; });
 
-  return { title: title, cover: cover, synopsis: synopsis, author: author, status: status, chapters: chapters };
+  return {
+    title: title,
+    url: mangaUrl,
+    imageUrl: imageUrl,
+    description: description,
+    authors: author ? [author] : [],
+    status: status,
+    genres: [],
+    chapters: chapters
+  };
 }
 
 /**
  * Parse chapter images.
  * MangaBuddy embeds: var chapImages = 'url1,url2,...'; in inline script.
  * CDN: https://sN.mbcdnsa<X>.org/res/manga/<slug>/chapter-N/<hash>_N.jpg
+ * Returns [{index, imageUrl}] -- MProvider Page contract.
  */
 function parseChapterImages(html) {
   var m = html.match(/var\s+chapImages\s*=\s*'([^']{10,50000})'/);
@@ -191,62 +207,79 @@ function parseChapterImages(html) {
   var raw = m[1];
   var urls = raw.split(",").map(function(u) { return u.trim(); });
   // Validate: keep only HTTP image URLs
-  return urls.filter(function(u) {
+  var validUrls = urls.filter(function(u) {
     return /^https?:\/\/.+\.(jpg|png|webp|jpeg)(\?.*)?$/i.test(u);
   });
-}
 
-// ---------- Hitomi Extension Interface ----------
-
-async function getPopular(page) {
-  // MangaBuddy popular page does not paginate via query param in static HTML
-  // page=1 only; for pages > 1, try /popular?page=N (may not work)
-  var url = page === 1 ? BASE_URL + "/popular" : BASE_URL + "/popular?page=" + page;
-  var html = await fetchv2(url, {});
-  var list = parseCatalogPage(html);
-  return JSON.stringify({
-    list: list,
-    hasNextPage: list.length >= 20 && page === 1
+  // Map to Page objects: {index, imageUrl}
+  return validUrls.map(function(url, i) {
+    return { index: i, imageUrl: url };
   });
 }
 
-async function getLatest(page) {
-  var url = page === 1 ? BASE_URL + "/latest" : BASE_URL + "/latest?page=" + page;
-  var html = await fetchv2(url, {});
-  var list = parseCatalogPage(html);
-  return JSON.stringify({
-    list: list,
-    hasNextPage: list.length >= 20 && page === 1
-  });
-}
+// ---------- MProvider class ----------
 
-async function search(query, page) {
-  var url = BASE_URL + "/search?q=" + encodeURIComponent(query);
-  var html = await fetchv2(url, {});
-  var list = parseCatalogPage(html);
-  return JSON.stringify({
-    list: list,
-    hasNextPage: false
-  });
-}
+class DefaultExtension extends MProvider {
+  get name() { return "MangaBuddy"; }
+  get lang() { return "en"; }
+  get baseUrl() { return BASE_URL; }
+  get supportsLatest() { return true; }
+  get isMature() { return true; }
+  get hasCloudflare() { return true; }
 
-async function getMangaDetail(mangaUrl) {
-  var html = await fetchv2(mangaUrl, {});
-  var detail = parseMangaDetail(html, mangaUrl);
-  return JSON.stringify(detail);
-}
-
-async function getChapterList(mangaUrl) {
-  var html = await fetchv2(mangaUrl, {});
-  var detail = parseMangaDetail(html, mangaUrl);
-  return JSON.stringify(detail.chapters);
-}
-
-async function getPageList(chapterUrl) {
-  var html = await fetchv2(chapterUrl, {});
-  var images = parseChapterImages(html);
-  if (images.length === 0) {
-    return JSON.stringify({ error: "No chapImages var found. CF bypass may be required or page structure changed." });
+  async getPopular(page) {
+    // MangaBuddy popular page does not paginate via query param in static HTML
+    // page=1 only; for pages > 1, try /popular?page=N (may not work)
+    var url = page === 1 ? BASE_URL + "/popular" : BASE_URL + "/popular?page=" + page;
+    var html = await fetchv2(url, {});
+    var list = parseCatalogPage(html);
+    return {
+      list: list,
+      hasNextPage: list.length >= 20 && page === 1
+    };
   }
-  return JSON.stringify(images);
+
+  async getLatestUpdates(page) {
+    var url = page === 1 ? BASE_URL + "/latest" : BASE_URL + "/latest?page=" + page;
+    var html = await fetchv2(url, {});
+    var list = parseCatalogPage(html);
+    return {
+      list: list,
+      hasNextPage: list.length >= 20 && page === 1
+    };
+  }
+
+  async search(query, page, filters) {
+    var url = BASE_URL + "/search?q=" + encodeURIComponent(query);
+    var html = await fetchv2(url, {});
+    var list = parseCatalogPage(html);
+    return {
+      list: list,
+      hasNextPage: false
+    };
+  }
+
+  async getMangaDetail(mangaUrl) {
+    var html = await fetchv2(mangaUrl, {});
+    return parseMangaDetail(html, mangaUrl);
+  }
+
+  async getChapterList(mangaUrl) {
+    var html = await fetchv2(mangaUrl, {});
+    var detail = parseMangaDetail(html, mangaUrl);
+    return detail.chapters;
+  }
+
+  async getPageList(chapterUrl) {
+    var html = await fetchv2(chapterUrl, {});
+    var pages = parseChapterImages(html);
+    if (pages.length === 0) {
+      throw new Error("No chapImages var found. CF bypass may be required or page structure changed.");
+    }
+    return pages;
+  }
+
+  getFilterList() {
+    return [];
+  }
 }
