@@ -87,9 +87,13 @@ function extractImageUrl(imgTag) {
     if (u.indexOf("blank.gif") !== -1) continue;
     if (u.indexOf("placeholder") !== -1) continue;
     if (u.length < 10) continue;
-    if (u.indexOf("//") === 0) return "https:" + u;
-    if (u.indexOf("/") === 0) return BASE_URL + u;
-    return u;
+    var resolved;
+    if (u.indexOf("//") === 0) resolved = "https:" + u;
+    else if (u.indexOf("/") === 0) resolved = BASE_URL + u;
+    else resolved = u;
+    // BEN-03: reject any result that does not start with https?:// after resolution
+    if (!isValidUrl(resolved)) continue;
+    return resolved;
   }
   return "";
 }
@@ -314,8 +318,20 @@ class DefaultExtension extends MProvider {
       }
 
       // Strategy 2: JSON array in script tag with pages/images data [HYPOTHESIS]
+      // BEN-02: extract the relevant <script> block first (bounded), then apply array regex
+      // on that block only — avoids [^\]]{0,50000} scanning the entire page.
       if (pages.length === 0) {
-        var scriptMatch = res.match(/var\s+(?:pages|images|chapter_images)\s*=\s*(\[[^\]]{0,50000}\])/);
+        var scriptBlockMatch = res.match(/<script[^>]{0,200}>([\s\S]{0,100000}?)<\/script>/g);
+        var scriptSrc = "";
+        if (scriptBlockMatch) {
+          for (var si = 0; si < scriptBlockMatch.length; si++) {
+            if (/var\s+(?:pages|images|chapter_images)\s*=/.test(scriptBlockMatch[si])) {
+              scriptSrc = scriptBlockMatch[si];
+              break;
+            }
+          }
+        }
+        var scriptMatch = scriptSrc.match(/var\s+(?:pages|images|chapter_images)\s*=\s*(\[[^\]]{0,10000}\])/);
         if (scriptMatch) {
           try {
             var arr = JSON.parse(scriptMatch[1]);
@@ -379,7 +395,9 @@ class DefaultExtension extends MProvider {
     var seen = {};
 
     // div.manga_item [HYPOTHESIS]
-    var itemPattern = /<div[^>]{0,200}class="[^"]{0,100}manga[_-]item[^"]{0,100}"[^>]{0,200}>([\s\S]{0,3000}?)(?=<div[^>]{0,200}class="[^"]{0,100}manga[_-]item|<\/div>\s*<\/div>\s*<\/(?:section|main|div)|$)/g;
+    // BEN-01: lookahead removed (ReDoS risk on large pages); capture bounded to {0,3000}.
+    // The fallback aPattern below handles any items missed at the end of the page.
+    var itemPattern = /<div[^>]{0,200}class="[^"]{0,100}manga[_-]item[^"]{0,100}"[^>]{0,200}>([\s\S]{0,3000}?)<\/div>/g;
     var m;
     while ((m = itemPattern.exec(html)) !== null) {
       var block = m[1];

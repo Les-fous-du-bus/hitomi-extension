@@ -185,6 +185,8 @@ class DefaultExtension extends MProvider {
         if (!hrefMatch) continue;
         var chapUrl = hrefMatch[1];
         if (!chapUrl.startsWith("http")) chapUrl = BASE_URL + chapUrl;
+        // TCB-01: reject non-http(s) schemes (javascript:, data:, file:, etc.)
+        if (!isValidUrl(chapUrl)) continue;
 
         // Title — h3.chapter-title (verified 2026-05-17)
         var titleMatch2 = block.match(/<h3[^>]{0,200}class="[^"]{0,100}chapter-title[^"]{0,100}"[^>]{0,200}>([\s\S]{0,300}?)<\/h3>/);

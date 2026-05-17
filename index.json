@@ -653,30 +653,30 @@
             "name": "TCB Scans",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/tcbscans.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=tcbscans.net&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v1.0.0: WordPress Mangaverse theme on www.tcbscans.net (NOT tcbscans.me or tcbscans.com which are expired domains). Multilingual site (EN/FR/ES/IT) - extension targets /en/ prefix only. Home /en/ lists 20 EN series in a series-card grid. getLatestUpdates=getPopular (no dedicated latest page). Chapter images on cdn.tcbscans.net. No CF. Harness 6/6 PASS 2026-05-17.",
-            "sha256": "7e65fb5c5c9c44523292936e7308cc28f8a0f40a243e74da669035f15bab81f6"
+            "note": "v2: TCB-01 security patch — getChapterList now rejects non-http(s) chapUrl via isValidUrl() guard after scheme normalisation (blocks javascript:, data:, file: injection). v1.0.0: WordPress Mangaverse theme. Harness 6/6 PASS 2026-05-17.",
+            "sha256": "dc80e2ea80215c6bfc0589b9f3f5af74c2c33211e90a537f27836b3cae2e6643"
         },
         {
             "id": "bentomanga",
             "name": "Bentomanga",
             "lang": "fr",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/bentomanga.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=bentomanga.com&sz=64",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v1.0.0: CF interactive challenge confirmed live 2026-05-17 (HTTP 403 + cf-mitigated: challenge on ALL endpoints including /api). Harness Node = YELLOW (CF block, expected). In-app WebView Android/JVM bypass may allow access. Selectors coded from Mangayomi/keiyoushi public references [HYPOTHESIS - not live-verified]. REQUIRES in-app validation on Android before marking GREEN. obsolescenceRisk=high: FR aggregator sites have elevated domain rotation risk.",
-            "sha256": "fff1f49c26f0476fb2e257f525cd0cd56551c6afbdb1f02930957799d8d804be"
+            "note": "v2: BEN-01 ReDoS patch — _parseMangaList lookahead removed, capture bounded {0,3000}, fallback aPattern covers tail. BEN-02 getPageList script-block scoping — JSON array regex now applied on extracted <script> block only (bounded {0,100000}), inner array bound reduced to {0,10000}. BEN-03 extractImageUrl protocol-relative guard — resolved URL validated via isValidUrl() before return; non-http(s) candidates skipped. v1.0.0: CF interactive challenge (YELLOW harness expected). Selectors [HYPOTHESIS]. Requires in-app validation.",
+            "sha256": "b4810b1fbca339df72d0d241f087db3bdce03b50f446548c07098ab913268314"
         }
     ]
 }
