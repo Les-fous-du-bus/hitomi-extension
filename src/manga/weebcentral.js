@@ -24,12 +24,22 @@
  * v2: runtime-fix 2026-05-13: title key alignment (name->title), chapter number regex extraction, imageUrl key alignment (url->imageUrl)
  *
  * @author @khun -- Extension Strategist
- * @version 4
+ * @version 5
  *
  * v4 fix 2026-05-15 (Yan bug report) : getPageList retournait 1 image car
  * l'endpoint HTMX /chapters/<id>/images necessite une session pour le mode
  * paginated. Le mode long_strip (&reading_style=long_strip) renvoie TOUTES
  * les pages sans session — 32+ images pour un chapitre standard.
+ *
+ * v5 fix 2026-05-17 (Yan bug report) : getChapterList chapter number cassé
+ * sur les séries "Episode N" ("The Infinite Mage", "The Archmage Returns
+ * After 4000 Years") et autres formats non-"Chapter N" ("# N", "Days N").
+ * Cause : ctx=300 chars insuffisant (SVG icone ~2100 chars absorbe la fenêtre
+ * avant le span titre). Regex nameMatch ne matchait que "Chapter/Ch." -> fallback
+ * "Chapter (index+1)" -> numbers inversés -> sort app degenère -> ordre cassé.
+ * Fix : ctx=3000 chars, extraction via <span class="">TITLE</span>, number via
+ * dernier digit du titre (couvre tous formats observés). Validé 0% zeros sur
+ * 4 séries: Episode N, # N, Days N (168/256/242/259 chapitres).
  */
 
 var BASE_URL = "https://weebcentral.com";
@@ -329,20 +339,27 @@ class DefaultExtension extends MProvider {
         if (seen[chapUrl]) continue;
         seen[chapUrl] = true;
 
-        // Context around this href (~200 chars)
-        var ctx = html.substring(m.index, m.index + 300);
+        // Context: 3000 chars to clear the inline SVG icon (~2100 chars) before the title span.
+        // WeebCentral chapter rows: <a href="..."><span class="me-2"><svg ...></svg></span>
+        //   <span class="grow ..."><span class="">TITLE</span>...</span>
+        // The SVG icon occupies ~2100 chars, so 300 chars is insufficient.
+        var ctx = html.substring(m.index, m.index + 3000);
 
-        // Chapter name: look for "Chapter N" or "Ch. N" pattern
-        var nameMatch = ctx.match(/Chapter\s+[\d\.]+(?:\s*[:-]\s*[^<]{1,60})?|Ch\.\s*[\d\.]+/i);
-        var name = nameMatch ? nameMatch[0].trim() : ("Chapter " + (index + 1));
+        // Chapter name: primary extraction from <span class="">TITLE</span>
+        // (WeebCentral uses an empty-class span for the chapter title regardless of format:
+        //  "Episode N", "# N", "Days N", "Chapter N", "Ch. N", etc.)
+        var spanMatch = ctx.match(/<span class=\"\">([^<]{1,150})<\/span>/);
+        var name = spanMatch ? spanMatch[1].trim() : ("Chapter " + (index + 1));
 
         // Date: look for datetime attribute or text date
         var dateMatch = ctx.match(/datetime=\"([^\"]+)\"|(\d{4}-\d{2}-\d{2})/);
         var date = dateMatch ? (dateMatch[1] || dateMatch[2]) : "";
 
-        // Extract chapter number from name via regex; fallback to 0 if no match
-        var chapNumMatch = name.match(/Chapter\s+(\d+(?:\.\d+)?)/i);
-        var chapNumber = chapNumMatch ? parseFloat(chapNumMatch[1]) : 0;
+        // Extract chapter number: take the LAST number in the title to handle
+        // formats like "Episode 5", "# 12", "Days 3", "Vol.2 Ch.45", "Chapter 1".
+        // Fallback to positional index (oldest-first after reverse) for unnumbered chapters.
+        var numMatches = name.match(/\d+(?:\.\d+)?/g);
+        var chapNumber = numMatches ? parseFloat(numMatches[numMatches.length - 1]) : index;
         chapters.push({ title: name, url: chapUrl, number: chapNumber, dateUpload: date, index: index });
         index++;
       }
