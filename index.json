@@ -631,7 +631,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined in QuickJS. Methods return objects (not JSON.stringify strings). Field names aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates, getPageList returns [{index,imageUrl}] objects. Harness GREEN (getPopular 83 items, getMangaDetail ok, getChapterList 26 chapters, getPageList 1 page YELLOW CF CDN). v2: fetchv2 fix. v1: initial port.",
-            "sha256": "2f5c57bfb6ee5b32805b27c4eb57e79027c63f4ee651c53a316880ad10c13f97"
+            "sha256": "8a4f54618d0d4442d3efca6ddd6eb964193874a7f60154b33cf64921917e39cf"
         },
         {
             "id": "mangabuddy",
@@ -646,7 +646,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined in QuickJS. Methods return objects (not JSON.stringify strings). Field names aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates, getPageList returns [{index,imageUrl}] objects. Harness YELLOW -- mangabuddy.com 502 DDoS-Guard upstream on 2026-05-17; cookie date parse error in Dart CookieJar (DDoS-Guard Expires=Sun format). Class wrap confirmed correct. v2: fetchv2 fix. v1: initial port.",
-            "sha256": "3218c53aacb3c9655fae3c19d8451c94a63e14c28ee044127499354005654597"
+            "sha256": "38a84f7e8139776d24b65b68f23c3f73c5722d43ba574d237f078879f800ffbe"
         }
     ]
 }
