@@ -647,6 +647,36 @@
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined in QuickJS. Methods return objects (not JSON.stringify strings). Field names aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates, getPageList returns [{index,imageUrl}] objects. Harness YELLOW -- mangabuddy.com 502 DDoS-Guard upstream on 2026-05-17; cookie date parse error in Dart CookieJar (DDoS-Guard Expires=Sun format). Class wrap confirmed correct. v2: fetchv2 fix. v1: initial port.",
             "sha256": "38a84f7e8139776d24b65b68f23c3f73c5722d43ba574d237f078879f800ffbe"
+        },
+        {
+            "id": "tcbscans",
+            "name": "TCB Scans",
+            "lang": "en",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/tcbscans.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=tcbscans.net&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1.0.0: WordPress Mangaverse theme on www.tcbscans.net (NOT tcbscans.me or tcbscans.com which are expired domains). Multilingual site (EN/FR/ES/IT) - extension targets /en/ prefix only. Home /en/ lists 20 EN series in a series-card grid. getLatestUpdates=getPopular (no dedicated latest page). Chapter images on cdn.tcbscans.net. No CF. Harness 6/6 PASS 2026-05-17.",
+            "sha256": "7e65fb5c5c9c44523292936e7308cc28f8a0f40a243e74da669035f15bab81f6"
+        },
+        {
+            "id": "bentomanga",
+            "name": "Bentomanga",
+            "lang": "fr",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": true,
+            "jsUrl": "src/manga/bentomanga.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=bentomanga.com&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "high",
+            "note": "v1.0.0: CF interactive challenge confirmed live 2026-05-17 (HTTP 403 + cf-mitigated: challenge on ALL endpoints including /api). Harness Node = YELLOW (CF block, expected). In-app WebView Android/JVM bypass may allow access. Selectors coded from Mangayomi/keiyoushi public references [HYPOTHESIS - not live-verified]. REQUIRES in-app validation on Android before marking GREEN. obsolescenceRisk=high: FR aggregator sites have elevated domain rotation risk.",
+            "sha256": "fff1f49c26f0476fb2e257f525cd0cd56551c6afbdb1f02930957799d8d804be"
         }
     ]
 }
