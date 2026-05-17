@@ -33,9 +33,17 @@
  * v4: runtime-fix 2026-05-15: bump itemPattern {0,2000} -> {0,5000} (real blocks
  *     measure ~2470 chars). Previous primary pattern silently dead -> fallback
  *     returned titles without imageUrl -> Discover with no covers.
+ * v5: runtime-fix 2026-05-17: extractChapNum now uses URL slug as authoritative
+ *     fallback. Harness reported 3864/3864 chapters with number==0 (NUMBER-FAILURE
+ *     100%). Root cause: title text alone cannot be relied upon for Madara chapter
+ *     naming variations (Martial Peak uses non-"Chapter N" titles on mangaread).
+ *     The URL /manga/slug/chapter-1122/ ALWAYS encodes the number. URL extraction
+ *     now runs when title extraction returns 0 or when title contains no digits.
+ *     Decimal chapter slugs: /chapter-12-5/ -> 12.5 (hyphen-as-dot convention).
+ *     Oneshot/special (no digits in slug) -> 0 (no fabricated fallback).
  *
  * @author @khun -- Extension Strategist
- * @version 4
+ * @version 5
  */
 
 var BASE_URL = "https://www.mangaread.org";
@@ -301,13 +309,41 @@ class DefaultExtension extends MProvider {
       // Madara inline chapter list: li.wp-manga-chapter a[href]
       // Structure: <li class="wp-manga-chapter"><a href="URL">Chapter N</a>
       //            <span class="chapter-release-date"><i>DD.MM.YYYY</i></span></li>
-      // Extract chapter number from name "Chapter 12" / "Chapter 12.5" / "Ch. 7"
-      function extractChapNum(s) {
+      // Extract chapter number from title string, with URL slug as authoritative fallback.
+      //
+      // WHY URL fallback: Madara sites (mangaread) use varied chapter title formats.
+      // "Martial Peak" (3864 chapters) does not use "Chapter N" in anchor text.
+      // extractChapNumFromTitle returned 0 for all 3864 -> NUMBER-FAILURE 100%.
+      // The URL slug /chapter-1122/ ALWAYS encodes the number reliably.
+      // Decimal chapters: /chapter-12-5/ -> 12.5 (Madara hyphen convention).
+      // Oneshot/special: /oneshot/ -> slug has no digits -> returns 0 (correct, no fabrication).
+      function extractChapNumFromTitle(s) {
+        if (!s) return 0;
         var mm = s.match(/(?:chapter|chap|ch\.?|ep\.?)\s*([\d]+(?:\.[\d]+)?)/i);
         if (mm) return parseFloat(mm[1]);
-        // Fallback: any leading number in the string
         var lead = s.match(/([\d]+(?:\.[\d]+)?)/);
         return lead ? parseFloat(lead[1]) : 0;
+      }
+
+      function extractChapNumFromUrl(url) {
+        if (!url) return 0;
+        // Match /chapter-N/ or /chapter-N-M/ (decimal chapters encoded as hyphen)
+        // Try: /chapter-12-5/ -> 12.5; /chapter-1122/ -> 1122
+        var mm = url.match(/\/chapter-(\d+)-(\d+)\/?$/i);
+        if (mm) return parseFloat(mm[1] + '.' + mm[2]);
+        var m2 = url.match(/\/chapter[- ]?(\d+(?:\.\d+)?)\/?$/i);
+        if (m2) return parseFloat(m2[1]);
+        // Last path segment numeric (e.g. /manga/slug/1122/)
+        var parts = url.replace(/\/$/, '').split('/');
+        var last = parts[parts.length - 1];
+        var seg = last.match(/^(\d+(?:\.\d+)?)$/);
+        return seg ? parseFloat(seg[1]) : 0;
+      }
+
+      function extractChapNum(name, url) {
+        var n = extractChapNumFromTitle(name);
+        if (n > 0) return n;
+        return extractChapNumFromUrl(url);
       }
 
       // Parse "DD.MM.YYYY" -> ms timestamp. Returns 0 on parse failure.
@@ -337,7 +373,7 @@ class DefaultExtension extends MProvider {
         chapters.push({
           title: name,
           url: chapUrl,
-          number: extractChapNum(name),
+          number: extractChapNum(name, chapUrl),
           dateUpload: parseMadaraDate(dateStr),
         });
       }
@@ -354,7 +390,7 @@ class DefaultExtension extends MProvider {
             chapters.push({
               title: simpleName,
               url: sm[1],
-              number: extractChapNum(simpleName),
+              number: extractChapNum(simpleName, sm[1]),
               dateUpload: 0,
             });
           }
