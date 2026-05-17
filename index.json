@@ -53,7 +53,7 @@
             "name": "MangaRead",
             "lang": "en",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangaread.js",
@@ -61,7 +61,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v4: harness 6/6 PASS with real imageUrls (2026-05-15). Bumped itemPattern {0,2000} -> {0,5000} (real blocks ~2470 chars; previous primary silently dead -> fallback returned no covers). Added parseSearchResults for c-tabs-item__content (search uses different markup than catalogue). Harness now FAILS on majority-empty imageUrl.",
-            "sha256": "1cc08cabcfa4fcb18037c018634f0cb4f79889c628fa0a31dc91d06c46018601"
+            "sha256": "ff7dac192bbb93dfba33658f12f0faf6162bf874da7941e08d463837c120c4fa"
         },
         {
             "id": "bato",
