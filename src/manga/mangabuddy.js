@@ -150,11 +150,13 @@ function parseMangaDetail(html, mangaUrl) {
   var description = descM ? decodeHtml(descM[1]) : "";
 
   // Author (look for "Author" label)
-  var authorM = html.match(/Author[^<]*<\/[^>]+>\s*<[^>]*>([^<]{2,80})</i);
+  // [^<]{0,500} bounds non-capture spans; [^>]{0,200} bounds tag-interior scan (ReDoS: F1)
+  var authorM = html.match(/Author[^<]{0,500}<\/[^>]{0,200}>\s*<[^>]{0,200}>([^<]{2,80})</i);
   var author = authorM ? authorM[1].trim() : "";
 
   // Status
-  var statusM = html.match(/Status[^<]*<\/[^>]+>\s*<[^>]*>([^<]{2,40})</i);
+  // [^<]{0,500} bounds non-capture spans; [^>]{0,200} bounds tag-interior scan (ReDoS: F1)
+  var statusM = html.match(/Status[^<]{0,500}<\/[^>]{0,200}>\s*<[^>]{0,200}>([^<]{2,40})</i);
   var status = statusM ? statusM[1].trim() : "Unknown";
 
   // Chapters: href="/<slug>/chapter-<number>"
