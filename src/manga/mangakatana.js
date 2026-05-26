@@ -56,7 +56,7 @@ function decodeHtml(str) {
     .replace(/&quot;/g, '"')
     .replace(/&#039;/g, "'")
     .replace(/&#x27;/g, "'")
-    .replace(/&#8217;/g, "'")
+    .replace(/&#8217;/g, "’")
     .replace(/&#8220;/g, "“")
     .replace(/&#8221;/g, "”");
 }
@@ -151,13 +151,11 @@ function parseMangaDetail(html, mangaUrl) {
   var description = descM ? decodeHtml(descM[1]) : "";
 
   // Author: div.author or class containing "author"
-  // [^"]{0,200} bounds the attribute scan; [^>]{0,200} bounds tag-interior scan (ReDoS: F1)
-  var authorM = html.match(/class="author[^"]{0,200}"[^>]{0,200}>([^<]{2,80})</);
+  var authorM = html.match(/class="author[^"]*"[^>]*>([^<]{2,80})</);
   var author = authorM ? authorM[1].trim() : "";
 
   // Status: look for "Status" label
-  // [^<]{0,500} bounds the non-capture spans between label and value (ReDoS: F1)
-  var statusM = html.match(/Status[^<]{0,500}<\/[^>]{0,200}>\s*<[^>]{0,200}>([^<]{1,100})<\/[^>]{0,200}>/i);
+  var statusM = html.match(/Status[^<]*<\/[^>]+>\s*<[^>]+>([^<]+)<\/[^>]+>/i);
   var status = statusM ? statusM[1].trim() : "Unknown";
 
   // Chapters: href="https://mangakatana.com/manga/<slug>/c<num>"
@@ -213,7 +211,7 @@ function parseChapterImages(html) {
   var urls = [];
   var um;
   while ((um = urlPattern.exec(raw)) !== null) {
-    // Validate: must start with http(s):// AND end with image extension (F4: scheme validation)
+    // Validate: must start with http(s):// AND end with image extension
     if (/^https?:\/\/.+\.(jpg|png|webp|jpeg)(\?[^']*)?$/i.test(um[1])) {
       urls.push(um[1]);
     }
