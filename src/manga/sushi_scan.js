@@ -19,7 +19,7 @@
 
 var MATURE_GENRES_RE = /\b(adulte|adult|smut|pornhwa|pornwha|hentai|erotique|ero|mature|ecchi|yaoi|yuri|18\+)\b/i;
 
-var BASE_URL = "https://sushiscan.fr";
+var BASE_URL = "https://sushiscan.net";
 var UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 function stripTags(str) {
@@ -44,6 +44,7 @@ function decodeHtml(str) {
 
 class DefaultExtension extends MProvider {
   get name() { return "SushiScan"; }
+  get hasCloudflare() { return true; }
   get lang() { return "fr"; }
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
