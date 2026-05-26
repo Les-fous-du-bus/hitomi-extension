@@ -7,7 +7,17 @@
  * Mature : true (manhwa/webtoon, may include mature content)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 1.0.1
+ *
+ * Fix v1.0.1 (2026-05-26):
+ *  - getPageList: Toonily lazy-loads images via data-src (not src). The original regex
+ *    required class="wp-manga-chapter-img" to appear BEFORE src= in the tag -- attribute
+ *    order is not guaranteed. Fixed to two-pass strategy: collect all img tags that contain
+ *    wp-manga-chapter-img in their class, then extract data-src || src from each tag.
+ *  - CDN filter (tnlycdn.com/chapters/) was too strict -- images may also be served from
+ *    cdn.toonily.com or other hostnames. Relaxed: accept any https URL extracted from
+ *    the chapter page; skip only obvious UI assets (logos, banners via /uploads/2023/).
+ *    The wp-manga-chapter-img class is sufficient guard against non-chapter images.
  */
 
 var BASE_URL = "https://toonily.com";
@@ -231,43 +241,52 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Referer": BASE_URL });
 
-      // Images: <img class="wp-manga-chapter-img" src="https://data.tnlycdn.com/...">
-      var imgMatches = res.match(/<img[^>]*class="wp-manga-chapter-img[^"]*"[^>]*src="([^"]+)"[^>]*>/gs);
-      if (!imgMatches) {
-        // Fallback: data-src
-        imgMatches = res.match(/<img[^>]*class="wp-manga-chapter-img[^"]*"[^>]*data-src="([^"]+)"[^>]*>/gs);
-      }
-      if (!imgMatches) return [];
-
+      // Two-pass strategy:
+      // Pass 1: collect all <img> tags that have wp-manga-chapter-img in their class
+      //         attribute (class may appear before or after src/data-src).
+      // Pass 2: from each collected tag, extract data-src first (lazy-load), then src.
       var result = [];
-      for (var i = 0; i < imgMatches.length; i++) {
-        var srcMatch = imgMatches[i].match(/(?:src|data-src)="(https?:\/\/[^"]+)"/);
-        if (srcMatch) {
-          var imgUrl = srcMatch[1].trim();
-          // Skip non-chapter images
-          if (imgUrl.indexOf("tnlycdn.com/chapters/") !== -1 || imgUrl.indexOf("data.tnlycdn.com") !== -1) {
+      var imgTagPattern = /<img[^>]*>/gs;
+      var tagMatch;
+      while ((tagMatch = imgTagPattern.exec(res)) !== null) {
+        var tag = tagMatch[0];
+        if (tag.indexOf("wp-manga-chapter-img") === -1) continue;
+
+        // Prefer data-src (lazy loading), fall back to src
+        var urlMatch = tag.match(/data-src="(https?:\/\/[^"]+)"/) ||
+                       tag.match(/src="(https?:\/\/[^"]+)"/);
+        if (!urlMatch) continue;
+
+        var imgUrl = urlMatch[1].trim();
+        // Skip data: URIs and placeholder images
+        if (imgUrl.indexOf("data:") === 0) continue;
+        // Skip obvious UI assets: logos, site-wide uploads that are not chapter content
+        // (e.g. /uploads/2023/logo.png pattern used by WP themes for branding)
+        if (imgUrl.indexOf("/uploads/sites/") !== -1) continue;
+
+        result.push({
+          index: result.length,
+          imageUrl: imgUrl,
+          headers: { "Referer": BASE_URL },
+        });
+      }
+
+      // Fallback: if no wp-manga-chapter-img tags found (some Madara versions omit class),
+      // collect all data-src from within the reading-content container.
+      if (result.length === 0) {
+        var containerMatch = res.match(/class="reading-content"[^>]*>([\s\S]*?)<\/div>/);
+        if (containerMatch) {
+          var containerHtml = containerMatch[1];
+          var dataSrcPattern = /data-src="(https?:\/\/[^"]+)"/g;
+          var ds;
+          while ((ds = dataSrcPattern.exec(containerHtml)) !== null) {
+            var fallbackUrl = ds[1].trim();
+            if (fallbackUrl.indexOf("data:") === 0) continue;
             result.push({
               index: result.length,
-              imageUrl: imgUrl,
+              imageUrl: fallbackUrl,
               headers: { "Referer": BASE_URL },
             });
-          }
-        }
-      }
-
-      // If wp-manga-chapter-img filter was too strict, try broader match
-      if (result.length === 0) {
-        var allImgs = res.match(/src="(https:\/\/data\.tnlycdn\.com\/[^"]+)"/gs);
-        if (allImgs) {
-          for (var j = 0; j < allImgs.length; j++) {
-            var match2 = allImgs[j].match(/src="([^"]+)"/);
-            if (match2) {
-              result.push({
-                index: result.length,
-                imageUrl: match2[1].trim(),
-                headers: { "Referer": BASE_URL },
-              });
-            }
           }
         }
       }
