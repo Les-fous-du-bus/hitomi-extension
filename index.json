@@ -619,6 +619,51 @@
             "obsolescenceRisk": "high",
             "note": "v2: BEN-01 ReDoS patch — _parseMangaList lookahead removed, capture bounded {0,3000}, fallback aPattern covers tail. BEN-02 getPageList script-block scoping — JSON array regex now applied on extracted <script> block only (bounded {0,100000}), inner array bound reduced to {0,10000}. BEN-03 extractImageUrl protocol-relative guard — resolved URL validated via isValidUrl() before return; non-http(s) candidates skipped. v1.0.0: CF interactive challenge (YELLOW harness expected). Selectors [HYPOTHESIS]. Requires in-app validation.",
             "sha256": "b4810b1fbca339df72d0d241f087db3bdce03b50f446548c07098ab913268314"
+        },
+        {
+            "id": "roliascan",
+            "name": "RoliaScan",
+            "lang": "en",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/roliascan.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=roliascan.com&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "WordPress REST API (wp-json/wp/v2/manga). Chapter images via /auth/chapter-content?chapter_id={id} with MD5 token (md5(timestamp+mng_ch_+YYYYMMDDhh).substring(0,16)). Token window=1h. If chapter API returns 403, re-verify token algorithm against manga.js.",
+            "sha256": "7722bb22be0f27c823989b61e7c648dde68d6eb8a50b28d29968e1946d535b77"
+        },
+        {
+            "id": "mangapark1",
+            "name": "MangaPark1",
+            "lang": "en",
+            "space": "manga",
+            "version": 1,
+            "mature": true,
+            "cloudflare": true,
+            "jsUrl": "src/manga/mangapark1.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=mangapark1.com&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "HTML scraping. Images from cdn2.holdingyouclose.xyz CDN. Cover: data-src from thumb CDN. Chapters filtered by manga slug to exclude related-manga pollution. mature=true (Boys Love, ecchi, Yaoi genres indexed).",
+            "sha256": "9c8db5ff33978cb8e0dc59a09bb1a4c523c5c2a54f22d3c0402ebf44ac460075"
+        },
+        {
+            "id": "manhwaz",
+            "name": "ManhwaZ",
+            "lang": "en",
+            "space": "manga",
+            "version": 1,
+            "mature": true,
+            "cloudflare": true,
+            "jsUrl": "src/manga/manhwaz.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=manhwaz.com&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "HTML scraping SSR. /popular returns 404 — home page used as catalog. Chapter images from cdn.manhwaz.com. Strict slug filter on chapter list to prevent related-manga link pollution. mature=true (adult manhwa indexed).",
+            "sha256": "ff474a4bb655285a3a60782a296b4a4db5938b9bdc515e1a7ccfabbc6e2f5949"
         }
     ]
 }
