@@ -580,15 +580,15 @@
             "name": "MangaBuddy",
             "lang": "en",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangabuddy.js",
-            "iconUrl": "https://www.google.com/s2/favicons?domain=mangabuddy.com&sz=64",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=mangak.io&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined in QuickJS. Methods return objects (not JSON.stringify strings). Field names aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates, getPageList returns [{index,imageUrl}] objects. Harness YELLOW -- mangabuddy.com 502 DDoS-Guard upstream on 2026-05-17; cookie date parse error in Dart CookieJar (DDoS-Guard Expires=Sun format). Class wrap confirmed correct. v2: fetchv2 fix. v1: initial port.",
-            "sha256": "38a84f7e8139776d24b65b68f23c3f73c5722d43ba574d237f078879f800ffbe"
+            "note": "v4: full rewrite for mangak.io (Next.js __NEXT_DATA__ parser). mangabuddy.com migrated to mangak.io in 2026-05. Catalog via /_next/data/{buildId}/popular.json + /latest.json. Detail + chapters via HTML __NEXT_DATA__ scrape (latest-50 chapters only -- site SSR limit, not a parsing bug). Images from initialChapter.images[] pre-signed URLs. v3: MProvider class wrap (mangabuddy.com). v2: fetchv2 fix. v1: initial port.",
+            "sha256": "6d10571eaac3b87108a978f923bd8b777b9ae29f7651a7c5bc0e9fc0a2e72da3"
         },
         {
             "id": "tcbscans",

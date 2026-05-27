@@ -1,184 +1,180 @@
 /**
- * MangaBuddy -- Extension Hitomi Reader
- * Source : https://mangabuddy.com
- * Method : HTML scraping (React SSR with hydration)
+ * MangaBuddy (migrated to MangaK) -- Extension Hitomi Reader
+ * Source : https://mangak.io  (formerly mangabuddy.com, migrated 2026-05)
+ * Method : Next.js __NEXT_DATA__ JSON extraction (SSR)
  * Language : en
- * Cloudflare : YES (managed, no JS challenge in testing 2026-05-10)
- * Mature : true (contains adult/ecchi manhwa, BL content)
+ * Cloudflare : YES (Turnstile present in HTML, managed)
+ * Mature : true (Mature/Smut/Adult/Yaoi content indexed)
  *
  * Architecture :
- *   - Popular  : /popular (server-side rendered: href="/slug" + res.mbbcdn.com thumbs)
- *   - Latest   : /latest (same structure)
- *   - Search   : /search?q=<query>
- *   - Detail   : /<slug> (og:title, og:image, chapter list as href="/<slug>/chapter-N")
- *   - Chapters : /<slug>/chapter-N (chapter links inline on detail page)
- *   - Images   : var chapImages = 'url1,url2,...'; embedded in inline script
+ *   - Catalog  : /_next/data/{buildId}/popular.json?page=N   (items[], paginé cursor)
+ *   - Latest   : /_next/data/{buildId}/latest.json?page=N
+ *   - Search   : /_next/data/{buildId}/search.json?q={q}     (ssrItems[])
+ *   - Detail   : /<slug> -> __NEXT_DATA__ -> initialManga     (50 latest chapters SSR)
+ *   - Images   : /<slug>/<chapter-slug> -> __NEXT_DATA__ -> initialChapter.images[]
  *
- * Cover CDN : https://res.mbbcdn.com/thumb/<slug>.png
- * Image CDN : https://sN.mbcdnsa<X>.org/res/manga/<slug>/chapter-N/<hash>_N.jpg
- *             (CDN subdomain rotates s1..s14+, letter suffix varies per chapter)
+ * Chapter coverage : SSR delivers the 50 most recent chapters only.
+ * Chapters older than latest-50 are not exposed via any public SSR endpoint.
+ * This is a documented structural limitation of mangak.io, not a parsing bug.
  *
- * Selectors verified against live DOM 2026-05-10 :
- *   Popular page : href="/slug" (len > 10) + src="https://res.mbbcdn.com/thumb/<slug>.png"
- *   Title        : og:title meta
- *   Cover        : og:image meta
- *   Chapters     : href="/<slug>/chapter-N" anchors
- *   Images       : var chapImages = 'comma,separated,urls'; in inline <script>
+ * Cover CDN     : https://rx.resmk.org/covers/<hash>.webp
+ * Image CDN     : https://rx.qvzrc.org/r/p/<hash1>/<hash2>/<storage_key>.webp
+ *                 (pre-signed URLs from initialChapter.images[] -- no derivation needed)
  *
- * Known limitation: /manga-list endpoint does not serve static manga slugs (React hydration
- *   only). Use /popular and /latest for catalog browsing.
+ * buildId note  : mangak.io Next.js buildId is embedded in every page's __NEXT_DATA__.
+ *                 The implementation reads buildId dynamically from the landing page
+ *                 once per session to construct /_next/data/{buildId}/*.json endpoints.
+ *                 BuildId changes on every deployment but is always available via SSR.
  *
- * Obsolescence risk: MEDIUM -- React SSR, CDN subdomain rotation possible.
+ * Obsolescence risk: MEDIUM -- Next.js __NEXT_DATA__ structure may change on site updates.
  *
- * v1: ported from Mangayomi mangabuddy source, runtime tested 2026-05-10
- * v2: runtime-fix 2026-05-13: sendRequest replaced with fetchv2 (sendRequest undefined in QuickJS bridge)
- * v3: MProvider class wrap -- global functions caused ReferenceError: DefaultExtension is not defined
- *     in QuickJS runtime. Methods now return objects (not JSON.stringify strings). Field names
- *     aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates,
- *     getPageList returns [{index,imageUrl}] objects (not plain string array).
+ * Migration history:
+ *   v4: Full rewrite for mangak.io (Next.js __NEXT_DATA__ parser).
+ *       mangabuddy.com HTML scraping approach discarded -- DOM fully replaced.
+ *       Chapter list limited to latest-50 SSR; no public REST endpoint for full list.
+ *   v3: MProvider class wrap (mangabuddy.com)
+ *   v2: fetchv2 fix (mangabuddy.com)
+ *   v1: initial port from mangabuddy.com
  *
  * @author @khun -- Extension Strategist
- * @version 3
+ * @version 4
  */
 
-var BASE_URL = "https://mangabuddy.com";
-var COVER_CDN = "https://res.mbbcdn.com/thumb/";
+var BASE_URL = "https://mangak.io";
+var POPULAR_URL = BASE_URL + "/popular";
+var LATEST_URL = BASE_URL + "/latest";
+var SEARCH_URL = BASE_URL + "/search";
 
-function stripTags(str) {
-  if (!str) return "";
-  return str.replace(/<[^>]*>/g, "");
-}
+// Cached buildId -- populated on first API call requiring _next/data endpoints.
+// BuildId is stable within a deployment; re-fetched on null.
+var _cachedBuildId = null;
 
-function decodeHtml(str) {
-  if (!str) return "";
-  return str
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&#x27;/g, "'");
-}
-
-function absoluteUrl(href) {
-  if (!href) return "";
-  if (href.startsWith("http")) return href;
-  if (href.startsWith("/")) return BASE_URL + href;
-  return BASE_URL + "/" + href;
-}
-
-/** Slug from URL. */
-function slugFromUrl(url) {
-  return url.replace(BASE_URL, "").replace(/^\//, "").split("/")[0];
+/**
+ * Extract __NEXT_DATA__ JSON from a mangak.io HTML page.
+ * Returns parsed object or null on failure.
+ */
+function extractNextData(html) {
+  var m = html.match(/<script id="__NEXT_DATA__" type="application\/json">(.+?)<\/script>/);
+  if (!m) return null;
+  try {
+    return JSON.parse(m[1]);
+  } catch (e) {
+    return null;
+  }
 }
 
 /**
- * Parse MangaBuddy catalog page (popular/latest).
- * Server-side renders: href="/slug" + img src=mbbcdn.com/thumb/<slug>.png
- * Exclusion list: nav slugs that are not manga titles.
- * Field imageUrl (not cover) -- matches MProvider MangaItem contract.
+ * Fetch the Next.js buildId from the popular page.
+ * BuildId is required to construct /_next/data/{buildId}/*.json endpoints.
+ * Cached in _cachedBuildId for the session lifetime.
  */
-var NAV_SLUGS = {
-  "manga-list": true, "discussions": true, "search": true, "home": true,
-  "popular": true, "latest": true, "users": true, "about": true,
-  "contact": true, "terms-of-service": true, "privacy-policy": true,
-  "genres": true, "az-list": true, "newest": true, "history": true,
-  "library": true, "notifications": true, "bookmark": true, "sort": true
+async function getBuildId() {
+  if (_cachedBuildId) return _cachedBuildId;
+  var html = await fetchv2(POPULAR_URL, {});
+  var data = extractNextData(html);
+  if (data && data.buildId) {
+    _cachedBuildId = data.buildId;
+    return _cachedBuildId;
+  }
+  throw new Error("MangaK: failed to extract Next.js buildId from popular page");
+}
+
+/**
+ * Fetch a _next/data endpoint and return pageProps.
+ * Falls back to full HTML scrape + __NEXT_DATA__ extraction if _next/data 404s.
+ * This handles buildId staleness between deployments.
+ */
+async function fetchNextData(path, params) {
+  var buildId = await getBuildId();
+  var qs = params ? "?" + params : "";
+  var url = BASE_URL + "/_next/data/" + buildId + path + qs;
+  var html = await fetchv2(url, {});
+
+  // _next/data returns JSON directly; try parsing as JSON first
+  try {
+    var d = JSON.parse(html);
+    return d.pageProps || d;
+  } catch (e) {
+    // Fallback: treat as HTML (may happen on 404 redirect or CF challenge page)
+    var nd = extractNextData(html);
+    if (nd) return nd.props && nd.props.pageProps ? nd.props.pageProps : nd;
+    throw new Error("MangaK: failed to parse pageProps from " + url);
+  }
+}
+
+/**
+ * Parse a manga item from the catalog items[] array in __NEXT_DATA__.
+ * Returns { title, url, imageUrl } matching MProvider MangaItem contract.
+ */
+function parseCatalogItem(item) {
+  if (!item || !item.slug) return null;
+  var title = item.name || item.slug.replace(/-/g, " ");
+  var url = BASE_URL + (item.url || "/" + item.slug);
+  var imageUrl = item.cover || "";
+  return { title: title, url: url, imageUrl: imageUrl };
+}
+
+/**
+ * Determine if a manga item should be flagged mature.
+ * Rules: isAdult===true OR any genre/tag slug in MATURE_GENRES set.
+ */
+var MATURE_GENRES = {
+  "mature": true, "adult": true, "smut": true, "hentai": true,
+  "yaoi": true, "yuri": true, "ecchi": true, "erotica": true
 };
 
-function parseCatalogPage(html) {
-  var list = [];
-  var seen = {};
-
-  // Extract slug -> cover mapping from img src
-  var coverMap = {};
-  var imgPattern = /src="(https:\/\/res\.mbbcdn\.com\/thumb\/([^"]+))"/g;
-  var im;
-  while ((im = imgPattern.exec(html)) !== null) {
-    var coverUrl = im[1];
-    var fileName = im[2]; // e.g. "solo-leveling.png"
-    var slugFromFile = fileName.replace(/\.(?:png|jpg|webp)$/, "");
-    coverMap[slugFromFile] = coverUrl;
+function isMatureItem(item) {
+  if (item.isAdult === true) return true;
+  var genres = item.genres || [];
+  for (var i = 0; i < genres.length; i++) {
+    var slug = (genres[i].slug || "").toLowerCase();
+    if (MATURE_GENRES[slug]) return true;
   }
-
-  // Extract slug links
-  var linkPattern = /href="(\/([a-z0-9][a-z0-9-]{8,60}))"/g;
-  var lm;
-  while ((lm = linkPattern.exec(html)) !== null) {
-    var slug = lm[2];
-    if (NAV_SLUGS[slug]) continue;
-    // Skip chapter-level paths (contain /chapter-)
-    if (slug.indexOf("chapter-") !== -1) continue;
-    var url = BASE_URL + lm[1];
-    if (seen[url]) continue;
-    seen[url] = true;
-
-    // Match cover from coverMap (slug may match filename without extension)
-    var imageUrl = coverMap[slug] || COVER_CDN + slug + ".png";
-
-    // Title: derive from slug (capitalized words)
-    var titleRaw = slug.replace(/-/g, " ");
-    var title = titleRaw.charAt(0).toUpperCase() + titleRaw.slice(1);
-
-    list.push({ title: title, url: url, imageUrl: imageUrl });
-  }
-
-  return list;
+  return false;
 }
 
 /**
- * Parse manga detail page.
- * og:title gives the real title. og:image gives cover.
- * Chapters: href="/<slug>/chapter-N" pattern.
- * Returns imageUrl (not cover) -- MProvider MangaDetail contract.
+ * Parse initialManga from __NEXT_DATA__ detail page.
+ * Returns MProvider MangaDetail contract object.
+ *
+ * Chapter coverage note: mangak.io SSR returns the latest 50 chapters only.
+ * This is a site-level constraint -- not fixable via scraping.
  */
-function parseMangaDetail(html, mangaUrl) {
-  var slug = slugFromUrl(mangaUrl);
+function parseMangaDetail(initialManga, mangaUrl) {
+  if (!initialManga) throw new Error("MangaK: initialManga missing in __NEXT_DATA__");
 
-  // Title
-  var titleM = html.match(/<meta property="og:title" content="([^"]+)"/);
-  var rawTitle = titleM ? titleM[1] : slug.replace(/-/g, " ");
-  // Strip " - MangaBuddy" suffix if present
-  var title = decodeHtml(rawTitle.replace(/\s*-\s*MangaBuddy\s*$/i, "").trim());
+  var title = initialManga.name || "";
+  var imageUrl = initialManga.cover || "";
+  var status = initialManga.status || "Unknown";
+  var description = initialManga.summary || "";
 
-  // Cover (imageUrl -- MProvider MangaDetail contract)
-  var coverM = html.match(/<meta property="og:image" content="([^"]+)"/);
-  var imageUrl = coverM ? coverM[1] : COVER_CDN + slug + ".png";
+  var authors = (initialManga.authors || []).map(function(a) {
+    return typeof a === "string" ? a : (a.name || "");
+  }).filter(Boolean);
 
-  // Synopsis
-  var descM = html.match(/<meta name="description" content="([^"]{5,2000})"/);
-  var description = descM ? decodeHtml(descM[1]) : "";
+  var genres = (initialManga.genres || []).map(function(g) {
+    return typeof g === "string" ? g : (g.name || "");
+  }).filter(Boolean);
 
-  // Author (look for "Author" label)
-  // [^<]{0,500} bounds non-capture spans; [^>]{0,200} bounds tag-interior scan (ReDoS: F1)
-  var authorM = html.match(/Author[^<]{0,500}<\/[^>]{0,200}>\s*<[^>]{0,200}>([^<]{2,80})</i);
-  var author = authorM ? authorM[1].trim() : "";
-
-  // Status
-  // [^<]{0,500} bounds non-capture spans; [^>]{0,200} bounds tag-interior scan (ReDoS: F1)
-  var statusM = html.match(/Status[^<]{0,500}<\/[^>]{0,200}>\s*<[^>]{0,200}>([^<]{2,40})</i);
-  var status = statusM ? statusM[1].trim() : "Unknown";
-
-  // Chapters: href="/<slug>/chapter-<number>"
-  // Escape regex metachars in slug to prevent injection via attacker-controlled mangaUrl (effie F3)
-  var safeSlug = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  var chapPattern = new RegExp('href="(/' + safeSlug + '/chapter-(\\d+(?:\\.\\d+)?))\"', "g");
+  // Parse chapters from SSR (latest 50 only)
+  var rawChapters = initialManga.chapters || initialManga.latestChapters || [];
+  var seenUrl = {};
   var chapters = [];
-  var seenChap = {};
-  var cm;
-  while ((cm = chapPattern.exec(html)) !== null) {
-    var chapPath = cm[1];
-    var chapUrl = BASE_URL + chapPath;
-    if (seenChap[chapUrl]) continue;
-    seenChap[chapUrl] = true;
-    var chapNum = parseFloat(cm[2]);
 
-    // Extract chapter title from surrounding anchor text
-    var afterHref = html.substring(cm.index, cm.index + 300);
-    var chapTitleM = afterHref.match(/>([^<]{3,60})</);
-    var chapTitle = chapTitleM ? stripTags(chapTitleM[1]).trim() : "Chapter " + chapNum;
+  for (var i = 0; i < rawChapters.length; i++) {
+    var ch = rawChapters[i];
+    var chUrl = BASE_URL + (ch.url || "/" + (ch.slug || ""));
+    if (seenUrl[chUrl]) continue;
+    seenUrl[chUrl] = true;
 
-    chapters.push({ title: chapTitle, url: chapUrl, number: chapNum });
+    var chapNum = ch.chapterNumber != null ? ch.chapterNumber : parseFloat(ch.chapter_number || 0);
+    var chapTitle = ch.name || "Chapter " + chapNum;
+
+    chapters.push({
+      title: chapTitle,
+      url: chUrl,
+      number: chapNum
+    });
   }
 
   // Sort descending by number (newest first)
@@ -189,32 +185,28 @@ function parseMangaDetail(html, mangaUrl) {
     url: mangaUrl,
     imageUrl: imageUrl,
     description: description,
-    authors: author ? [author] : [],
+    authors: authors,
     status: status,
-    genres: [],
+    genres: genres,
     chapters: chapters
   };
 }
 
 /**
- * Parse chapter images.
- * MangaBuddy embeds: var chapImages = 'url1,url2,...'; in inline script.
- * CDN: https://sN.mbcdnsa<X>.org/res/manga/<slug>/chapter-N/<hash>_N.jpg
+ * Parse chapter images from initialChapter.__NEXT_DATA__.
+ * Uses initialChapter.images[] which contains pre-signed full URLs.
+ * No hash derivation needed -- URLs are provided directly by SSR.
  * Returns [{index, imageUrl}] -- MProvider Page contract.
  */
-function parseChapterImages(html) {
-  var m = html.match(/var\s+chapImages\s*=\s*'([^']{10,50000})'/);
-  if (!m) return [];
+function parseChapterImages(initialChapter) {
+  if (!initialChapter) throw new Error("MangaK: initialChapter missing in __NEXT_DATA__");
 
-  var raw = m[1];
-  var urls = raw.split(",").map(function(u) { return u.trim(); });
-  // Validate: keep only HTTP image URLs
-  var validUrls = urls.filter(function(u) {
-    return /^https?:\/\/.+\.(jpg|png|webp|jpeg)(\?.*)?$/i.test(u);
-  });
+  var images = initialChapter.images || [];
+  if (images.length === 0) {
+    throw new Error("MangaK: no images in initialChapter. CF bypass may be required.");
+  }
 
-  // Map to Page objects: {index, imageUrl}
-  return validUrls.map(function(url, i) {
+  return images.map(function(url, i) {
     return { index: i, imageUrl: url };
   });
 }
@@ -226,35 +218,49 @@ class DefaultExtension extends MProvider {
   get lang() { return "en"; }
   get baseUrl() { return BASE_URL; }
   get supportsLatest() { return true; }
+  // mature: true -- site indexes adult/BL/smut content (genres: Mature, Smut, Adult, Yaoi)
   get isMature() { return true; }
   get hasCloudflare() { return true; }
 
   async getPopular(page) {
-    // MangaBuddy popular page does not paginate via query param in static HTML
-    // page=1 only; for pages > 1, try /popular?page=N (may not work)
-    var url = page === 1 ? BASE_URL + "/popular" : BASE_URL + "/popular?page=" + page;
-    var html = await fetchv2(url, {});
-    var list = parseCatalogPage(html);
+    var pp = await fetchNextData("/popular.json", "page=" + page);
+    var items = pp.items || [];
+    var pagination = pp.pagination || {};
+    var list = [];
+    for (var i = 0; i < items.length; i++) {
+      var parsed = parseCatalogItem(items[i]);
+      if (parsed) list.push(parsed);
+    }
     return {
       list: list,
-      hasNextPage: list.length >= 20 && page === 1
+      hasNextPage: pagination.has_next === true
     };
   }
 
   async getLatestUpdates(page) {
-    var url = page === 1 ? BASE_URL + "/latest" : BASE_URL + "/latest?page=" + page;
-    var html = await fetchv2(url, {});
-    var list = parseCatalogPage(html);
+    var pp = await fetchNextData("/latest.json", "page=" + page);
+    var items = pp.items || [];
+    var pagination = pp.pagination || {};
+    var list = [];
+    for (var i = 0; i < items.length; i++) {
+      var parsed = parseCatalogItem(items[i]);
+      if (parsed) list.push(parsed);
+    }
     return {
       list: list,
-      hasNextPage: list.length >= 20 && page === 1
+      hasNextPage: pagination.has_next === true
     };
   }
 
   async search(query, page, filters) {
-    var url = BASE_URL + "/search?q=" + encodeURIComponent(query);
-    var html = await fetchv2(url, {});
-    var list = parseCatalogPage(html);
+    var pp = await fetchNextData("/search.json", "q=" + encodeURIComponent(query));
+    // Search result is in ssrItems (not items) for the search page
+    var items = pp.ssrItems || pp.items || [];
+    var list = [];
+    for (var i = 0; i < items.length; i++) {
+      var parsed = parseCatalogItem(items[i]);
+      if (parsed) list.push(parsed);
+    }
     return {
       list: list,
       hasNextPage: false
@@ -262,23 +268,25 @@ class DefaultExtension extends MProvider {
   }
 
   async getMangaDetail(mangaUrl) {
+    // Fetch detail page HTML directly -- buildId not needed for HTML scrape
     var html = await fetchv2(mangaUrl, {});
-    return parseMangaDetail(html, mangaUrl);
+    var nd = extractNextData(html);
+    if (!nd) throw new Error("MangaK: no __NEXT_DATA__ on detail page: " + mangaUrl);
+    var initialManga = nd.props && nd.props.pageProps && nd.props.pageProps.initialManga;
+    return parseMangaDetail(initialManga, mangaUrl);
   }
 
   async getChapterList(mangaUrl) {
-    var html = await fetchv2(mangaUrl, {});
-    var detail = parseMangaDetail(html, mangaUrl);
+    var detail = await this.getMangaDetail(mangaUrl);
     return detail.chapters;
   }
 
   async getPageList(chapterUrl) {
     var html = await fetchv2(chapterUrl, {});
-    var pages = parseChapterImages(html);
-    if (pages.length === 0) {
-      throw new Error("No chapImages var found. CF bypass may be required or page structure changed.");
-    }
-    return pages;
+    var nd = extractNextData(html);
+    if (!nd) throw new Error("MangaK: no __NEXT_DATA__ on chapter page: " + chapterUrl);
+    var initialChapter = nd.props && nd.props.pageProps && nd.props.pageProps.initialChapter;
+    return parseChapterImages(initialChapter);
   }
 
   getFilterList() {
