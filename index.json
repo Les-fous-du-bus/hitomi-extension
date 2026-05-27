@@ -83,15 +83,15 @@
             "name": "MangaFire",
             "lang": "multi",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangafire.js",
             "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v2 fix 2026-05-15: (1) getChapterList regex /\\.([\\w]+)(?:[/?#]|$)/ matched 'to' from domain; fixed to anchor on /manga/ path segment. (2) search /filter?keyword=<q> triggers CF Turnstile; fallback: fetch popular + client-side filter. getPageList still CF-blocked on /read/ reader URLs (WebView bypass required in-app). Harness 4/6 PASS.",
-            "sha256": "d5e3ad7f0231fa6420c5dddcebb08699dd91ba9e784791f81477198ed376c4dd"
+            "note": "v3 fix 2026-05-27: getPageList no longer JSON.parse()s HTML reader page. Now extracts internal chapter ID via class=\"reading-detail\" data-id=\"<id>\" regex, then GET /ajax/read/<id> returns {result:{images:[[url,w,h],...]}}. v2 fix 2026-05-15: (1) getChapterList regex /\\.([\\w]+)(?:[/?#]|$)/ matched 'to' from domain; fixed to anchor on /manga/ path segment. (2) search /filter?keyword=<q> triggers CF Turnstile; fallback: fetch popular + client-side filter. getPageList still CF-blocked on /read/ reader URLs (WebView bypass required in-app). Harness 4/6 PASS.",
+            "sha256": "932a9ec0657d9980f8d3ba449ad03dd5625a2b3d6d79ec8f50485616bb13328e"
         },
         {
             "id": "webtoons",

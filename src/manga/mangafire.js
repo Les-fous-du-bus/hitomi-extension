@@ -7,7 +7,7 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 2.0.0
+ * @version 2.0.1
  *
  * Fix v2.0.0 (2026-05-15):
  *  - getChapterList: manga ID extraction regex /\.(\w+)(?:\?|$|\/)/ matched "to"
@@ -17,6 +17,13 @@
  *    Fallback: fetch /filter?sort=trending (popular, no keyword) and filter client-side
  *    by title match. Same approach as flamecomics. Covers Discover search adequately.
  *    Note: CF-gated keyword search may work in-app via WebView bypass -- monitor.
+ *
+ * Fix v2.0.1 (2026-05-26):
+ *  - getPageList: was calling JSON.parse() on the HTML reader page (/read/...) which
+ *    is not a JSON endpoint. Threw SyntaxError -> catch returned [].
+ *    Fix: fetch HTML reader page, extract internal chapter ID from
+ *    class="reading-detail" data-id="<id>", then call GET /ajax/read/<id>
+ *    which returns {"result":{"images":[[url,width,height],...]}}.
  */
 
 const BASE_URL = "https://mangafire.to";
@@ -227,22 +234,44 @@ class DefaultExtension extends MProvider {
 
   async getPageList(url) {
     try {
+      // MangaFire chapter reader URL: /read/<slug>.<manga-id>/<lang>/chapter-<num>
+      // The reader HTML page is NOT JSON -- it embeds a reading-detail div with data-id
+      // (internal chapter ID) which is needed for the AJAX image endpoint.
+      // Endpoint: GET /ajax/read/<chapter-data-id>
+      //   Returns: {"result":{"images":[[url,width,height],...]},...}
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, {});
+      var html = await fetchv2(fullUrl, {});
+
+      // Extract internal chapter ID from reading container: data-id="12345"
+      var idMatch = html.match(/class="reading-detail[^"]*"[^>]*data-id="(\d+)"/);
+      if (!idMatch) {
+        // Fallback: look for id in script var or window object
+        idMatch = html.match(/["']chapter_id["']\s*:\s*(\d+)/);
+      }
+      if (!idMatch) {
+        // Fallback 2: extract from URL path and try numeric chapter ID embedded in page
+        idMatch = html.match(/data-reading-style[^>]+data-id="(\d+)"/);
+      }
+      if (!idMatch) return [];
+
+      var chapterId = idMatch[1];
+      var ajaxUrl = BASE_URL + "/ajax/read/" + chapterId;
+      var ajaxRes = await fetchv2(ajaxUrl, { "X-Requested-With": "XMLHttpRequest", "Referer": fullUrl });
 
       var data;
       try {
-        data = JSON.parse(res);
+        data = JSON.parse(ajaxRes);
       } catch (e) {
         return [];
       }
 
-      var images = data.result && data.result.images || [];
+      var images = (data.result && data.result.images) || [];
       var pages = [];
       for (var i = 0; i < images.length; i++) {
+        // Each image entry: [url, width, height] or plain string
         pages.push({
           index: i,
-          imageUrl: images[i][0] || images[i],
+          imageUrl: Array.isArray(images[i]) ? images[i][0] : images[i],
           headers: { "Referer": BASE_URL },
         });
       }
