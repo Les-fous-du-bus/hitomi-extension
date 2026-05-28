@@ -31,7 +31,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. API v5 stable, search + chapters verified.",
-            "sha256": "912a4f0016fa738376f85f491aa56dc0391964ceefb2191e86294c50f7b09419"
+            "sha256": "eae5215c52b06379f224b7badbba4ec07be346dc5b88bc9b04cde15ed435f038"
         },
         {
             "id": "weebcentral",
@@ -79,41 +79,11 @@
             "sha256": "c458d3424217dd5ab2ca5d84fcc5e00bd73947c2b14fe7139e347a505c8ff7af"
         },
         {
-            "id": "manga_plus",
-            "name": "MangaPlus",
-            "lang": "fr",
-            "space": "manga",
-            "version": 2,
-            "mature": false,
-            "cloudflare": false,
-            "jsUrl": "src/manga/manga_plus.js",
-            "iconUrl": "https://mangaplus.shueisha.co.jp/favicon.ico",
-            "status": "dormant",
-            "obsolescenceRisk": "critical",
-            "note": "API returns protobuf binary — JSON.parse fails. Fixing requires a protobuf decoder in QuickJS (high effort). Deferred.",
-            "sha256": "74265f8a61a10317afb65e8235e8cc93b52605d779dd34dacd500a9a1fcb47a2"
-        },
-        {
-            "id": "comick",
-            "name": "ComicK",
-            "lang": "multi",
-            "space": "manga",
-            "version": 1,
-            "mature": false,
-            "cloudflare": true,
-            "jsUrl": "src/manga/comick.js",
-            "iconUrl": "https://comick.dev/favicon.ico",
-            "status": "dead",
-            "obsolescenceRisk": "critical",
-            "note": "api.comick.fun DNS dead. comick.io redirects to comick.dev (CF 403). api.comick.dev also CF-blocked. Full remap to comick.dev API required — high effort.",
-            "sha256": "970dea20debf5cd1fb735bfd395bef0af25a79d615f0d71cc32999d82797534c"
-        },
-        {
             "id": "mangafire",
             "name": "MangaFire",
             "lang": "multi",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangafire.js",
@@ -121,7 +91,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
-            "sha256": "d8d18bc1f1264ee154fb1f2aca6219f4d92a80dd2dd401ebb58bc6b6776d9c31"
+            "sha256": "932a9ec0657d9980f8d3ba449ad03dd5625a2b3d6d79ec8f50485616bb13328e"
         },
         {
             "id": "webtoons",
@@ -136,7 +106,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3 (round 4 fix 2026-05-10): dropped alt='[^]*' requirement from primary parse pattern. Live DOM has alt='' on all series imgs which broke v2 regex. Fix verified: 143 series parsed.",
-            "sha256": "cdd76b211da9da3ac1fdf9e918a48ae19fa44628b4b83e9cc80538816d2b0139"
+            "sha256": "58652a8c91e6c24a5608356a16f14b897063f19b5b1cbb4b35faae11e7a986a5"
         },
         {
             "id": "asurascans",
@@ -179,7 +149,7 @@
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "b1f1ddcb439d83182fbe81357db34dd04a695772e25f066a5f6db443a514457a"
+            "sha256": "bb78754357291a233f36fc6b5f2771cbf88ab05cc9e44c03cb291d1ffb5d0f72"
         },
         {
             "id": "lelmanga",
@@ -208,7 +178,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v2.1: scheme validation + ReDoS pre-slicing. imageUrl/chapUrl reject non-http(s) schemes. getMangaDetail anchors each dotAll pattern to a 3-10KB window to prevent backtracking on 300KB+ Madara pages.",
-            "sha256": "15123d2cb4397f13b4289e63044c78eb634bcb9093bf6d71e30064a573e1a506"
+            "sha256": "19f34669a2c8041cce26be7fbffb1658ef76d92a62a54f0120e984ad362cb8ff"
         },
         {
             "id": "manga_scantrad",
@@ -239,20 +209,6 @@
             "sha256": "254168385adf885133e386f7c4722ff2b2c6b2233dfafee3e47c1f7a914d40cd"
         },
         {
-            "id": "epsilon_scan",
-            "name": "EpsilonScan",
-            "lang": "fr",
-            "space": "manga",
-            "version": 1,
-            "mature": false,
-            "cloudflare": true,
-            "jsUrl": "src/manga/epsilon_scan.js",
-            "iconUrl": "https://soft.epsilonscan.fr/favicon.ico",
-            "status": "active",
-            "obsolescenceRisk": "high",
-            "sha256": "d1c9e1997edcd99e197cf4ef9640da26d74605fb759415c2fec3a509c5150ad3"
-        },
-        {
             "id": "mangapill",
             "name": "MangaPill",
             "lang": "en",
@@ -265,7 +221,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-EMPTY. HTTP 200 + CF-RAY. No JS framework (not Next/React/Vue). Homepage returns 0 manga item refs from static HTML. Cause: content loaded via JS after page render (client-side AJAX or defer). Selector-based extension cannot extract items without JS execution.",
-            "sha256": "3469736fe9721e52f882272c50ad2d858296367151a44e137a9edb3873550fa6"
+            "sha256": "c10732a9bf5cb8ee9fe5efb92cf5650082977a8d4878cc4b2be3a1cc19d0f68e"
         },
         {
             "id": "flamecomics",
@@ -280,7 +236,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v2 (round 4 fix 2026-05-10): _extractAllSeries switched from regex with [^\\[\\]] character class to JSON.parse on __NEXT_DATA__ script tag. Previous regex broke on nested arrays (tags:[]). Fix verified: 153 series parsed via pageProps.series. Effie hardening: 2MB cap on JSON.parse + series_id /^\\d+$/ validation against CDN path traversal.",
-            "sha256": "84566561231b2c882b036c1ac0597ee27a41c82965a0158cd4beb5948377595c"
+            "sha256": "4dd922266325599ae39aad30231b9d1f9f39d220e9aa4d7856c2700712c24545"
         },
         {
             "id": "mangahere",
@@ -295,7 +251,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/ returns 200 + 70 items matching manga-list-1-cover pattern. Extension uses /directory/1.htm (200, 128KB). Detail regex confirmed against live DOM. CF-RAY present but no challenge.",
-            "sha256": "854d55ae8d2757cfaa9d7607752c345caf9c174e31b07c602a62e921634d9801"
+            "sha256": "031eb70b7c7f554ee9db861fe6d24f65677793cde7115425c7f64679880ee2de"
         },
         {
             "id": "toonily",
@@ -310,7 +266,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. Homepage 200 + 95KB + Madara theme confirmed (wp-manga). 24 page-item-detail.manga items. 101 /serie/ hrefs. Extension serie/ URL pattern matches live DOM. CF managed challenge present but no JS block in testing.",
-            "sha256": "284f6325c4a37cc62e44e1af500e65ec4dc518a35ecf445a537fb3132564ccb8"
+            "sha256": "65c69f6a6698f5d67ea6bdf34edd68ddd6e30a177f36bea73d304695b1fdbf73"
         },
         {
             "id": "mangakakalot",
@@ -340,7 +296,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/0-0-0-0-0-0-0/ returns 200 + 222 manga hrefs. Extension uses /directory/ with page params. manga_cover class selector confirmed matching live DOM. CF-RAY present, no JS challenge.",
-            "sha256": "601f480d67298b5cd523117813817b5b657d6f4ebb2d5698c490bbb18f358b1e"
+            "sha256": "7c8372d624d249aa5de32bc83f344ecc27fdcb2e77891db7fca01ce441149f20"
         },
         {
             "id": "royal_road",
@@ -560,20 +516,6 @@
             "sha256": "7f4515cc3261ec0e2f32c33d4279aec56b09f02a04a324c4b87cfb6884242440"
         },
         {
-            "id": "vynovel",
-            "name": "VyNovel",
-            "lang": "en",
-            "space": "light_novel",
-            "version": 1,
-            "mature": true,
-            "cloudflare": false,
-            "jsUrl": "src/novel/vynovel.js",
-            "iconUrl": "https://vynovel.com/favicon.ico",
-            "status": "active",
-            "obsolescenceRisk": "medium",
-            "sha256": "6fcfbfaf0b9efb1e728bafe7aa2580f38ff86f1b2e634db93d8a43d12cbe1ab7"
-        },
-        {
             "id": "allnovel",
             "name": "AllNovel",
             "lang": "en",
@@ -630,14 +572,14 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap + ReDoS hardening (F1: author/status patterns bounded [^<]{0,500}/[^>]{0,200}) + scheme validation on ytaw image URLs (F4: ^https?://.+). v1-v2 history: ported from Mangayomi, sendRequest->fetchv2 fix.",
-            "sha256": "8a4f54618d0d4442d3efca6ddd6eb964193874a7f60154b33cf64921917e39cf"
+            "sha256": "de3a6100d0ca91de2595bd02309bd8bdf5336884b4db8aef9d4d99adab1906f7"
         },
         {
             "id": "mangabuddy",
             "name": "MangaBuddy",
             "lang": "en",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangabuddy.js",
@@ -645,22 +587,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap + ReDoS hardening (F1: author/status patterns bounded [^<]{0,500}/[^>]{0,200}). F3 (slug injection) + F4 (scheme validation) already fixed in prior audit. v1-v2 history: ported from Mangayomi, sendRequest->fetchv2 fix.",
-            "sha256": "38a84f7e8139776d24b65b68f23c3f73c5722d43ba574d237f078879f800ffbe"
-        },
-        {
-            "id": "wuxiaworld",
-            "name": "WuxiaWorld",
-            "lang": "en",
-            "space": "light_novel",
-            "version": 1,
-            "mature": false,
-            "cloudflare": true,
-            "jsUrl": "src/novel/wuxiaworld.js",
-            "iconUrl": "https://www.google.com/s2/favicons?domain=wuxiaworld.com&sz=64",
-            "status": "active",
-            "obsolescenceRisk": "medium",
-            "note": "v1: ported from Mangayomi wuxiaworld source, runtime tested 2026-05-10. Catalog via REST JSON API (/api/novels?orderBy=totalviews): 243 novels, 10 per page verified. BLOCKER: isFree=false on all novels -- chapter content reads may require user auth token. Catalog + detail = public. Chapter content = access-dependent.",
-            "sha256": "cc34eb5466ca5299ffa9bc9be88d0b37ac3a22f387797b16c38a348aad5d2468"
+            "sha256": "6d10571eaac3b87108a978f923bd8b777b9ae29f7651a7c5bc0e9fc0a2e72da3"
         },
         {
             "id": "roliascan",
