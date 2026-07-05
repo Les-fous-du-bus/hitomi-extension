@@ -1,6 +1,6 @@
 /**
  * LightNovelFR — Extension Hitomi Reader Ultimate
- * Source : https://lightnovelfr.com
+ * Source : https://novel-fr.net
  * Type : Scraping HTML (theme Themesia)
  * Langue : FR
  * Cloudflare : NON
@@ -30,7 +30,7 @@
  * @version 4.1.0
  */
 
-var BASE_URL = "https://lightnovelfr.com";
+var BASE_URL = "https://novel-fr.net";
 
 var HEADERS = {
   "User-Agent": "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36",
@@ -104,7 +104,7 @@ class DefaultExtension extends LNProvider {
   get name()    { return "LightNovelFR"; }
   get lang()    { return "fr"; }
   get baseUrl() { return BASE_URL; }
-  get iconUrl() { return "https://lightnovelfr.com/favicon.ico"; }
+  get iconUrl() { return "https://novel-fr.net/favicon.ico"; }
 
   // -- CATALOGUE --
 
@@ -153,7 +153,8 @@ class DefaultExtension extends LNProvider {
       var title = titleMatch ? decodeHtml(stripTags(titleMatch[1])) : "Inconnu";
 
       // Cover : div.mdthumb img
-      var coverMatch = html.match(/<div[^>]*class="mdthumb"[^>]*>([\s\S]*?)<\/div>/i);
+      var coverMatch = html.match(/<div[^>]*class="[^"]*sertothumb[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                       html.match(/<div[^>]*class="mdthumb"[^>]*>([\s\S]*?)<\/div>/i);
       var cover = "";
       if (coverMatch) {
         var imgM = coverMatch[1].match(/<img[^>]+src="([^"]+)"/i);
@@ -191,7 +192,8 @@ class DefaultExtension extends LNProvider {
 
       // Genres : span.mdgenre a (sur page detail ou dans bloc sertoinfo)
       var genres = [];
-      var genreBlock = html.match(/<span[^>]*class="mdgenre"[^>]*>([\s\S]*?)<\/span>/i) ||
+      var genreBlock = html.match(/<div[^>]*class="[^"]*sertogenre[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+                       html.match(/<span[^>]*class="mdgenre"[^>]*>([\s\S]*?)<\/span>/i) ||
                        html.match(/<div[^>]*class="[^"]*seriestugenre[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
       if (genreBlock) {
         var genreLinks = genreBlock[1].match(/<a[^>]*>([\s\S]*?)<\/a>/gi);
@@ -204,28 +206,19 @@ class DefaultExtension extends LNProvider {
       }
 
       // Chapitres : div.eplister li[data-ID] > a[href]
-      // Tries sont newest-first dans le HTML, on inverse pour oldest-first
+      // Tries sont newest-first dans le HTML, on inverse pour oldest-first.
+      // FIX novel-fr.net : le theme rend un header .ephead a <div> imbriques ;
+      // l'ancien capture non-greedy `([\s\S]*?)</div></div>` s'arretait sur ce
+      // header et ne voyait aucun <li>. On ancre sur div.eplister et on parse
+      // les <li data-ID> directement dans une large fenetre (1400+ chapitres).
       var chapters = [];
-      var eplisterMatch = html.match(/<div[^>]*class="[^"]*eplister[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
-      if (!eplisterMatch) {
-        // Fallback : chercher tous les li data-ID dans toute la page
-        // OOM guard : sur HTML volumineux (>500KB, ex: Lord of the Mysteries 1431 ch),
-        // borner la fenetre de recherche autour de l'ancre "eplister" pour eviter
-        // que le regex <ul>...</ul> capture le premier <ul> du document entier.
-        var searchHtml = html;
-        if (html.length > 500000) {
-          var anchorIdx = html.indexOf("eplister");
-          if (anchorIdx >= 0) {
-            searchHtml = html.substring(anchorIdx, anchorIdx + 500000);
-          }
-        }
-        eplisterMatch = searchHtml.match(/<ul[^>]*>([\s\S]*?)<\/ul>/i);
-      }
+      var eplIdx = html.search(/<div[^>]*class="[^"]*eplister[^"]*"/i);
+      var chapterRegion = eplIdx >= 0 ? html.substring(eplIdx, eplIdx + 2000000) : html;
 
-      if (eplisterMatch) {
+      {
         var liRegex = /<li[^>]*data-ID="(\d+)"[^>]*>([\s\S]*?)<\/li>/gi;
         var lm;
-        while ((lm = liRegex.exec(eplisterMatch[1])) !== null) {
+        while ((lm = liRegex.exec(chapterRegion)) !== null) {
           var liBlock = lm[2];
 
           var chapLinkMatch = liBlock.match(/<a[^>]+href="([^"]+)"[^>]*>/i);

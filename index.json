@@ -73,7 +73,7 @@
             "cloudflare": true,
             "jsUrl": "src/manga/bato.js",
             "iconUrl": "https://bato.to/favicon.ico",
-            "status": "active",
+            "status": "dead",
             "obsolescenceRisk": "medium",
             "note": "v1: ported from Mangayomi bato source, runtime tested 2026-05-10. NETWORK-BLOCKED in test environment (bato.to TCP timeout from macOS dev machine -- CF TCP-level block). Extension architecture validated against DOM snapshot. Requires in-app test on Android device. Exists in assets/extensions/manga/bato.js.",
             "sha256": "c458d3424217dd5ab2ca5d84fcc5e00bd73947c2b14fe7139e347a505c8ff7af"
@@ -144,7 +144,7 @@
             "space": "manga",
             "version": 2,
             "mature": true,
-            "cloudflare": false,
+            "cloudflare": true,
             "jsUrl": "src/manga/sushi_scan.js",
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
@@ -325,7 +325,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v4.1: ReDoS hardening + OOM guard for large novels. parseChapter ads-strip uses {0,5000}? bound to prevent catastrophic backtrack. parseNovelAndChapters fallback UL search bounded to 500KB window anchored on 'eplister' substring. v4.11: edge-case fix anchorIdx >= 0 (eplister at offset 0).",
-            "sha256": "f5f6c1eff4c002a3f220c0caf23a7a10fa763dcb41bb2ea71a356f9b5467d7a6"
+            "sha256": "4f235fdf6be4ab06b85d0fb4a8b53c86120e245156e6cb6b8e21353de765d639"
         },
         {
             "id": "massnovel",
@@ -511,7 +511,7 @@
             "cloudflare": false,
             "jsUrl": "src/novel/novelbuddy.js",
             "iconUrl": "https://novelbuddy.com/favicon.ico",
-            "status": "active",
+            "status": "dead",
             "obsolescenceRisk": "medium",
             "sha256": "7f4515cc3261ec0e2f32c33d4279aec56b09f02a04a324c4b87cfb6884242440"
         },
@@ -539,7 +539,7 @@
             "cloudflare": true,
             "jsUrl": "src/novel/novelbin.js",
             "iconUrl": "https://novelbin.com/favicon.ico",
-            "status": "active",
+            "status": "dead",
             "obsolescenceRisk": "medium",
             "note": "CF 403 confirmed (cf-ray present). cloudflare: true required for app WebView bypass.",
             "sha256": "885076f85c9b947048c45a0a55fdba764e622d95e26e50b6666de3b65cab6367"
@@ -659,7 +659,7 @@
             "cloudflare": true,
             "jsUrl": "src/novel/lightnovelpub.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=lightnovelpub.com&sz=64",
-            "status": "active",
+            "status": "dead",
             "obsolescenceRisk": "medium",
             "note": "CF managed (cType='managed') confirmed on all endpoints 2026-05-27. Harness RED from curl (CF blocks native HTTP, expected). In-app WebView resolves managed challenge. Selectors [HYPOTHESIS] -- CF prevents curl verification. Mandatory in-app validation before marking GREEN. Structure derived from platform documentation + lightnovelworld.com (same codebase, defunct).",
             "sha256": "218609f20566cccb43d28082ff27d8dcf45ec5e8601f9bcd72a6b6ab2f0d0f2f"
