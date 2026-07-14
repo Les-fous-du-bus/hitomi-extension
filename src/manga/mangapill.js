@@ -7,7 +7,13 @@
  * Mature : false
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
+ *
+ * 2026-07-14 fix (v1.0.2): covers parsed 50/50 but blank on screen --
+ * cdn.readdetectiveconan.com is Referer-gated (403 without a site Referer, 200
+ * with; live-verified). List items + getMangaDetail now emit
+ * headers:{Referer:BASE_URL+"/"} forwarded by the app to the cover loader.
+ * imgPattern also accepts src (path-anchored, no false positive).
  *
  * 2026-05-15 fix:
  *  - getPopular now uses /search?q=&type=manga&page=N (50 items, paginated)
@@ -132,6 +138,7 @@ class DefaultExtension extends MProvider {
         status: status,
         genres: genres,
         authors: [],
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       };
     } catch (e) {
@@ -250,7 +257,9 @@ class DefaultExtension extends MProvider {
   // Match title and image by manga id, decoupled from the surrounding markup.
   _parseMangaGrid(html) {
     var titlePattern = /<a[^>]*href="\/manga\/(\d+)\/([^"]+)"[^>]*>\s*<div[^>]*(?:font-black|font-bold)[^>]*>([^<]+)<\/div>/gs;
-    var imgPattern = /data-src="(https:\/\/[^"]*\/file\/mangapill\/i\/(\d+)[^"]*)"/gs;
+    // Accept src OR data-src -- the capture is anchored on the /file/mangapill/i/<id>
+    // CDN path, so a src flip (or a non-lazy render) can never mis-hit a non-cover img.
+    var imgPattern = /(?:data-src|src)="(https:\/\/[^"]*\/file\/mangapill\/i\/(\d+)[^"]*)"/gs;
 
     var titles = {};
     var images = {};
@@ -272,6 +281,9 @@ class DefaultExtension extends MProvider {
         title: titles[id2].title,
         url: BASE_URL + "/manga/" + id2 + "/" + titles[id2].slug,
         imageUrl: images[id2] || "",
+        // cdn.readdetectiveconan.com is Referer-gated (403 without, 200 with
+        // the mangapill origin) -- live-verified. Forwarded to the cover loader.
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       });
     }

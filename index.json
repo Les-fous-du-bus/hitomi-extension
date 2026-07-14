@@ -98,7 +98,7 @@
             "name": "Webtoons",
             "lang": "multi",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/webtoons.js",
@@ -106,7 +106,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3 (round 4 fix 2026-05-10): dropped alt='[^]*' requirement from primary parse pattern. Live DOM has alt='' on all series imgs which broke v2 regex. Fix verified: 143 series parsed.",
-            "sha256": "58652a8c91e6c24a5608356a16f14b897063f19b5b1cbb4b35faae11e7a986a5"
+            "sha256": "ead573ceb5dbe6b4ea15096c1a060174b454b178b37b4de9fa200f573475ba1e"
         },
         {
             "id": "asurascans",
@@ -142,14 +142,14 @@
             "name": "SushiScan",
             "lang": "fr",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/sushi_scan.js",
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "bb78754357291a233f36fc6b5f2771cbf88ab05cc9e44c03cb291d1ffb5d0f72"
+            "sha256": "6b9ce2a68efe46bead6616a4b6608242fea6b6e7a2b860bc808424387332d96c"
         },
         {
             "id": "lelmanga",
@@ -213,7 +213,7 @@
             "name": "MangaPill",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangapill.js",
@@ -221,7 +221,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-EMPTY. HTTP 200 + CF-RAY. No JS framework (not Next/React/Vue). Homepage returns 0 manga item refs from static HTML. Cause: content loaded via JS after page render (client-side AJAX or defer). Selector-based extension cannot extract items without JS execution.",
-            "sha256": "c10732a9bf5cb8ee9fe5efb92cf5650082977a8d4878cc4b2be3a1cc19d0f68e"
+            "sha256": "6cf36a794bc5cae7b29cf7342f32b8ea6cbfa4b212e17575f91bf5f7776c4672"
         },
         {
             "id": "flamecomics",
@@ -243,7 +243,7 @@
             "name": "MangaHere",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/manga/mangahere.js",
@@ -251,14 +251,14 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/ returns 200 + 70 items matching manga-list-1-cover pattern. Extension uses /directory/1.htm (200, 128KB). Detail regex confirmed against live DOM. CF-RAY present but no challenge.",
-            "sha256": "031eb70b7c7f554ee9db861fe6d24f65677793cde7115425c7f64679880ee2de"
+            "sha256": "94a72115c8901704a899a0ecf66af9a3e7a3d533ec40831c38695cd7ced02507"
         },
         {
             "id": "toonily",
             "name": "Toonily",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/toonily.js",
@@ -266,7 +266,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. Homepage 200 + 95KB + Madara theme confirmed (wp-manga). 24 page-item-detail.manga items. 101 /serie/ hrefs. Extension serie/ URL pattern matches live DOM. CF managed challenge present but no JS block in testing.",
-            "sha256": "65c69f6a6698f5d67ea6bdf34edd68ddd6e30a177f36bea73d304695b1fdbf73"
+            "sha256": "9ea86655917ab4d2653328785f8cd9024b77c664aeaaf952513000b9b7910896"
         },
         {
             "id": "mangakakalot",
@@ -288,7 +288,7 @@
             "name": "MangaTown",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangatown.js",
@@ -296,7 +296,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/0-0-0-0-0-0-0/ returns 200 + 222 manga hrefs. Extension uses /directory/ with page params. manga_cover class selector confirmed matching live DOM. CF-RAY present, no JS challenge.",
-            "sha256": "7c8372d624d249aa5de32bc83f344ecc27fdcb2e77891db7fca01ce441149f20"
+            "sha256": "04aa4d819a72bfc5648a56efb82354b837323f010d15ce08dce246969cad5f26"
         },
         {
             "id": "royal_road",
@@ -564,7 +564,7 @@
             "name": "MangaKatana",
             "lang": "en",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangakatana.js",
@@ -572,14 +572,14 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap + ReDoS hardening (F1: author/status patterns bounded [^<]{0,500}/[^>]{0,200}) + scheme validation on ytaw image URLs (F4: ^https?://.+). v1-v2 history: ported from Mangayomi, sendRequest->fetchv2 fix.",
-            "sha256": "de3a6100d0ca91de2595bd02309bd8bdf5336884b4db8aef9d4d99adab1906f7"
+            "sha256": "83fff93c0c852bf9f435d7d58081828710dc95b8172f2eb48e339ba991ea1af7"
         },
         {
             "id": "mangabuddy",
             "name": "MangaBuddy",
             "lang": "en",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangabuddy.js",
@@ -587,7 +587,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v3: MProvider class wrap + ReDoS hardening (F1: author/status patterns bounded [^<]{0,500}/[^>]{0,200}). F3 (slug injection) + F4 (scheme validation) already fixed in prior audit. v1-v2 history: ported from Mangayomi, sendRequest->fetchv2 fix.",
-            "sha256": "6d10571eaac3b87108a978f923bd8b777b9ae29f7651a7c5bc0e9fc0a2e72da3"
+            "sha256": "6822546d754ee13aab29e2a9eadd55a8669d6204b6019f0c60a5f27571317eab"
         },
         {
             "id": "roliascan",
@@ -624,7 +624,7 @@
             "name": "ManhwaZ",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/manhwaz.js",
@@ -632,7 +632,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "HTML scraping SSR. /popular returns 404 - home page used as catalog. Chapter images from cdn.manhwaz.com. Strict slug filter on chapter list to prevent related-manga link pollution. mature=true (adult manhwa indexed).",
-            "sha256": "ff474a4bb655285a3a60782a296b4a4db5938b9bdc515e1a7ccfabbc6e2f5949"
+            "sha256": "cd97eac1a28fe38c8232bd60995c7902c276e8eae6aadfecb54f3e210e805a17"
         },
         {
             "id": "scan_vf",

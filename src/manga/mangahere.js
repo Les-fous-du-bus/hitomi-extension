@@ -7,7 +7,12 @@
  * Mature : true (has adult content toggle)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.2
+ * @version 1.0.3
+ *
+ * 2026-07-14 fix (v1.0.3): covers were parsed correctly (70/70) but blank on
+ * screen -- fmcdn.mangahere.com is Referer-gated (403 without a site Referer,
+ * 200 with; live-verified). List items + getMangaDetail now emit
+ * headers:{Referer:BASE_URL+"/"} which the app forwards to the cover loader.
  *
  * LIVE AUDIT 2026-04-19 (@khun)
  * - Probed https://www.mangahere.cc/directory/1.htm?latest (mobile UA)
@@ -205,6 +210,7 @@ class DefaultExtension extends MProvider {
         status: status,
         genres: genres,
         authors: authors,
+        headers: { "Referer": BASE_URL + "/" },
         isMature: true,
       };
     } catch (e) {
@@ -402,6 +408,10 @@ class DefaultExtension extends MProvider {
         title: decodeHtml(match[2]),
         url: mangaUrl,
         imageUrl: match[3],
+        // fmcdn.mangahere.com is Referer-gated (403 without, 200 with the site
+        // origin) -- live-verified. The app forwards these headers to the cover
+        // Image.network so the tile loads instead of 403-ing.
+        headers: { "Referer": BASE_URL + "/" },
         isMature: true,
       });
     }

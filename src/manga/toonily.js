@@ -303,40 +303,58 @@ class DefaultExtension extends MProvider {
 
   _parseListPage(html) {
     var list = [];
+    var seen = {};
+    // Scope every extraction to one card. The old code resolved the cover with
+    // a document-global html.match() that anchored on the FIRST tnlycdn src in
+    // the whole page -> every card got the same image (cover-dup). Splitting on
+    // the card container makes a cross-card first-match structurally impossible.
+    var blocks = html.split(/<div\s+class="page-item-detail/);
+    for (var i = 1; i < blocks.length; i++) {
+      var block = blocks[i];
 
-    // Homepage items: <div class="page-item-detail">
-    //   <a href="...serie-url..." title="..."><img src="...thumbnail..."></a>
-    //   <div class="post-title font-title"><h3><a href="...">Title</a></h3></div>
-    // </div>
-    var titleLinks = html.match(/class="post-title[^"]*"[^>]*>\s*<h3[^>]*>\s*<a[^>]*href="(https:\/\/toonily\.com\/serie\/[^"]*)"[^>]*>(.*?)<\/a>/gs);
-    if (titleLinks) {
-      var seen = {};
-      for (var i = 0; i < titleLinks.length; i++) {
-        var m = titleLinks[i];
-        var hrefMatch = m.match(/href="(https:\/\/toonily\.com\/serie\/[^"]*)"/);
-        var titleMatch = m.match(/<a[^>]*>(.*?)<\/a>/s);
-        if (!hrefMatch || !titleMatch) continue;
+      // Serie URL: first serie link in the card (the thumb <a>).
+      var hrefMatch = block.match(/href="(https?:\/\/toonily\.com\/serie\/[^"]+)"/);
+      if (!hrefMatch) continue;
+      var mangaUrl = hrefMatch[1];
+      if (seen[mangaUrl]) continue;
+      seen[mangaUrl] = true;
 
-        var mangaUrl = hrefMatch[1];
-        if (seen[mangaUrl]) continue;
-        seen[mangaUrl] = true;
-
-        // Find image near this link
-        var slug = mangaUrl.replace(BASE_URL + "/serie/", "").replace(/\/$/, "");
-        var imgMatch = html.match(new RegExp('src="(https://static\\.tnlycdn\\.com/[^"]*)"[^]*?href="' + mangaUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"', 's'));
-        if (!imgMatch) {
-          // Try reverse order
-          imgMatch = html.match(new RegExp('href="' + mangaUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^]*?src="(https://static\\.tnlycdn\\.com/[^"]*)"', 's'));
-        }
-        var imageUrl = imgMatch ? imgMatch[1] : "";
-
-        list.push({
-          title: decodeHtml(stripTags(titleMatch[1]).trim()),
-          url: mangaUrl,
-          imageUrl: imageUrl,
-          isMature: true,
-        });
+      // Title: prefer the thumb <a title="...">, fall back to post-title text.
+      var title = "";
+      var titleAttr = block.match(/<a[^>]*title="([^"]+)"/);
+      if (titleAttr) {
+        title = titleAttr[1];
+      } else {
+        var titleText = block.match(/class="post-title[^"]*"[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/);
+        if (titleText) title = titleText[1];
       }
+
+      // Cover: first <img> in the card. Prefer real-URL attributes over any
+      // lazy placeholder (data-src / data-lazy-src), then src, then srcset.
+      var imageUrl = "";
+      var imgTag = block.match(/<img[^>]*>/);
+      if (imgTag) {
+        var tag = imgTag[0];
+        var srcMatch = tag.match(/data-src="([^"]+)"/) ||
+                       tag.match(/data-lazy-src="([^"]+)"/) ||
+                       tag.match(/src="([^"]+)"/);
+        if (srcMatch && srcMatch[1].indexOf("data:") !== 0) {
+          imageUrl = srcMatch[1].trim();
+        } else {
+          var srcset = tag.match(/srcset="([^"]+)"/);
+          if (srcset) imageUrl = srcset[1].trim().split(/\s+/)[0];
+        }
+        // Normalize schemeless //host and relative /path URLs.
+        if (imageUrl.indexOf("//") === 0) imageUrl = "https:" + imageUrl;
+        else if (imageUrl.indexOf("/") === 0) imageUrl = BASE_URL + imageUrl;
+      }
+
+      list.push({
+        title: decodeHtml(stripTags(title).trim()),
+        url: mangaUrl,
+        imageUrl: imageUrl,
+        isMature: true,
+      });
     }
 
     // Check for next page

@@ -7,7 +7,15 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
+ *
+ * 2026-07-14 fix (v1.0.2):
+ *  - BASE_URL sushiscan.net -> sushiscan.fr: .net is Cloudflare-walled (403
+ *    "Just a moment") for programmatic clients -> blank catalogue. .fr is
+ *    reachable, current parser extracts 30/30 covers live (verified L2).
+ *  - _parseMangaReaderList now splits on .bsx boundaries (survives closing-div
+ *    drift) and extracts covers via _extractImg (data-lazy-src||data-src||
+ *    srcset||src, skip data:, absolute-URL normalization).
  *
  * 2026-05-15 fix:
  *  - Extension declared isMature=true (sushi_scan hosts pornhwa/smut alongside SFW).
@@ -19,7 +27,12 @@
 
 var MATURE_GENRES_RE = /\b(adulte|adult|smut|pornhwa|pornwha|hentai|erotique|ero|mature|ecchi|yaoi|yuri|18\+)\b/i;
 
-var BASE_URL = "https://sushiscan.net";
+// BASE_URL points at sushiscan.fr (the mirror named in this header). The old
+// sushiscan.net value was hard-walled by Cloudflare ("Just a moment...", 403)
+// for programmatic clients -> zero cards -> blank covers. sushiscan.fr is
+// reachable and the parser extracts 30/30 covers live. hasCloudflare stays true
+// as a safety net in case .fr gates on-device under a different network/geo.
+var BASE_URL = "https://sushiscan.fr";
 var UA = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36";
 
 function stripTags(str) {
@@ -267,46 +280,74 @@ class DefaultExtension extends MProvider {
 
   _parseMangaReaderList(html) {
     var list = [];
+    // Scope to the listing container, then split on .bsx card boundaries.
+    // The old fixed </a></div></div> terminator was brittle to closing-div
+    // drift; a boundary split survives it and keeps each card self-contained.
+    var scope = html;
+    var listupd = html.match(/<div class="listupd[^"]*">([^]*)/);
+    if (listupd) scope = listupd[1];
 
-    // MangaReader: .bsx items inside .listupd .bs
-    var itemMatches = html.match(/<div class="bsx">[^]*?<\/a>\s*<\/div>\s*<\/div>/gs);
-    if (!itemMatches) {
-      // Broader match
-      itemMatches = html.match(/<div class="bsx">[^]*?(?=<div class="bsx">|<\/div>\s*<\/div>\s*<\/div>)/gs);
-    }
+    var parts = scope.split(/<div class="bsx">/);
+    for (var i = 1; i < parts.length; i++) {
+      var item = parts[i];
 
-    if (itemMatches) {
-      for (var i = 0; i < itemMatches.length; i++) {
-        var item = itemMatches[i];
-
-        // Link and title from <a href="..." title="...">
-        var linkMatch = item.match(/<a[^>]*href="([^"]+)"[^>]*title="([^"]+)"/s);
-        if (!linkMatch) continue;
-
-        var mangaUrl = linkMatch[1];
-        var title = linkMatch[2];
-
-        // Image
-        var imgMatch = item.match(/<img[^>]*(?:data-src|src)\s*=\s*"([^"]+)"/);
-        var imageUrl = imgMatch ? imgMatch[1] : "";
-
-        if (title) {
-          // Listing markup carries no genre chip per tile. Title-only
-          // heuristic — low recall but zero false positives. Real flag
-          // comes from getMangaDetail once user opens the manga.
-          var titleMature = MATURE_GENRES_RE.test(title);
-          list.push({
-            title: decodeHtml(title),
-            url: mangaUrl,
-            imageUrl: imageUrl,
-            isMature: titleMature,
-          });
-        }
+      // Link + title from <a href="..." title="...">
+      var linkMatch = item.match(/<a[^>]*href="([^"]+)"[^>]*?title="([^"]*)"/);
+      if (!linkMatch) continue;
+      var mangaUrl = this._absUrl(linkMatch[1]);
+      var title = decodeHtml(linkMatch[2]).trim();
+      if (!title) {
+        var ttMatch = item.match(/<div class="tt"[^>]*>([^]*?)<\/div>/);
+        if (ttMatch) title = decodeHtml(stripTags(ttMatch[1])).trim();
       }
+      if (!title) continue;
+
+      // Cover via the fallback chain (data-lazy-src||data-src||srcset||src),
+      // skipping data: placeholders, normalized to an absolute URL.
+      var imageUrl = this._extractImg(item);
+
+      // Listing markup carries no genre chip per tile. Title-only heuristic —
+      // low recall, zero false positives. Real flag comes from getMangaDetail.
+      list.push({
+        title: title,
+        url: mangaUrl,
+        imageUrl: imageUrl,
+        isMature: MATURE_GENRES_RE.test(title),
+      });
     }
 
     var hasNextPage = list.length >= 10;
     return { list: list, hasNextPage: hasNextPage };
+  }
+
+  // Real image URL from a markup block: prefer data-* (real URL) over the lazy
+  // src placeholder, any quote style, skip data: placeholders. Host-agnostic
+  // so it survives a CDN rename.
+  _extractImg(block) {
+    var tagMatch = block.match(/<img\b[^>]*>/);
+    if (!tagMatch) return "";
+    var tag = tagMatch[0];
+    var patterns = [
+      /data-lazy-src\s*=\s*["']([^"']+)["']/,
+      /data-src\s*=\s*["']([^"']+)["']/,
+      /data-original\s*=\s*["']([^"']+)["']/,
+      /srcset\s*=\s*["']([^"'\s,]+)/,
+      /\bsrc\s*=\s*["']([^"']+)["']/,
+    ];
+    for (var i = 0; i < patterns.length; i++) {
+      var m = tag.match(patterns[i]);
+      if (m && m[1] && m[1].indexOf("data:") !== 0) return this._absUrl(m[1].trim());
+    }
+    return "";
+  }
+
+  _absUrl(u) {
+    if (!u) return "";
+    u = u.trim();
+    if (u.indexOf("//") === 0) return "https:" + u;   // schemeless
+    if (u.indexOf("http") === 0) return u;             // absolute
+    if (u.charAt(0) === "/") return BASE_URL + u;      // root-relative
+    return BASE_URL + "/" + u;                          // relative
   }
 
   _parseDateEN(dateText) {

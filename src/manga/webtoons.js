@@ -19,7 +19,15 @@
  *     Working endpoint: /fr/search?keyword=... (no /originals). Still uses strong.title.
  *
  * @author @khun — Extension Strategist
- * @version 4.1.0
+ * @version 4.2.0
+ *
+ * Fix v4.2.0 (2026-07-14): covers parsed 122/122 but blank on screen --
+ * webtoon-phinf.pstatic.net is Referer-gated and validates the origin (foreign
+ * Referer still 403s; webtoons.com/ -> 200, live-verified). List items +
+ * getMangaDetail emit headers:{Referer:BASE_URL+"/"} forwarded by the app.
+ * _parseMangaListFromPage rewritten to per-card block parsing (data-url||
+ * data-src||src) so the mobile m.webtoons layout the app is redirected to is
+ * also covered.
  *
  * Fix v4.1.0 (2026-05-15):
  *  - getPageList: <div id="_imageList"> uses lazy (.*?)</div> which stops at first
@@ -155,6 +163,7 @@ class DefaultExtension extends MProvider {
         status: status,
         genres: genres,
         authors: authors,
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       };
     } catch (e) {
@@ -288,40 +297,50 @@ class DefaultExtension extends MProvider {
     var list = [];
     var seen = {};
 
-    // 2026-04-19: originals grid uses
-    //   <a href="...list?title_no=N"> ... <img src alt=""> ... <strong class="title">Title</strong>
-    // Tested on /fr/originals -> 97 matches
-    var pat = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<strong class="title">([^<]+)<\/strong>/g;
-    var m;
-    while ((m = pat.exec(html)) !== null) {
-      var url = m[1];
+    // Per-card block parse tolerant of the desktop (www) grid AND the mobile
+    // (m.webtoons) layout the app's mobile UA is redirected to. Within each
+    // card: cover via data-src||data-url||data-lazy-src, then src (mobile may
+    // lazy-load with a placeholder in src and the real URL in data-url); title
+    // via strong.title (grid) or p.subj (search fallback).
+    var cardPat = /<a\s+href="([^"]*\/list\?title_no=\d+[^"]*)"[\s\S]*?<\/a>/g;
+    var card;
+    while ((card = cardPat.exec(html)) !== null) {
+      var block = card[0];
+      var url = card[1];
       if (seen[url]) continue;
+      var imgMatch =
+        block.match(/<img[^>]*\bdata-(?:src|url|lazy-src)="([^"]+)"/i) ||
+        block.match(/<img[^>]*\bsrc="([^"]+)"/i);
+      var imageUrl = imgMatch ? this._normalizeCover(imgMatch[1]) : "";
+      var titleMatch =
+        block.match(/<strong[^>]*class="[^"]*title[^"]*"[^>]*>([\s\S]*?)<\/strong>/) ||
+        block.match(/<p[^>]*class="[^"]*subj[^"]*"[^>]*>([\s\S]*?)<\/p>/);
+      var title = titleMatch ? decodeHtml(stripTags(titleMatch[1]).trim()) : "";
+      if (!title) continue;
       seen[url] = true;
       list.push({
-        title: decodeHtml(stripTags(m[3]).trim()),
+        title: title,
         url: url,
-        imageUrl: m[2],
+        imageUrl: imageUrl,
+        // webtoon-phinf.pstatic.net is Referer-gated and validates the origin
+        // (a foreign Referer still 403s; webtoons.com/ returns 200 -- live-
+        // verified). Forwarded by the app to the cover loader.
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       });
     }
 
-    // Fallback for search pages using <p class="subj">
-    if (list.length === 0) {
-      var pat2 = /<a\s+href="([^"]+\/list\?title_no=\d+[^"]*)"[^>]*>[\s\S]*?<img[^>]*src="([^"]+)"[^>]*>[\s\S]*?<p[^>]*class="[^"]*subj[^"]*"[^>]*>([\s\S]*?)<\/p>/g;
-      var m2;
-      while ((m2 = pat2.exec(html)) !== null) {
-        if (seen[m2[1]]) continue;
-        seen[m2[1]] = true;
-        list.push({
-          title: decodeHtml(stripTags(m2[3]).trim()),
-          url: m2[1],
-          imageUrl: m2[2],
-          isMature: false,
-        });
-      }
-    }
-
     return { list: list, hasNextPage: false };
+  }
+
+  // Absolutize schemeless/relative covers and percent-encode spaces (some
+  // Webtoons posters carry raw spaces/parens in the path).
+  _normalizeCover(u) {
+    if (!u) return "";
+    u = u.trim();
+    if (u.indexOf("//") === 0) u = "https:" + u;
+    else if (u.indexOf("/") === 0) u = BASE_URL + u;
+    return u.replace(/ /g, "%20");
   }
 
   _parseDate(dateStr) {

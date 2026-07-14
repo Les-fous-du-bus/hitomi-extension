@@ -11,7 +11,13 @@
  * to extract the number of pages, then builds image URLs from the pattern.
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
+ *
+ * 2026-07-14 fix (v1.0.2): covers parsed 30/30 but blank on screen -- fmcdn
+ * cover CDN is Referer-gated (403 without a site Referer, 200 with; live-
+ * verified, same family as MangaHere). List + search items now emit
+ * headers:{Referer:BASE_URL+"/"} (forwarded by the app) + schemeless-URL
+ * normalization as defense.
  *
  * 2026-05-15 fix:
  *  - getLatestUpdates now uses /latest/<page>.htm (was /directory/?latest
@@ -332,10 +338,15 @@ class DefaultExtension extends MProvider {
       if (seen[mangaUrl]) continue;
       seen[mangaUrl] = true;
 
+      var imgUrl = match[3];
+      if (imgUrl.indexOf("//") === 0) imgUrl = "https:" + imgUrl; // schemeless -> https
       list.push({
         title: decodeHtml(match[2]),
         url: BASE_URL + mangaUrl,
-        imageUrl: match[3],
+        imageUrl: imgUrl,
+        // fmcdn cover CDN is Referer-gated (403 without, 200 with the site
+        // origin) -- live-verified. Forwarded by the app to the cover loader.
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       });
     }
@@ -361,10 +372,13 @@ class DefaultExtension extends MProvider {
       if (seen[mangaUrl]) continue;
       seen[mangaUrl] = true;
 
+      var imgUrl = match[2];
+      if (imgUrl.indexOf("//") === 0) imgUrl = "https:" + imgUrl; // schemeless -> https
       list.push({
         title: decodeHtml(match[3]),
         url: BASE_URL + mangaUrl,
-        imageUrl: match[2],
+        imageUrl: imgUrl,
+        headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       });
     }

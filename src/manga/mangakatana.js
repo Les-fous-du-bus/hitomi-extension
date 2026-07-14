@@ -35,9 +35,12 @@
  *     in QuickJS runtime. Methods now return objects (not JSON.stringify strings). Field names
  *     aligned to MProvider contract: cover->imageUrl, getLatest->getLatestUpdates,
  *     getPageList returns [{index,imageUrl}] objects (not plain string array).
+ * v4: getPageList fix 2026-07-14: image array renamed ytaw -> thzq (ytaw is now a
+ *     1-element anti-scrape decoy). parseChapterImages now discovers the live var
+ *     name from the render loop + var-agnostic tokenized-CDN fallback. Live-verified L1.
  *
  * @author @khun -- Extension Strategist
- * @version 3
+ * @version 4
  */
 
 var BASE_URL = "https://mangakatana.com";
@@ -197,28 +200,52 @@ function parseMangaDetail(html, mangaUrl) {
 
 /**
  * Parse chapter page images.
- * MangaKatana embeds: var ytaw = ['url1','url2',...]; in an inline script.
- * CDN: https://i1.mangakatana.com/token/<encoded-token>/N.jpg
+ * MangaKatana renders pages via kxatz(): obj.attr('data-src', <VAR>[i]).
+ * The full page array was renamed ytaw -> thzq (~2026-07); `ytaw` is now a
+ * 1-element anti-scrape DECOY, so the old /var ytaw=/ regex silently returned
+ * only page 0. Strategy: follow the render loop to discover the live var name
+ * (survives future renames), then fall back to a var-agnostic collect-all of
+ * the tokenized CDN URLs ordered by their /N.ext index.
+ * Page CDN: https://i<N>.mangakatana.com/token/<encoded-token>/N.jpg
  * Returns [{index, imageUrl}] -- MProvider Page contract.
  */
 function parseChapterImages(html) {
-  var m = html.match(/var\s+ytaw\s*=\s*\[([^\]]{10,20000})\]/);
-  if (!m) return [];
-
-  var raw = m[1];
-  // Extract quoted URLs
-  var urlPattern = /'(https?:\/\/[^']+)'/g;
   var urls = [];
-  var um;
-  while ((um = urlPattern.exec(raw)) !== null) {
-    // Validate: must start with http(s):// AND end with image extension
-    if (/^https?:\/\/.+\.(jpg|png|webp|jpeg)(\?[^']*)?$/i.test(um[1])) {
-      urls.push(um[1]);
+  var seen = {};
+  function pushUrl(u) {
+    if (!u) return;
+    // Real page images live on the tokenized CDN: i<N>.mangakatana.com/token/.../N.ext
+    if (/^https?:\/\/i\d+\.mangakatana\.com\/token\/.+\.(?:jpg|jpeg|png|webp)(?:\?[^'"]*)?$/i.test(u) && !seen[u]) {
+      seen[u] = true;
+      urls.push(u);
     }
   }
 
+  // Strategy 1 -- follow the render loop. Discover the var name the site
+  // actually wires into the DOM (thzq today, ytaw historically). Preserves the
+  // site's exact page order and survives another var-name rotation.
+  var varM = html.match(/attr\(\s*['"]data-src['"]\s*,\s*([A-Za-z0-9_$]+)\s*\[/);
+  if (varM) {
+    var arrM = html.match(new RegExp("var\\s+" + varM[1] + "\\s*=\\s*\\[([^\\]]{10,60000})\\]"));
+    if (arrM) {
+      var q = /['"]([^'"]+)['"]/g, qm;
+      while ((qm = q.exec(arrM[1])) !== null) pushUrl(qm[1]);
+    }
+  }
+
+  // Strategy 2 (fallback) -- var-agnostic. Collect every tokenized CDN URL,
+  // dedupe (the decoy array shares page 0), order by the trailing /N.ext index.
+  if (urls.length <= 1) {
+    var g = /https?:\/\/i\d+\.mangakatana\.com\/token\/[^'"\s)]+?\.(?:jpg|jpeg|png|webp)/gi, gm;
+    while ((gm = g.exec(html)) !== null) pushUrl(gm[0]);
+    urls.sort(function (a, b) {
+      function idx(u) { var mm = u.match(/\/(\d+)\.(?:jpg|jpeg|png|webp)/i); return mm ? parseInt(mm[1], 10) : 1e9; }
+      return idx(a) - idx(b);
+    });
+  }
+
   // Map to Page objects: {index, imageUrl}
-  return urls.map(function(url, i) {
+  return urls.map(function (url, i) {
     return { index: i, imageUrl: url };
   });
 }

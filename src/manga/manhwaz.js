@@ -30,8 +30,14 @@
  *   - CF challenge may tighten; hasCloudflare=true required
  *   - Chapter list may contain related-manga links -- slug filter is critical
  *
+ * v2: cover fix 2026-07-14: parser keyed only on data-src, so search results
+ *     (src= only) returned an empty catalogue and the featured grid was missed.
+ *     parseCatalogPage now anchors on the /storage/images/cover/ path and reads
+ *     data-lazy-src||data-src||src. Emits a Referer per item (insurance).
+ *     getPageList unchanged (live-verified 44/44). Live-verified L2.
+ *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://manhwaz.com";
@@ -53,55 +59,40 @@ function parseCatalogPage(html) {
   var list = [];
   var seen = {};
 
-  // Primary: extract from anchor tags with /webtoon/ hrefs that have accompanying img data-src
-  var re = /href="(https:\/\/manhwaz\.com\/webtoon\/([^"\/]+))"[^>]*>[\s\S]{0,300}?data-src="(https:\/\/manhwaz\.com\/storage\/images\/cover\/[^"]+)"/g;
+  // All card layouts (featured grid, recommended widget, search results) share:
+  //   <a href=".../webtoon/{slug}"> ... <img ... (src|data-src)=".../storage/images/cover/{file}">
+  // Featured grid + search emit the real cover in src=; the recommended widget
+  // lazy-loads it in data-src. The OLD parser keyed EXCLUSIVELY on data-src, so
+  // search (0 data-src -> empty list) and the featured grid (src= -> missed)
+  // both failed. Anchor the capture on the /storage/images/cover/ path so a
+  // placeholder src can never win over the real data-src.
+  var re = /href="(https?:\/\/[^"]*\/webtoon\/([^"\/]+))"[^>]*>[\s\S]{0,400}?<img\b[^>]*?\b(?:data-lazy-src|data-src|src)="([^"]*\/storage\/images\/cover\/[^"]+)"/gi;
   var m;
   while ((m = re.exec(html)) !== null) {
     var url = m[1];
     if (seen[url]) continue;
     seen[url] = true;
-    var slug = m[2];
     var imageUrl = m[3];
-    // Extract title from nearby alt or title attribute or post-title h5
-    list.push({ title: slug.replace(/-/g, ' '), url: url, imageUrl: imageUrl });
+    if (imageUrl.indexOf('//') === 0) imageUrl = 'https:' + imageUrl;      // schemeless //host
+    else if (imageUrl.charAt(0) === '/') imageUrl = BASE_URL + imageUrl;   // root-relative
+    // Referer insurance: covers are same-origin today (no gate observed), but
+    // the CDN's hotlink policy is unverified — a Referer is harmless if unneeded.
+    list.push({
+      title: m[2].replace(/-/g, ' '),
+      url: url,
+      imageUrl: imageUrl,
+      headers: { "Referer": BASE_URL + "/" }
+    });
   }
 
-  // If primary failed, do two-pass: find all /webtoon/ links, pair with cover images by proximity
-  if (list.length === 0) {
-    var allLinks = [];
-    var linkRe = /href="(https:\/\/manhwaz\.com\/webtoon\/([^"\/]+))"/g;
-    var lm;
-    while ((lm = linkRe.exec(html)) !== null) {
-      if (seen[lm[1]]) continue;
-      // Skip chapter links
-      seen[lm[1]] = true;
-      allLinks.push({ url: lm[1], slug: lm[2], idx: lm.index });
-    }
-    // For each link, find nearest cover image
-    var coverRe2 = /data-src="(https:\/\/manhwaz\.com\/storage\/images\/cover\/[^"]+)"/g;
-    var covers = [];
-    var cm2;
-    while ((cm2 = coverRe2.exec(html)) !== null) {
-      covers.push({ url: cm2[1], idx: cm2.index });
-    }
-    for (var i = 0; i < allLinks.length && i < covers.length; i++) {
-      list.push({
-        title: allLinks[i].slug.replace(/-/g, ' '),
-        url: allLinks[i].url,
-        imageUrl: covers[i].url
-      });
-    }
-  }
-
-  // Enrich titles from post-title h5 elements (title tag often has the real title)
+  // Enrich titles from the card's text anchor (real title, not the slug).
   var titleRe = /href="(https:\/\/manhwaz\.com\/webtoon\/([^"\/]+))"[^>]*>([^<]+)<\/a>/g;
   var tm;
   var titleMap = {};
   while ((tm = titleRe.exec(html)) !== null) {
-    var url2 = tm[1];
     var rawTitle = tm[3].trim();
     if (rawTitle.length > 3 && rawTitle.length < 200) {
-      titleMap[url2] = rawTitle;
+      titleMap[tm[1]] = rawTitle;
     }
   }
   for (var j = 0; j < list.length; j++) {

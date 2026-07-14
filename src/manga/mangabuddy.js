@@ -36,8 +36,16 @@
  *   v2: fetchv2 fix (mangabuddy.com)
  *   v1: initial port from mangabuddy.com
  *
+ * v5: cover/page fix 2026-07-14: item.cover parsed fine but blank on screen --
+ *     rx.resmk.org (covers) / rx.qvzrc.org (pages) are Referer-gated (403
+ *     without, 200 with the mangak origin -- covers live-verified, pages
+ *     extrapolated same-operator). parseCatalogItem/parseMangaDetail/
+ *     parseChapterImages now emit headers:{Referer:BASE_URL+"/"}. Also: stale
+ *     buildId (404 "{}") no longer yields a silent empty catalogue -- fetchNextData
+ *     detects the no-content case and re-fetches the buildId once.
+ *
  * @author @khun -- Extension Strategist
- * @version 4
+ * @version 5
  */
 
 var BASE_URL = "https://mangak.io";
@@ -88,18 +96,33 @@ async function fetchNextData(path, params) {
   var buildId = await getBuildId();
   var qs = params ? "?" + params : "";
   var url = BASE_URL + "/_next/data/" + buildId + path + qs;
-  var html = await fetchv2(url, {});
+  var pp = _pageProps(await fetchv2(url, {}));
 
-  // _next/data returns JSON directly; try parsing as JSON first
-  try {
-    var d = JSON.parse(html);
-    return d.pageProps || d;
-  } catch (e) {
-    // Fallback: treat as HTML (may happen on 404 redirect or CF challenge page)
-    var nd = extractNextData(html);
-    if (nd) return nd.props && nd.props.pageProps ? nd.props.pageProps : nd;
-    throw new Error("MangaK: failed to parse pageProps from " + url);
+  // A STALE buildId (after a site redeploy) makes /_next/data/{old}/... return
+  // HTTP 404 with body "{}" -- which JSON.parse accepts, so the old code
+  // silently returned {} and the catalogue came back empty (blank Discover).
+  // Detect the no-content case, drop the cached buildId, re-fetch it once.
+  if (!pp || (!pp.items && !pp.ssrItems)) {
+    _cachedBuildId = null;
+    buildId = await getBuildId();
+    url = BASE_URL + "/_next/data/" + buildId + path + qs;
+    pp = _pageProps(await fetchv2(url, {}));
   }
+  if (pp) return pp;
+  throw new Error("MangaK: failed to parse pageProps from " + url);
+}
+
+/**
+ * Unwrap pageProps from either a _next/data JSON body ({pageProps:{...}}) or a
+ * full HTML page (__NEXT_DATA__). Returns null when neither yields content.
+ */
+function _pageProps(body) {
+  try {
+    var d = JSON.parse(body);
+    if (d && (d.pageProps || d.items || d.ssrItems)) return d.pageProps || d;
+  } catch (e) { /* not JSON -- fall through to HTML */ }
+  var nd = extractNextData(body);
+  return (nd && nd.props && nd.props.pageProps) ? nd.props.pageProps : null;
 }
 
 /**
@@ -111,7 +134,9 @@ function parseCatalogItem(item) {
   var title = item.name || item.slug.replace(/-/g, " ");
   var url = BASE_URL + (item.url || "/" + item.slug);
   var imageUrl = item.cover || "";
-  return { title: title, url: url, imageUrl: imageUrl };
+  // rx.resmk.org cover CDN is Referer-gated (403 without, 200 with the mangak
+  // origin -- live-verified). Forwarded by the app to the cover loader.
+  return { title: title, url: url, imageUrl: imageUrl, headers: { "Referer": BASE_URL + "/" } };
 }
 
 /**
@@ -188,6 +213,7 @@ function parseMangaDetail(initialManga, mangaUrl) {
     authors: authors,
     status: status,
     genres: genres,
+    headers: { "Referer": BASE_URL + "/" },
     chapters: chapters
   };
 }
@@ -206,8 +232,11 @@ function parseChapterImages(initialChapter) {
     throw new Error("MangaK: no images in initialChapter. CF bypass may be required.");
   }
 
+  // rx.qvzrc.org page CDN shares the same hotlink protection as the cover CDN;
+  // attach the site Referer so the reader images load instead of 403-ing.
+  var imgHeaders = { "Referer": BASE_URL + "/" };
   return images.map(function(url, i) {
-    return { index: i, imageUrl: url };
+    return { index: i, imageUrl: url, headers: imgHeaders };
   });
 }
 
