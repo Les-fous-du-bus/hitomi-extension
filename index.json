@@ -38,15 +38,15 @@
             "name": "WeebCentral",
             "lang": "en",
             "space": "manga",
-            "version": 5,
+            "version": 6,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/weebcentral.js",
             "iconUrl": "https://weebcentral.com/static/images/brand.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v5 fix 2026-05-17 (Yan bug report): getChapterList chapter number cassé sur séries Episode N (The Infinite Mage 168ch, The Archmage 256ch) et autres formats (# N, Days N). Cause: ctx=300 chars, SVG icone ~2100 chars absorbe la fenetre, nameMatch rate -> fallback number inversé -> sort app degenere -> ordre cassé. Fix: ctx=3000, extraction via <span class=''>, number via dernier digit. 0% zeros validé 4 séries.",
-            "sha256": "d96c01d2ccafde888305547fd9b32c18fb6410a3c5b7f2235f15b1b578188407"
+            "note": "v6 fix 2026-08-10 (Yan bug report 'extension morte'): le site est passe aux liens RELATIFS. /hot-updates et /series/<ULID>/full-chapter-list servent href='/series/...' et href='/chapters/...' au lieu de href='https://weebcentral.com/...'. Migration PARTIELLE: /search/data rend encore de l'absolu. Toutes les regex d'href etaient ancrees sur la forme absolue -> 0 match sur listing ET liste de chapitres, sans exception levee (le site repond 200). Fix: prefixe d'hote optionnel via hrefPattern(), normalisation en ABSOLU via absoluteUrl() (le relatif orphelinerait les telechargements et la progression deja indexes par URL absolue). Runtime verifie: v5 list=0/chapters=0 -> v6 list=60/chapters=194/pages=84.",
+            "sha256": "7cabb7ac878d7166bde2e45e6d435b824fd9924459594c4771810f031185a24e"
         },
         {
             "id": "mangaread",

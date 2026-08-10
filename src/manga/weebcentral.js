@@ -24,7 +24,7 @@
  * v2: runtime-fix 2026-05-13: title key alignment (name->title), chapter number regex extraction, imageUrl key alignment (url->imageUrl)
  *
  * @author @khun -- Extension Strategist
- * @version 5
+ * @version 6
  *
  * v4 fix 2026-05-15 (Yan bug report) : getPageList retournait 1 image car
  * l'endpoint HTMX /chapters/<id>/images necessite une session pour le mode
@@ -40,10 +40,36 @@
  * Fix : ctx=3000 chars, extraction via <span class="">TITLE</span>, number via
  * dernier digit du titre (couvre tous formats observés). Validé 0% zeros sur
  * 4 séries: Episode N, # N, Days N (168/256/242/259 chapitres).
+ *
+ * v6 fix 2026-08-10 (Yan bug report "extension morte") : le site est passé aux
+ * liens RELATIFS. /hot-updates et /series/<ULID>/full-chapter-list servent
+ * désormais href="/series/..." et href="/chapters/..." au lieu de
+ * href="https://weebcentral.com/...". Migration PARTIELLE : /search/data rend
+ * encore de l'absolu. Toutes les regex d'href étaient ancrées sur la forme
+ * absolue -> 0 match -> listing vide ET liste de chapitres vide, sans aucune
+ * exception levée (le site répond 200). Symptôme côté app : une oeuvre pourtant
+ * téléchargée n'affichait plus aucun chapitre.
+ * Fix : préfixe d'hôte rendu OPTIONNEL dans chaque regex, puis normalisation
+ * systématique via absoluteUrl().
+ *
+ * ATTENTION pour toute évolution future : on normalise vers l'ABSOLU, jamais
+ * vers le relatif. Les chapitres déjà téléchargés et les lignes de progression
+ * de lecture sont indexés côté app par l'URL du chapitre telle qu'elle a été
+ * produite à l'époque (absolue). Normaliser vers le relatif rendrait orphelins
+ * tous les téléchargements et toute la progression existante.
  */
 
 var BASE_URL = "https://weebcentral.com";
 var COVER_CDN = "https://temp.compsci88.com/cover/fallback/";
+
+// Préfixe d'hôte optionnel : accepte les deux formes servies par le site
+// ("https://weebcentral.com/series/..." et "/series/..."). Voir note v6.
+var HOST_PREFIX = "(?:https?:\\/\\/weebcentral\\.com)?";
+
+/** Construit une regex d'href tolérante absolu/relatif pour un chemin donné. */
+function hrefPattern(pathPattern, flags) {
+  return new RegExp('href=\\"(' + HOST_PREFIX + pathPattern + ')\\"', flags);
+}
 
 function stripTags(str) {
   if (!str) return "";
@@ -115,13 +141,14 @@ function parseArticleList(html) {
     if (!dataTipMatch) continue;
     var title = decodeHtml(dataTipMatch[1].trim());
 
-    // Series URL: href containing /series/<ULID>/<slug> (not /chapters/)
-    var urlMatch = artHtml.match(/href=\"(https?:\/\/weebcentral\.com\/series\/[0-9A-Z]{26}\/[^\"]+)\"/);
+    // Series URL: href containing /series/<ULID>/<slug> (not /chapters/).
+    // Absolu OU relatif (v6) — normalise en absolu.
+    var urlMatch = artHtml.match(hrefPattern("\\/series\\/[0-9A-Z]{26}\\/[^\\\"]+"));
     if (!urlMatch) {
-      urlMatch = artHtml.match(/href=\"(https?:\/\/weebcentral\.com\/series\/[0-9A-Z]{26})\"/);
+      urlMatch = artHtml.match(hrefPattern("\\/series\\/[0-9A-Z]{26}"));
     }
     if (!urlMatch) continue;
-    var seriesUrl = urlMatch[1];
+    var seriesUrl = absoluteUrl(urlMatch[1]);
 
     // Cover image: prefer compsci88 CDN
     var imgMatch = artHtml.match(/src=\"(https?:\/\/temp\.compsci88\.com\/cover\/[^\"]+)\"/);
@@ -157,10 +184,11 @@ function parseSearchList(html) {
   for (var i = 1; i < parts.length; i++) {
     var block = parts[i];
 
-    // Series URL: first /series/ULID/slug href in this block
-    var urlMatch = block.match(/href=\"(https?:\/\/weebcentral\.com\/series\/[0-9A-Z]{26}\/[^\"]+)\"/);
+    // Series URL: first /series/ULID/slug href in this block.
+    // Absolu OU relatif (v6) — normalise en absolu.
+    var urlMatch = block.match(hrefPattern("\\/series\\/[0-9A-Z]{26}\\/[^\\\"]+"));
     if (!urlMatch) continue;
-    var seriesUrl = urlMatch[1];
+    var seriesUrl = absoluteUrl(urlMatch[1]);
     if (seen[seriesUrl]) continue;
     seen[seriesUrl] = true;
 
@@ -327,15 +355,18 @@ class DefaultExtension extends MProvider {
       var html = await fetchv2(chapListUrl, headers);
 
       var chapters = [];
-      // Pattern: href="https://weebcentral.com/chapters/<ULID>" with chapter number and date
-      var chapPattern = /href=\"(https?:\/\/weebcentral\.com\/chapters\/([0-9A-Z]{26}))\"/g;
+      // Pattern: href="/chapters/<ULID>" (v6 : relatif) ou la forme absolue
+      // historique. On normalise en absolu — voir la note v6 en tete de
+      // fichier : l'URL absolue est la cle des telechargements et de la
+      // progression de lecture cote app.
+      var chapPattern = hrefPattern("\\/chapters\\/([0-9A-Z]{26})", "g");
       var seen = {};
       var m;
       var index = 0;
 
       // Also extract chapter name/number context
       while ((m = chapPattern.exec(html)) !== null) {
-        var chapUrl = m[1];
+        var chapUrl = absoluteUrl(m[1]);
         if (seen[chapUrl]) continue;
         seen[chapUrl] = true;
 
