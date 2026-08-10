@@ -13,7 +13,29 @@
  *   - Image URL priority: data-src > data-lazy-src > srcset > src
  *
  * @author @khun — Extension Strategist
- * @version 2.0.0
+ * @version 4
+ *
+ * v4 2026-08-10 (Yan bug report "extension morte") : la liste de chapitres
+ * revenait VIDE (site up, 200, aucune exception). Aligne sur l'extension
+ * Mihon/keiyoushi de CE site — `src/fr/mangasoriginesfr/.../MangasOriginesFr.kt`
+ * v1.4.56, activement maintenue — qui declare `useNewChapterEndpoint = true`
+ * et confirme `mangaSubString = "catalogues"` (deja bon ici).
+ * Divergences corrigees dans getChapterList, reprises de
+ * `lib-multisrc/madara/.../Madara.kt` :
+ *   1. POST "{manga_url}/ajax/chapters" SANS slash final (Madara.kt L877 fait
+ *      removeSuffix("/")). On postait sur ".../ajax/chapters/" -> redirection
+ *      canonique WordPress -> POST redirige perd son corps -> zero chapitre.
+ *   2. En-tete "X-Requested-With: XMLHttpRequest" (xhrHeaders, L47-51).
+ *   3. Nouvel endpoint essaye EN PREMIER ; admin-ajax.php passe en repli
+ *      (les Madara recents y repondent 400).
+ * Les selecteurs de detail etaient deja conformes (summary__content,
+ * author-content) — verifie contre la meme reference.
+ *
+ * NON VERIFIE AU RUNTIME depuis un poste de dev : Cloudflare rend 403 a tout
+ * client non-navigateur sur ce domaine (y compris le sitemap), c'est le cas
+ * "node-blind" documente dans docs/EXTENSIONS-HEALTH.md. Le portage vient d'une
+ * reference qui marche, pas d'une hypothese — mais la validation se fait SUR
+ * DEVICE (l'app resout le challenge CF via son CloudflareInterceptor).
  */
 
 var BASE_URL = "https://mangas-origines.fr";
@@ -230,14 +252,50 @@ class DefaultExtension extends MProvider {
 
       var chapterHtml = "";
 
-      // Method 1: POST to admin-ajax.php (old Madara)
-      if (mangaId) {
+      // Method 1 : NOUVEL endpoint Madara — POST {manga_url}/ajax/chapters
+      //
+      // v4 2026-08-10 : aligne sur l'extension Mihon/keiyoushi de CE site
+      // (`src/fr/mangasoriginesfr/.../MangasOriginesFr.kt`, v1.4.56, maintenue),
+      // qui declare `useNewChapterEndpoint = true` — donc ce site attend le
+      // NOUVEL endpoint, pas admin-ajax.php. Trois divergences corrigees ici,
+      // toutes reprises de `lib-multisrc/madara/.../Madara.kt` :
+      //
+      //   1. PAS de slash final. Madara.kt fait `mangaUrl.removeSuffix("/")`
+      //      puis POST "$mangaUrl/ajax/chapters" (L877). On postait sur
+      //      ".../ajax/chapters/" : WordPress repond alors par une redirection
+      //      canonique, et un POST redirige perd son corps / degenere en GET —
+      //      le handler AJAX ne rend jamais les chapitres.
+      //   2. En-tete `X-Requested-With: XMLHttpRequest` (xhrHeaders, L47-51).
+      //      Beaucoup d'installs Madara conditionnent la route AJAX dessus.
+      //   3. Ce endpoint est essaye EN PREMIER. admin-ajax.php ne reste qu'un
+      //      repli : les Madara recents y repondent 400.
+      try {
+        var mangaUrlNoSlash = fullUrl.replace(/\/+$/, "");
+        var newRes = await fetchv2(mangaUrlNoSlash + "/ajax/chapters", {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": fullUrl,
+            "User-Agent": HEADERS["User-Agent"],
+          },
+        });
+        if (newRes && newRes.indexOf("wp-manga-chapter") !== -1) {
+          chapterHtml = newRes;
+        }
+      } catch (e) {
+        // Repli ci-dessous
+      }
+
+      // Method 2 : ANCIEN endpoint admin-ajax.php (Madara historique).
+      // Conserve en repli pour ne pas regresser si le site revient en arriere.
+      if (mangaId && (!chapterHtml || chapterHtml.indexOf("wp-manga-chapter") === -1)) {
         try {
           var ajaxUrl = BASE_URL + "/wp-admin/admin-ajax.php";
           var ajaxRes = await fetchv2(ajaxUrl, {
             method: "POST",
             headers: {
               "Content-Type": "application/x-www-form-urlencoded",
+              "X-Requested-With": "XMLHttpRequest",
               "Referer": fullUrl,
               "User-Agent": HEADERS["User-Agent"],
             },
@@ -245,25 +303,6 @@ class DefaultExtension extends MProvider {
           });
           if (ajaxRes && ajaxRes !== "0" && ajaxRes.indexOf("wp-manga-chapter") !== -1) {
             chapterHtml = ajaxRes;
-          }
-        } catch (e) {
-          // Fallback below
-        }
-      }
-
-      // Method 2: POST to {manga_url}ajax/chapters/ (new Madara)
-      if (!chapterHtml || chapterHtml.indexOf("wp-manga-chapter") === -1) {
-        try {
-          var trailingUrl = fullUrl.endsWith("/") ? fullUrl : fullUrl + "/";
-          var newRes = await fetchv2(trailingUrl + "ajax/chapters/", {
-            method: "POST",
-            headers: {
-              "Referer": fullUrl,
-              "User-Agent": HEADERS["User-Agent"],
-            },
-          });
-          if (newRes && newRes.indexOf("wp-manga-chapter") !== -1) {
-            chapterHtml = newRes;
           }
         } catch (e) {
           // Use main page fallback
