@@ -128,15 +128,15 @@
             "name": "Mangas Origines",
             "lang": "fr",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangas_origines.js",
             "iconUrl": "https://mangas-origines.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v4 2026-08-10 (Yan bug report 'extension morte'): getChapterList rendait une liste VIDE sans exception (site up, 200). Aligne sur l'extension Mihon/keiyoushi de ce site (MangasOriginesFr.kt v1.4.56, maintenue) qui pose useNewChapterEndpoint=true et confirme mangaSubString='catalogues'. Corrige d'apres Madara.kt: (1) POST {manga_url}/ajax/chapters SANS slash final - le slash declenchait une redirection canonique WordPress qui vide le corps du POST; (2) en-tete X-Requested-With: XMLHttpRequest; (3) nouvel endpoint essaye en premier, admin-ajax.php en repli. Selecteurs de detail deja conformes. NON verifie au runtime cote dev (Cloudflare 403 = cas node-blind), validation SUR DEVICE requise.",
-            "sha256": "09df06957809df9af32b7eea8d856561761e47bed1111155edba7d32eb18d3f9"
+            "note": "v5 2026-08-10 REECRITURE COMPLETE: le site a ete refondu (theme maison 'ori-*'), les selecteurs Madara des v1-v4 ne matchent plus rien - manga__item, summary_image, wp-manga-chapter: 0 occurrence; base des permaliens passee de /catalogues/<slug>/ a /oeuvre/<slug>/; admin-ajax manga_get_chapters repond 400. CAUSE EXACTE de la liste vide sans exception: v4 interrogeait deja le bon endpoint POST {url}/ajax/chapters mais gardait le test indexOf('wp-manga-chapter') - absent de la reponse du nouveau theme, donc reponse correcte rejetee puis repli sur un HTML sans chapitre = []. FIX: catalogue/recherche via POST admin-ajax action=madara_child_catalogue (JSON html+more+total, tri/statut/origine/genres, 30/page) avec repli SSR sur /catalogues/ et /?s=..&post_type=wp-manga; cartes a.ori-cat-card; detail via h1.ori-sr-title + .ori-sr-cover + .ori-sr-syn-texte + a.ori-sr-genre + .ori-sr-signature + .ori-sr-badge-statut; chapitres via POST /oeuvre/<slug>/ajax/chapters puis div.ori-chl-row (le GET ne rend aucune ligne, la liste est injectee en JS); pages inchangees en div.page-break img (le lecteur est reste Madara) avec ?style=list obligatoire pour les oeuvres en mode paged. URLs de chapitre TOUJOURS absolues; les URLs d'entree en base historique (/catalogues/, /manga/) sont normalisees vers /oeuvre/ sinon l'endpoint chapitres repond 404 pour toute oeuvre deja en bibliotheque. VERIFIE EN DIRECT sur le HTML reellement servi (navigateur passe par Cloudflare): 6/6 methodes vertes, 20 oeuvres, 7018 chapitres, 0 date non parsee, 0 URL non absolue. ATTENTION MIGRATION: les chapitres telecharges avant la refonte sont indexes sous /catalogues/<slug>/chapitre-N/ (URL desormais 404) et ne seront pas reconnus par les nouvelles URLs /oeuvre/<slug>/chapitre-N/.",
+            "sha256": "e223e2ee037cdd509ca3d9323c8d7b225287e7341998a0da1220f286cac29f6b"
         },
         {
             "id": "sushi_scan",
