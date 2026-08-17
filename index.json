@@ -244,15 +244,15 @@
             "name": "MangaHere",
             "lang": "en",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/manga/mangahere.js",
             "iconUrl": "https://www.mangahere.cc/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "chapter-list fix 2026-08-17: getChapterList isolates the detail-main-list container and splits per <li> before matching. The old pattern let a lazy gap cross element boundaries, so the top read-first/last shortcut href paired with the newest chapter's label: c001 was numbered 156 and the real c156 entry was swallowed (155 of 156 returned). Verified live on 3 works: god_slayer 155->156, onepunch_man 417->418, martial_master 548->549; first entry correctly paired in each.",
-            "sha256": "fbf0104699d4cd521ae5a32c09e538f31f6bdc25ee5849926f6815f4a79bd07d"
+            "note": "v4 2026-08-17: (1) chapter list isolates detail-main-list and splits per <li> before matching - the old lazy gap crossed element boundaries so c001 was numbered 156 and the real c156 entry was swallowed (155 of 156). (2) getPageList advances TWO pages per request: pvalue is an array of two paths and only the first was read, so 22 round-trips were made for 22 pages. These are sequential under a 20s per-attempt ceiling, so duration scaled with page count - measured 22 pages 4163ms -> 2296ms, 6 pages 1335ms -> 787ms. Long chapters were timing out on mobile while short ones passed. Verified: counts unchanged (22/13/9/6), harness 6/6, second-of-pair images serve 200.",
+            "sha256": "cb4f8e2ff1ca095148b8567d1a6c9d791751f4e3c8591422b87dc8784e8a3e54"
         },
         {
             "id": "toonily",
