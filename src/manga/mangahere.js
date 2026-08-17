@@ -223,63 +223,81 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, this._getHeaders());
 
-      var chapters = [];
-      // Chapter items in <ul class="detail-main-list">
-      // <li><a href="/manga/slug/vXX/cXXX/1.html" title="...">
-      //   <div class="detail-main-list-main">
-      //     <p class="title3">Vol.XX Ch.XXX</p>
-      //     <p class="title2">Feb 28,2026</p>
-      //   </div></a></li>
-      var chapterPattern = /<a[^>]*href="(\/manga\/[^"]*\/\d+\.html)"[^>]*title="([^"]*)"[^>]*>.*?class="title3"[^>]*>(.*?)<\/p>.*?class="title2"[^>]*>(.*?)<\/p>/gs;
-      var match;
-      var seen = {};
-
-      while ((match = chapterPattern.exec(res)) !== null) {
-        var chapUrl = match[1];
-        if (seen[chapUrl]) continue;
-        seen[chapUrl] = true;
-
-        var chapTitle = stripTags(match[3]).trim();
-        var dateText = stripTags(match[4]).trim();
-
-        // Extract chapter number
-        var chapNum = 0;
-        var numMatch = chapTitle.match(/Ch\.(\d+(?:\.\d+)?)/i);
-        if (numMatch) chapNum = parseFloat(numMatch[1]);
-
-        chapters.push({
-          title: match[2] || chapTitle || "Chapter " + (chapNum || chapters.length + 1),
-          url: BASE_URL + chapUrl,
-          number: chapNum || chapters.length + 1,
-          dateUpload: parseMangaHereDate(dateText),
-        });
+      // POURQUOI on isole le conteneur PUIS on decoupe par <li> (correctif
+      // 2026-08-17) : l'ancien motif reliait un href a un titre en autorisant
+      // n'importe quel texte entre les deux. La page porte en haut un bloc de
+      // raccourcis "premier / dernier chapitre" ; le lien vers c001 y etait
+      // capte, puis la recherche filait jusqu'au premier titre trouve — celui du
+      // dernier chapitre, plus bas dans la vraie liste. Resultat mesure sur
+      // all_class_awakening_god_slayer : c001 numerote 156, et l'entree reelle du
+      // 156 avalee dans la meme correspondance. 155 chapitres au lieu de 156.
+      //
+      // Decouper par element rend tout croisement impossible : chaque fragment
+      // ne contient qu'un chapitre.
+      var scope = res;
+      var listStart = res.indexOf("detail-main-list");
+      if (listStart >= 0) {
+        var ulEnd = res.indexOf("</ul>", listStart);
+        scope = ulEnd > listStart
+          ? res.substring(listStart, ulEnd)
+          : res.substring(listStart);
       }
 
-      // Fallback: simpler regex if above didn't match
-      if (chapters.length === 0) {
-        var simplePattern = /<a[^>]*href="(\/manga\/[^"]*\/\d+\.html)"[^>]*title="([^"]*)"[^>]*>/gs;
-        while ((match = simplePattern.exec(res)) !== null) {
-          var chapUrl2 = match[1];
-          if (seen[chapUrl2]) continue;
-          seen[chapUrl2] = true;
-
-          var chapNum2 = 0;
-          var numMatch2 = match[2].match(/Ch\.(\d+(?:\.\d+)?)/i);
-          if (numMatch2) chapNum2 = parseFloat(numMatch2[1]);
-
-          chapters.push({
-            title: match[2],
-            url: BASE_URL + chapUrl2,
-            number: chapNum2 || chapters.length + 1,
-            dateUpload: Date.now(),
-          });
-        }
+      var chapters = this._parseChapterItems(scope);
+      // Filet : conteneur introuvable ou vide (refonte du site) -> on rebalaye
+      // le document entier avec la meme logique par element.
+      if (chapters.length === 0 && scope !== res) {
+        chapters = this._parseChapterItems(res);
       }
-
       return chapters;
     } catch (e) {
       return [];
     }
+  }
+
+  /// Extrait les chapitres d'un fragment HTML, un par element <li>.
+  ///
+  /// N'utilise PAS le drapeau /s : `[\s\S]` est l'equivalent supporte partout,
+  /// y compris par le moteur JS embarque dans l'app.
+  _parseChapterItems(scope) {
+    var chapters = [];
+    var seen = {};
+    var items = scope.split("<li");
+
+    for (var i = 0; i < items.length; i++) {
+      var item = items[i];
+
+      var hrefMatch = item.match(/href="(\/manga\/[^"]*\/\d+\.html)"/);
+      if (!hrefMatch) continue;
+      var chapUrl = hrefMatch[1];
+      if (seen[chapUrl]) continue;
+      seen[chapUrl] = true;
+
+      var titleAttr = "";
+      var attrMatch = item.match(/title="([^"]*)"/);
+      if (attrMatch) titleAttr = decodeHtml(attrMatch[1]).trim();
+
+      var t3 = item.match(/class="title3"[^>]*>([\s\S]*?)<\/p>/);
+      var chapTitle = t3 ? stripTags(t3[1]).trim() : "";
+      var t2 = item.match(/class="title2"[^>]*>([\s\S]*?)<\/p>/);
+      var dateText = t2 ? stripTags(t2[1]).trim() : "";
+
+      // Le numero vient du libelle de CE chapitre. title3 d'abord : l'attribut
+      // title est parfois le titre de l'oeuvre suivi du chapitre, parfois le
+      // chapitre seul, selon l'endroit de la page.
+      var chapNum = 0;
+      var numSource = chapTitle || titleAttr;
+      var numMatch = numSource.match(/Ch\.(\d+(?:\.\d+)?)/i);
+      if (numMatch) chapNum = parseFloat(numMatch[1]);
+
+      chapters.push({
+        title: titleAttr || chapTitle || "Chapter " + (chapNum || chapters.length + 1),
+        url: BASE_URL + chapUrl,
+        number: chapNum || chapters.length + 1,
+        dateUpload: parseMangaHereDate(dateText),
+      });
+    }
+    return chapters;
   }
 
   async getPageList(url) {

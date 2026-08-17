@@ -105,8 +105,11 @@ if not drift:
     print("OK: no drift — index.json untouched")
     sys.exit(0)
 
-# Preserve 2-space indent + trailing newline to match current file style.
-new_raw = json.dumps(index, indent=2, ensure_ascii=False) + "\n"
+# Preserve the file's ACTUAL indent (4 spaces) + trailing newline.
+# Le commentaire disait 2 et le code ecrivait 2, alors que index.json est
+# indente a 4 : chaque execution reformatait donc les 1300 lignes du fichier,
+# noyant le seul champ reellement modifie dans un diff illisible.
+new_raw = json.dumps(index, indent=4, ensure_ascii=False) + "\n"
 with index_path.open("w", encoding="utf-8") as f:
     f.write(new_raw)
 

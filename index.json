@@ -244,15 +244,15 @@
             "name": "MangaHere",
             "lang": "en",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/manga/mangahere.js",
             "iconUrl": "https://www.mangahere.cc/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/ returns 200 + 70 items matching manga-list-1-cover pattern. Extension uses /directory/1.htm (200, 128KB). Detail regex confirmed against live DOM. CF-RAY present but no challenge.",
-            "sha256": "94a72115c8901704a899a0ecf66af9a3e7a3d533ec40831c38695cd7ced02507"
+            "note": "chapter-list fix 2026-08-17: getChapterList isolates the detail-main-list container and splits per <li> before matching. The old pattern let a lazy gap cross element boundaries, so the top read-first/last shortcut href paired with the newest chapter's label: c001 was numbered 156 and the real c156 entry was swallowed (155 of 156 returned). Verified live on 3 works: god_slayer 155->156, onepunch_man 417->418, martial_master 548->549; first entry correctly paired in each.",
+            "sha256": "fbf0104699d4cd521ae5a32c09e538f31f6bdc25ee5849926f6815f4a79bd07d"
         },
         {
             "id": "toonily",
