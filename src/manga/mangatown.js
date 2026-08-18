@@ -11,7 +11,7 @@
  * to extract the number of pages, then builds image URLs from the pattern.
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.2
+ * @version 1.1.0
  *
  * 2026-07-14 fix (v1.0.2): covers parsed 30/30 but blank on screen -- fmcdn
  * cover CDN is Referer-gated (403 without a site Referer, 200 with; live-
@@ -232,77 +232,78 @@ class DefaultExtension extends MProvider {
   }
 
   async getPageList(url) {
-    try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      // Ensure URL ends with /
-      if (!fullUrl.endsWith("/")) fullUrl += "/";
-      var res = await fetchv2(fullUrl, this._getHeaders());
+    // UN SEUL appel HTTP par chapitre (v1.1.0, verifie en direct 2026-08-18).
+    //
+    // CE QUI NE MARCHAIT PAS : la version precedente cherchait le compte de
+    // pages dans un <select>, avec le filtre `options.length > 1 && < 100`.
+    // Or la page de chapitre contient DEUX <select> de 156 options chacun — ce
+    // sont deux selecteurs de CHAPITRES, pas de pages. Le filtre les rejetait
+    // tous les deux, `pageCount` restait a 1, et le lecteur n'affichait que la
+    // PREMIERE image de chaque chapitre. Mesure : c152 rendait 1 image sur 5.
+    //
+    // CE QUI MARCHE : la page expose `total_pages`, et toutes les images d'un
+    // chapitre ne differvent que par leur suffixe numerique. On lit le compte,
+    // on prend l'URL de l'image 1, et on incremente — zero appel de plus.
+    //
+    // Verifie contre le vrai site sur trois chapitres (5, 6 et 21 pages) :
+    // chaque URL derivee rend un vrai JPEG en 200.
+    //
+    // POURQUOI on ne va PAS jusqu'a total_pages + 1 : MangaHere, meme
+    // operateur et meme CDN, annonce une image de plus (imagecount). Cette
+    // derniere est la carte de fin de chapitre — nom en "cf<NN>.jpg" au lieu
+    // de "<x><NNN>.jpg", 200 Ko contre 2 Mo. Elle n'est pas une page de
+    // lecture et ne se derive pas par increment. On s'arrete donc a
+    // total_pages, qui est le compte exact des vraies pages.
+    var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
+    if (!fullUrl.endsWith("/")) fullUrl += "/";
 
-      // Extract the first image to get the CDN base pattern
-      // Image: <img src="//zjcdn.mangahere.org/store/manga/ID/chapter/compressed/prefix_001.jpg"
-      //         id="image">
-      var imgMatch = res.match(/id="image"[^>]*src="([^"]+)"/);
-      if (!imgMatch) {
-        imgMatch = res.match(/src="([^"]*zjcdn\.mangahere\.org[^"]*)"/);
-      }
-      if (!imgMatch) return [];
+    var res = await fetchv2(fullUrl, this._getHeaders());
+    if (!res || res.length === 0) {
+      throw new Error("MangaTown: page de chapitre vide (" + fullUrl + ")");
+    }
 
-      var firstImgUrl = imgMatch[1];
-      if (firstImgUrl.startsWith("//")) firstImgUrl = "https:" + firstImgUrl;
+    var imgMatch = res.match(/id="image"[^>]*src="([^"]+)"/);
+    if (!imgMatch) {
+      imgMatch = res.match(/src="([^"]*zjcdn\.mangahere\.org[^"]*)"/);
+    }
+    // Lever plutot que rendre [] : un chapitre annonce mais pas encore publie
+    // sert une page courte sans image (verifie sur c157). Rendre [] laissait
+    // le lecteur peindre un ecran vide sans expliquer pourquoi.
+    if (!imgMatch) {
+      throw new Error(
+        "MangaTown: aucune image sur " + fullUrl +
+        " — chapitre annonce mais pas encore publie ?"
+      );
+    }
 
-      // Count pages: second <select> contains page options (01, 02, 03, ...)
-      // Exclude the last option which is "featured.html"
-      var selects = res.match(/<select[^>]*>([\s\S]*?)<\/select>/g);
-      var pageCount = 1;
-      if (selects) {
-        for (var s = 0; s < selects.length; s++) {
-          var options = selects[s].match(/<option/g);
-          if (options && options.length > 1 && options.length < 100) {
-            // This is likely the page selector (not the chapter selector)
-            // Subtract 1 for the "featured.html" page
-            pageCount = options.length - 1;
-            break;
-          }
+    var firstUrl = imgMatch[1];
+    if (firstUrl.startsWith("//")) firstUrl = "https:" + firstUrl;
+
+    var totalMatch = res.match(/total_pages\s*=\s*(\d+)/);
+    var count = totalMatch ? parseInt(totalMatch[1]) : 1;
+    if (!count || count < 1) count = 1;
+
+    var result = [];
+    for (var i = 1; i <= count; i++) {
+      // Remplace le dernier groupe de chiffres avant l'extension, en gardant
+      // le meme remplissage par des zeros (c001 -> c002, o001 -> o002...).
+      var pageUrl = firstUrl.replace(
+        /(\d+)(\.[a-zA-Z]+)$/,
+        function (_m, digits, ext) {
+          var n = String(i);
+          while (n.length < digits.length) n = "0" + n;
+          return n + ext;
         }
-      }
-
-      // Build page URLs by fetching each page
-      // Image URL pattern: prefix_001.jpg, prefix_002.jpg, etc.
-      var result = [];
+      );
       result.push({
-        index: 0,
-        imageUrl: firstImgUrl,
+        index: result.length,
+        imageUrl: pageUrl,
+        // zjcdn est filtre par Referer (403 sans, 200 avec l'origine du site).
         headers: { "Referer": BASE_URL + "/" },
       });
-
-      // Fetch remaining pages to get actual image URLs
-      for (var p = 2; p <= pageCount; p++) {
-        try {
-          var pageUrl = fullUrl + p + ".html";
-          var pageRes = await fetchv2(pageUrl, this._getHeaders());
-
-          var pageImgMatch = pageRes.match(/id="image"[^>]*src="([^"]+)"/);
-          if (!pageImgMatch) {
-            pageImgMatch = pageRes.match(/src="([^"]*zjcdn\.mangahere\.org[^"]*)"/);
-          }
-          if (pageImgMatch) {
-            var pageImgUrl = pageImgMatch[1];
-            if (pageImgUrl.startsWith("//")) pageImgUrl = "https:" + pageImgUrl;
-            result.push({
-              index: p - 1,
-              imageUrl: pageImgUrl,
-              headers: { "Referer": BASE_URL + "/" },
-            });
-          }
-        } catch (pageErr) {
-          // Skip failed pages
-        }
-      }
-
-      return result;
-    } catch (e) {
-      return [];
     }
+
+    return result;
   }
 
   getFilterList() {

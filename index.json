@@ -289,15 +289,15 @@
             "name": "MangaTown",
             "lang": "en",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangatown.js",
             "iconUrl": "https://www.mangatown.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "runtime-audit 2026-05-10: RUNTIME-OK. /directory/0-0-0-0-0-0-0/ returns 200 + 222 manga hrefs. Extension uses /directory/ with page params. manga_cover class selector confirmed matching live DOM. CF-RAY present, no JS challenge.",
-            "sha256": "04aa4d819a72bfc5648a56efb82354b837323f010d15ce08dce246969cad5f26"
+            "note": "fix 2026-08-18 (v1.1.0): getPageList ne rendait qu'UNE image par chapitre. Le compte de pages etait cherche dans un <select> avec le filtre options<100, mais la page contient deux <select> de 156 options (selecteurs de CHAPITRES). Filtre toujours faux -> pageCount=1. Remplace par total_pages + derivation du suffixe numerique : 1 seul appel HTTP par chapitre au lieu de N. Verifie en direct sur c001/c100/c152 (21/6/5 pages, toutes servies en 200). Un chapitre annonce mais non publie leve une erreur explicite au lieu de rendre [].",
+            "sha256": "18497e7cbad9a1900bbae554d121725af0d31261af93263bc0abcae57d8aac04"
         },
         {
             "id": "royal_road",
