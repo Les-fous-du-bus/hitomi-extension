@@ -664,6 +664,21 @@
             "obsolescenceRisk": "medium",
             "note": "CF managed (cType='managed') confirmed on all endpoints 2026-05-27. Harness RED from curl (CF blocks native HTTP, expected). In-app WebView resolves managed challenge. Selectors [HYPOTHESIS] -- CF prevents curl verification. Mandatory in-app validation before marking GREEN. Structure derived from platform documentation + lightnovelworld.com (same codebase, defunct).",
             "sha256": "218609f20566cccb43d28082ff27d8dcf45ec5e8601f9bcd72a6b6ab2f0d0f2f"
+        },
+        {
+            "id": "valir_scans",
+            "name": "ValirScans",
+            "lang": "en",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/valir_scans.js",
+            "iconUrl": "https://www.google.com/s2/favicons?domain=valirscans.org&sz=64",
+            "status": "active",
+            "obsolescenceRisk": "high",
+            "note": "v1 (2026-08-24): Next.js App Router, data read from the server-rendered RSC stream (self.__next_f.push) -- there is NO __NEXT_DATA__ tag. Catalogue via GET /series?page=N key 'initialSeries' (24/page); latest via /series-sitemap-1.xml lastmod; chapters via paginated series page validated against 'chapterCount'. Pages are plain URLs on media.valirscans.org/series/<slug>/<NNNN>/p-<uuid>.webp. PARTIALLY PAID SITE: newest chapters are coin-locked, older ones become free. Locked chapters ARE listed with a [Locked] title prefix so the app never believes the series stops there, and getPageList throws on them -- no paywall bypass, /api/ is Disallow in robots.txt and is never touched. HARNESS FALSE NEGATIVE: ext-test.js reads chaps[0] (the NEWEST chapter), which on this site is systematically the locked one, so it reports content=0 / YELLOW. Measured directly instead: revenge-of-reborn-villainess 8 chapters (7 free) -> ch7 52 pages, ch6 52 pages; insos-law 283 chapters -> ch0 12 pages. Same category of structural false negative as the Cloudflare node-blind cases in EXTENSIONS-HEALTH.md. Not the UA blacklist either: Python-urllib gets 403, any browser UA gets 200, no challenge and no cookie -- hence cloudflare:false. NOVEL SIDE DELIBERATELY NOT SHIPPED: novel chapter text is never server-rendered ('content':'' on three chapters with isLocked:false, i.e. free), so a novel extension could only ever return an empty read. FIRST THING THAT WILL BREAK: the RSC key names ('initialSeries', 'chapterCount') -- they are build-time internals of the site's own components.",
+            "sha256": "7dd00d49067770f61bfdacab005654389b8c4e4cd7041286a201f49e36406575"
         }
     ]
 }
