@@ -250,31 +250,70 @@ function sampleIndices(n) {
   if (out.kind === '?' && sr.via === 'search') out.kind = 'manga';
 
   // FICHE + LISTE DE CHAPITRES
+  //
+  // On essaie PLUSIEURS oeuvres, pas seulement la premiere de la liste
+  // (correction du 2026-09-05). Sur mangadex, la premiere oeuvre populaire
+  // etait une serie sous licence : MangaDex la REFERENCE sans l'heberger, ses
+  // 24 chapitres pointent tous vers l'editeur officiel et aucun n'est lisible.
+  // Le harnais concluait "aucun contenu" sur une extension par ailleurs saine.
+  // Une oeuvre n'est pas un echantillon : c'est un tirage.
   let chaps = [];
-  if (firstUrl) {
-    const dr = await tryVariants([
-      ['parseNovelAndChapters', () => ext.parseNovelAndChapters(firstUrl), d => d && (d.title || d.name)],
-      ['getMangaDetail', () => ext.getMangaDetail(firstUrl), d => d && (d.title || d.name)],
-    ]);
-    const detail = dr.val;
-    out.stages.detail = detail && (detail.title || detail.name) ? 1 : 0;
-    if (dr.err) out.err.detail = dr.err;
+  const candidates = [];
+  for (const it of list.slice(0, 4)) { const u = urlOf(it); if (u) candidates.push(u); }
+  for (const it of slist.slice(0, 2)) { const u = urlOf(it); if (u && !candidates.includes(u)) candidates.push(u); }
 
-    chaps = chaptersOf(detail);
-    if (!chaps.length) {
-      const cr = await tryVariants([['getChapterList', () => ext.getChapterList(firstUrl), l => Array.isArray(l) && l.length > 0]]);
-      chaps = Array.isArray(cr.val) ? cr.val : [];
-      if (cr.err) out.err.chapters = cr.err;
+  if (candidates.length) {
+    out.works_tried = [];
+    for (const candidate of candidates) {
+      const dr = await tryVariants([
+        ['parseNovelAndChapters', () => ext.parseNovelAndChapters(candidate), d => d && (d.title || d.name)],
+        ['getMangaDetail', () => ext.getMangaDetail(candidate), d => d && (d.title || d.name)],
+      ]);
+      const detail = dr.val;
+      const gotDetail = detail && (detail.title || detail.name) ? 1 : 0;
+
+      let found = chaptersOf(detail);
+      if (!found.length) {
+        const cr = await tryVariants([['getChapterList', () => ext.getChapterList(candidate), l => Array.isArray(l) && l.length > 0]]);
+        found = Array.isArray(cr.val) ? cr.val : [];
+        if (cr.err && !out.err.chapters) out.err.chapters = cr.err;
+      }
+
+      out.works_tried.push({ url: candidate.slice(-52), detail: gotDetail, chapters: found.length });
+      out.stages.detail = gotDetail;
+      if (dr.err) out.err.detail = dr.err; else delete out.err.detail;
+
+      if (found.length) { chaps = found; firstUrl = candidate; break; }
     }
     out.stages.chapters = chaps.length;
   } else { out.stages.detail = 0; out.stages.chapters = 0; }
 
+  // Un chapitre que l'extension DECLARE verrouille n'est pas un echec.
+  //
+  // Certaines extensions marquent explicitement les chapitres payants dans leur
+  // titre plutot que de les cacher, pour que l'utilisateur sache qu'ils
+  // existent, et rendent un message d'explication a l'ouverture. C'est un choix
+  // delibere et documente (valir_scans le fait, avec la mesure a l'appui).
+  // Compter ces chapitres comme illisibles revenait a punir la franchise :
+  // l'extension passait PARTIAL alors que tout ce qu'elle peut servir, elle le
+  // sert.
+  //
+  // La regle est etroite A DESSEIN : on ne s'appuie que sur un marqueur que
+  // l'extension a elle-meme pose dans le titre. Le harnais ne devine rien, et
+  // un chapitre reellement vide reste un echec.
+  const declaredLocked = (c) => /^\s*\[(locked|verrouille|premium|paid)\]/i.test(String(c && (c.title || c.name) || ''));
+
   // CONTENU — on ouvre plusieurs chapitres, pas seulement le premier.
-  let readable = 0, probed = 0, pagesSeen = 0;
+  let readable = 0, probed = 0, pagesSeen = 0, skippedLocked = 0;
   for (const idx of sampleIndices(chaps.length)) {
     const c = chaps[idx];
     const u = urlOf(c);
     if (!u) continue;
+    if (declaredLocked(c)) {
+      skippedLocked++;
+      out.chapters_probed.push({ i: idx, name: String(c.title || c.name || '').slice(0, 48), locked: true });
+      continue;
+    }
     probed++;
     const kr = await tryVariants([
       ['parseChapter', () => ext.parseChapter(u), r => contentOf(r).length > 0],
@@ -298,6 +337,7 @@ function sampleIndices(n) {
     out.chapters_probed.push(rec);
   }
   out.stages.content = pagesSeen > 0 ? `PAGES:${pagesSeen}` : readable;
+  if (skippedLocked) out.stages.locked = skippedLocked;
   out.readable = `${readable}/${probed}`;
   out.min_text = MIN_TEXT;
 
