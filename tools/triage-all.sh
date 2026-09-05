@@ -39,7 +39,7 @@ case "$SCOPE" in
   *) echo "Usage: $0 [manga|novel]" >&2; exit 1 ;;
 esac
 
-echo "ext,space,verdict,readable,list,search,chapters,cloudflare,detail" > "$OUT"
+echo "ext,space,verdict,readable,list,search,chapters,couv_abs,couv_rel,couv_vide,couv_ok,cloudflare,detail" > "$OUT"
 
 TOTAL=0
 run_one() {
@@ -64,17 +64,20 @@ ext, space = os.environ["EXT"], os.environ["SPACE"]
 try:
     d = json.load(open(sys.argv[1]))
 except Exception:
-    print(f'{ext},{space},TIMEOUT,,,,,,"pas de sortie dans le delai imparti"')
+    print(f'{ext},{space},TIMEOUT,,,,,,,,,,"pas de sortie dans le delai imparti"')
     raise SystemExit
 if d.get("error"):
-    print(f'{ext},{space},HARNESS-ERROR,,,,,,"{d.get("error")}: {str(d.get("message",""))[:80]}"')
+    print(f'{ext},{space},HARNESS-ERROR,,,,,,,,,,"{d.get("error")}: {str(d.get("message",""))[:80]}"')
     raise SystemExit
 s = d.get("stages", {})
 probes = d.get("chapters_probed", [])
 detail = " ".join(f"[{c['i']}]{c.get('text', c.get('pages', '?'))}" for c in probes)
+cp = d.get("cover_probes", [])
+cov = f'{s.get("cover_abs",0)},{s.get("cover_rel",0)},{s.get("cover_none",0)},{s.get("cover_ok",0)}/{len(cp)}'
+codes = "/".join(str(p.get("status")) for p in cp) or "-"
 print(f'{ext},{space},{d.get("verdict","?")},{d.get("readable","")},'
-      f'{s.get("list",0)},{s.get("search",0)},{s.get("chapters",0)},'
-      f'{"oui" if d.get("cloudflare") else ""},"texte par chapitre: {detail}"')
+      f'{s.get("list",0)},{s.get("search",0)},{s.get("chapters",0)},{cov},'
+      f'{"oui" if d.get("cloudflare") else ""},"texte: {detail} | couvertures: {codes}"')
 PY
 }
 
@@ -100,5 +103,9 @@ done
 echo
 echo "A reparer en priorite (EMPTY et PARTIAL — on navigue mais on ne lit pas) :"
 awk -F, 'NR>1 && ($3=="EMPTY" || $3=="PARTIAL") {printf "  %-24s %s %s\n", $1, $3, $4}' "$OUT"
+
+echo ""
+echo "Couvertures a regarder (aucune adresse rendue, ou aucune joignable) :"
+awk -F, 'NR>1 && $5+0>0 && ($8+0==0 || $11 ~ /^0\//) {printf "  %-24s liste=%-4s absolues=%-4s relatives=%-3s vides=%-4s joignables=%s\n", $1, $5, $8, $9, $10, $11}' "$OUT"
 echo
 echo "Rapport : $OUT"

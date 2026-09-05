@@ -109,6 +109,43 @@ const chaptersOf = (d) => (d && (d.chapters || d.chapterList)) || [];
 const contentOf = (r) => typeof r === 'string' ? r : (r && (r.content || r.text || r.html || r.body)) || '';
 const urlOf = (o) => o && (o.url || o.path || o.link) || null;
 
+// Les deux dialectes ne nomment pas la couverture pareil : le style roman rend
+// `cover`, le style manga rend `imageUrl`. Le pont de l'app convertit l'un vers
+// l'autre, donc les deux sont legitimes ici.
+const coverOf = (o) => (o && (o.cover || o.imageUrl || o.image || o.thumbnail || o.coverUrl)) || null;
+
+// Une couverture absente de l'ecran a DEUX causes distinctes, et les confondre
+// envoie chercher au mauvais endroit :
+//   - l'extension ne rend aucune adresse, ou une adresse relative que l'app ne
+//     sait pas resoudre. C'est un defaut d'extension.
+//   - l'extension rend une adresse correcte mais l'hote la refuse : protection
+//     anti-lien direct (il faut un Referer), 403, hebergement disparu. C'est un
+//     defaut cote site, et le correctif est ailleurs.
+// D'ou une mesure en deux temps : on compte les adresses, puis on va vraiment
+// en chercher quelques-unes.
+async function probeImage(url, headers) {
+  const ctl = new AbortController();
+  const to = setTimeout(() => ctl.abort(), 15000);
+  try {
+    // On demande le premier kilo-octet : assez pour connaitre le type de
+    // contenu et le code, sans telecharger l'image entiere.
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: { ...(headers || {}), Range: 'bytes=0-1023' },
+      redirect: 'follow',
+      signal: ctl.signal,
+    });
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    return {
+      status: res.status,
+      type: ct.split(';')[0],
+      ok: (res.status === 200 || res.status === 206) && ct.startsWith('image/'),
+    };
+  } catch (e) {
+    return { status: 0, type: '', ok: false, err: String(e.message || e).slice(0, 60) };
+  } finally { clearTimeout(to); }
+}
+
 // Longueur du texte REEL : on retire scripts, styles et balises, on decode les
 // entites les plus courantes, on normalise les blancs. C'est cette valeur qui
 // decide si un chapitre est lisible — pas la taille du HTML, qui peut etre grosse
@@ -173,6 +210,32 @@ function sampleIndices(n) {
   out.stages.list = list.length;
   if (lr.err) out.err.list = lr.err;
   if (list.length) firstUrl = urlOf(list[0]);
+
+  // COUVERTURES — angle mort corrige le 2026-09-05 apres un retour utilisateur
+  // ("plusieurs extensions n'affichent pas les images des oeuvres"). Le harnais
+  // ne les regardait pas du tout : une extension rendant zero couverture
+  // passait au vert, exactement comme un chapitre vide passait au vert avant
+  // que le seuil de texte reel n'existe.
+  if (list.length) {
+    const raw = list.map(coverOf);
+    const absolute = raw.filter(c => typeof c === 'string' && /^https?:\/\//.test(c));
+    const relative = raw.filter(c => typeof c === 'string' && c && !/^https?:\/\//.test(c));
+    out.stages.cover_abs = absolute.length;
+    out.stages.cover_rel = relative.length;
+    out.stages.cover_none = raw.filter(c => !c).length;
+    if (relative.length) out.cover_rel_sample = relative[0].slice(0, 90);
+
+    // On va vraiment chercher un echantillon : premier, milieu, dernier. Une
+    // adresse bien formee qui rend 403 est une panne aussi reelle qu'une
+    // adresse absente, et c'est celle qu'on ne voit jamais sans essayer.
+    out.cover_probes = [];
+    for (const i of sampleIndices(absolute.length)) {
+      const u = absolute[i];
+      const r = await probeImage(u, { Referer: out.baseUrl + '/' });
+      out.cover_probes.push({ status: r.status, type: r.type, ok: r.ok, err: r.err });
+    }
+    out.stages.cover_ok = out.cover_probes.filter(p => p.ok).length;
+  }
 
   // RECHERCHE
   const sr = await tryVariants([
