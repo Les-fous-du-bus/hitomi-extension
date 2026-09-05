@@ -399,7 +399,7 @@
             "iconUrl": "https://xiaowaz.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "3ce64da6db41a788eb2528e94730894ae9d1dd7ecbe1aafb868ad6ca1574db27",
+            "sha256": "b1bdfe78b758b928a5499878fdbe6f85f265ff160934fad62e1d3b5b385ce368",
             "note": "v2 (2026-09-04) : le decoupage du texte bornait entre wp-post-navigation et l'un de abh_box / ko-fi / sharedaddy. Les trois marqueurs de fin ont disparu du site, la regex ne fermait plus son bloc et tous les chapitres rendaient le message d'indisponibilite. Remplace par une extraction de entry-content par comptage d'imbrication, insensible aux encarts optionnels. Mesure : 190 chapitres, 3/3 lisibles."
         },
         {
@@ -640,6 +640,21 @@
             "obsolescenceRisk": "medium",
             "note": "Cloudflare en mode managed confirme sur tous les points d'entree (403 + cf-ray, revalide le 2026-09-04). Le harnais rend BLOCKED-CF depuis du HTTP natif : c'est attendu, ce n'est pas une panne d'extension. Le navigateur embarque de l'app resout le defi, d'ou cloudflare: true. Statut repasse de dead a active : l'extension n'a jamais ete fautive.",
             "sha256": "218609f20566cccb43d28082ff27d8dcf45ec5e8601f9bcd72a6b6ab2f0d0f2f"
+        },
+        {
+            "id": "worldnovel",
+            "name": "World Novel",
+            "lang": "fr",
+            "space": "light_novel",
+            "version": 1,
+            "mature": false,
+            "cloudflare": true,
+            "jsUrl": "src/novel/worldnovel.js",
+            "iconUrl": "https://world-novel.fr/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "sha256": "f82ee4544f35a78f04e40d5b170137b81ff30f944449a1871b885edb4e0e3318",
+            "note": "v1 (2026-09-05). Site francais (Victorian Novel House), application Next.js App Router : les donnees sont lues dans le flux self.__next_f, PAS dans les classes CSS qui sont hachees et changent a chaque compilation du site. Defi Cloudflare gere sur tous les chemins, resolu par le navigateur embarque. Catalogue de 14 oeuvres sur /home ; pas d'index /oeuvres ni de route de recherche (404), d'ou le filtrage local. La fiche porte la liste COMPLETE des chapitres (374 mesures). LIMITE MESUREE : le texte des chapitres n'est pas dans la page, il vient de Firestore (projet victorian-novel-house) qui refuse toute lecture anonyme (403, permissions insuffisantes) et exige Firebase App Check. La lecture demande donc une session signee ; le compte est gratuit. parseChapter tente l'extraction puis explique en clair, plutot que de rendre une page blanche. Verifiee par tools/fixture-test.js : 23/23 sur des pages reellement capturees."
         },
         {
             "id": "valir_scans",

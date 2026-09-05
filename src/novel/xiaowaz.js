@@ -95,6 +95,70 @@ function decodeHtml(str) {
     .replace(/&raquo;/g, '"');
 }
 
+
+// Cle de correspondance : le menu et l'API n'ecrivent pas toujours l'adresse a
+// l'identique (barre oblique finale, casse). On compare sur une forme reduite.
+function urlKey(u) {
+  if (!u) return "";
+  return String(u).toLowerCase().replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
+// Les couvertures des oeuvres, par adresse de page.
+//
+// POURQUOI passer par l'API du site et non par la page d'accueil : l'accueil ne
+// porte que des vignettes d'articles de chapitre et l'image generique du site
+// (og.jpg, repetee). Les associer aux oeuvres donnerait la MEME image a toutes
+// — silencieusement faux, donc pire qu'un cadre vide.
+//
+// POURQUOI deux requetes et non `_embed=1` : avec `_embed`, la reponse fait
+// 2 Mo car elle embarque toutes les tailles derivees de chaque image. Demander
+// les seuls champs utiles puis resoudre les identifiants ramene l'ensemble a
+// environ 5 Ko — mesure du 2026-09-05, 39 pages dont 21 avec couverture.
+//
+// Deux requetes pour toute la liste, contre une par oeuvre si on ouvrait chaque
+// fiche. Un echec ne coute rien : la liste part sans couvertures, elle n'est
+// jamais fausse ni vide.
+var _coverMapCache = null;
+
+async function fetchCoverMap() {
+  if (_coverMapCache) return _coverMapCache;
+  var map = {};
+  try {
+    var pagesRaw = await fetchv2(
+      BASE_URL + "/wp-json/wp/v2/pages?per_page=100&_fields=link,featured_media",
+      { "Accept-Encoding": "deflate" }
+    );
+    var pages = JSON.parse(pagesRaw);
+
+    var byId = {};
+    var ids = [];
+    for (var i = 0; i < pages.length; i++) {
+      var mediaId = pages[i] && pages[i].featured_media;
+      if (!mediaId) continue;
+      byId[mediaId] = byId[mediaId] || [];
+      byId[mediaId].push(urlKey(pages[i].link));
+      if (ids.indexOf(mediaId) === -1) ids.push(mediaId);
+    }
+    if (!ids.length) { _coverMapCache = map; return map; }
+
+    var mediaRaw = await fetchv2(
+      BASE_URL + "/wp-json/wp/v2/media?include=" + ids.join(",") +
+        "&per_page=100&_fields=id,source_url",
+      { "Accept-Encoding": "deflate" }
+    );
+    var media = JSON.parse(mediaRaw);
+    for (var j = 0; j < media.length; j++) {
+      var m = media[j];
+      if (!m || !m.source_url || !byId[m.id]) continue;
+      for (var k = 0; k < byId[m.id].length; k++) map[byId[m.id][k]] = m.source_url;
+    }
+  } catch (e) {
+    // Site sans API, reponse illisible, reseau coupe : on rend ce qu'on a.
+  }
+  _coverMapCache = map;
+  return map;
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "Xiaowaz"; }
   get lang() { return "fr"; }
@@ -108,7 +172,17 @@ class DefaultExtension extends MProvider {
 
       var url = BASE_URL;
       var res = await fetchv2(url, { "Accept-Encoding": "deflate" });
-      return this._parseNavNovels(res);
+      var parsed = this._parseNavNovels(res);
+
+      // Le menu ne porte aucune image : la liste sortait donc sans une seule
+      // couverture, et l'application affichait vingt cadres vides. Mesure du
+      // 2026-09-05 par le harnais : liste=20, couvertures=0.
+      var covers = await fetchCoverMap();
+      for (var i = 0; i < parsed.list.length; i++) {
+        var hit = covers[urlKey(parsed.list[i].url)];
+        if (hit) parsed.list[i].imageUrl = hit;
+      }
+      return parsed;
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
