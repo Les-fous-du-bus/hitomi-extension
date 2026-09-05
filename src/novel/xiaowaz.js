@@ -20,6 +20,56 @@
 
 var BASE_URL = "https://xiaowaz.fr";
 
+// Extrait le contenu d'un <div> dont l'attribut class CONTIENT le nom donne.
+// POURQUOI un compteur d'imbrication : le corps d'un chapitre contient lui-meme
+// des <div>. Une regex non-gourmande coupe au premier </div>, une regex gourmande
+// avale le pied de page. Seul le comptage rend le bloc exact — et il ne depend
+// d'aucun encart optionnel, contrairement aux bornes de fin qui ont disparu du
+// site en 2026.
+function extractDivByClass(html, className) {
+  if (!html || !className) return "";
+  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', "i");
+  var m = open.exec(html);
+  if (!m) return "";
+  var start = m.index + m[0].length;
+  var depth = 1;
+  var tagRx = /<\/?div\b[^>]*>/gi;
+  tagRx.lastIndex = start;
+  var t;
+  while ((t = tagRx.exec(html)) !== null) {
+    if (t[0].charAt(1) === "/") {
+      depth--;
+      if (depth === 0) return html.substring(start, t.index);
+    } else {
+      depth++;
+    }
+  }
+  return html.substring(start);
+}
+
+// Retire un <div> entier (balises comprises) repere par une classe.
+function removeDivByClass(html, className) {
+  if (!html || !className) return html || "";
+  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', "i");
+  var m = open.exec(html);
+  if (!m) return html;
+  var start = m.index;
+  var after = m.index + m[0].length;
+  var depth = 1;
+  var tagRx = /<\/?div\b[^>]*>/gi;
+  tagRx.lastIndex = after;
+  var t;
+  while ((t = tagRx.exec(html)) !== null) {
+    if (t[0].charAt(1) === "/") {
+      depth--;
+      if (depth === 0) return html.substring(0, start) + html.substring(t.index + t[0].length);
+    } else {
+      depth++;
+    }
+  }
+  return html.substring(0, start);
+}
+
 function stripTags(str) {
   if (!str) return "";
   return str.replace(/<[^>]*>/g, "");
@@ -234,26 +284,38 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Accept-Encoding": "deflate" });
 
-      // Content is between wp-post-navigation and abh_box_down or ko-fi link
-      var contentMatch = res.match(/wp-post-navigation[^>]*>.*?<\/div>([\s\S]*?)(?:abh_box(?:_down)?|ko-fi\.com\/wazouille|<div[^>]*class="[^"]*sharedaddy)/);
-      if (contentMatch) {
-        var content = contentMatch[1];
-        // Clean up: remove empty paragraphs
-        content = content.replace(/<p>&nbsp;<\/p>/g, "");
-        // Remove footnote_container_prepare, add at end
-        var footnoteMatch = content.match(/<div[^>]*class="[^"]*footnote_container_prepare[^"]*"[^>]*>[\s\S]*?<\/div>/);
-        if (footnoteMatch) {
-          content = content.replace(footnoteMatch[0], "");
-          content = content + footnoteMatch[0];
-        }
-        return content;
+      // POURQUOI cette reecriture (2026-09-04) : le decoupage precedent bornait le
+      // texte entre wp-post-navigation et l'un de abh_box / ko-fi / sharedaddy. Les
+      // TROIS marqueurs de fin ont disparu du site, donc la regex ne fermait plus
+      // son bloc et l'extension rendait son message d'indisponibilite sur tous les
+      // chapitres. On part maintenant du conteneur entry-content, ferme par
+      // comptage d'imbrication, ce qui ne depend d'aucun encart optionnel.
+      var content = extractDivByClass(res, "entry-content");
+      if (!content) return "<p>Contenu non disponible</p>";
+
+      // La barre de navigation entre chapitres est EN TETE du conteneur : elle
+      // ferait passer les titres voisins pour le debut du texte.
+      content = removeDivByClass(content, "wp-post-navigation");
+      content = removeDivByClass(content, "post-navigation");
+
+      // Bornes de fin — ancrees sur des attributs, jamais sur un mot nu. Couper sur
+      // la chaine "comment" amputait le chapitre des sa premiere occurrence du mot
+      // francais "comment".
+      var endMarkers = ['<div id="comments"', '<div class="comments', 'id="respond"', "<footer"];
+      for (var i = 0; i < endMarkers.length; i++) {
+        var idx = content.indexOf(endMarkers[i]);
+        if (idx !== -1) content = content.substring(0, idx);
       }
 
-      // Fallback: entry-content
-      var entryMatch = res.match(/<div class="entry-content"[^>]*>([\s\S]*?)<\/div>\s*(?:<footer|<div class="(?:post-navigation|sharedaddy))/);
-      if (entryMatch) return entryMatch[1];
+      content = content.replace(/<p>&nbsp;<\/p>/g, "");
 
-      return "<p>Contenu non disponible</p>";
+      // Les notes de bas de page sont replacees a la fin, apres le texte.
+      var footnoteMatch = content.match(/<div[^>]*class="[^"]*footnote_container_prepare[^"]*"[^>]*>[\s\S]*?<\/div>/);
+      if (footnoteMatch) {
+        content = content.replace(footnoteMatch[0], "") + footnoteMatch[0];
+      }
+
+      return content;
     } catch (e) {
       return "<p>Erreur de chargement</p>";
     }

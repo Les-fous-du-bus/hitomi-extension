@@ -168,14 +168,24 @@ class DefaultExtension extends MProvider {
         var chapUrl = hrefMatch[1];
         var chapTitle = stripTags(textMatch[1]).replace(/\u00A0/g, " ").trim();
 
-        // Filter: only chapter-like links (containing "chapitre" or numbered)
+        // Le site sert quelques pages en http ; on normalise pour que le
+        // dedoublonnage fonctionne et que l'app ne bascule pas en clair.
+        chapUrl = chapUrl.replace(/^http:\/\//i, "https://");
+
         if (!chapTitle) continue;
         if (chapUrl === fullUrl) continue;
+        if (chapTitle.length < 3) continue;
+
+        // Ce filtre etait ANNONCE en commentaire mais jamais applique : la liste
+        // ramassait donc les liens du menu vers les AUTRES romans du site
+        // ("Emperor of the Cosmos", "Star Rank Hunter"), qui rendaient une page de
+        // presentation au lieu d'un texte. Un chapitre se reconnait a son adresse
+        // ou a son intitule.
+        var looksLikeChapter = /chapitre|chapter/i.test(chapUrl) || /chapitre|chapter/i.test(chapTitle);
+        if (!looksLikeChapter) continue;
+
         if (seen[chapUrl]) continue;
         seen[chapUrl] = true;
-
-        // Skip navigation/menu links
-        if (chapTitle.length < 3) continue;
 
         // Extract chapter number
         var chapNum = 0;

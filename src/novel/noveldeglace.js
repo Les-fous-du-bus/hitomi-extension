@@ -38,6 +38,51 @@ function decodeHtml(str) {
     .replace(/&ndash;/g, "-");
 }
 
+// Extrait le contenu d'un <div> dont l'attribut class CONTIENT le nom donne.
+//
+// POURQUOI un compteur d'imbrication plutot qu'une regex : le corps d'un chapitre
+// contient lui-meme des <div> (encarts, accordeons, illustrations). Une regex
+// non-gourmande coupe au premier </div> venu, une regex gourmande avale le pied
+// de page. Seul le comptage rend le bloc exact.
+//
+// POURQUOI "contient" et non "vaut" : le theme du site a fait passer l'attribut de
+// class="chapter-content" a class="entry-content-chapitre chapter-inner chapter-content".
+// Une correspondance exacte ne trouvait plus rien, et l'extension rendait son
+// message d'indisponibilite sur tous les chapitres.
+function extractDivByClass(html, className) {
+  if (!html || !className) return "";
+  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', 'i');
+  var m = open.exec(html);
+  if (!m) return "";
+  var start = m.index + m[0].length;
+  var depth = 1;
+  var tagRx = /<\/?div\b[^>]*>/gi;
+  tagRx.lastIndex = start;
+  var t;
+  while ((t = tagRx.exec(html)) !== null) {
+    if (t[0].charAt(1) === "/") {
+      depth--;
+      if (depth === 0) return html.substring(start, t.index);
+    } else {
+      depth++;
+    }
+  }
+  return html.substring(start);
+}
+
+// Borne une section reperee par son data-title jusqu'au data-title suivant.
+// POURQUOI : la table des matieres est suivie d'autres onglets. Sans borne haute
+// on ramassait toute la page ; avec une regex non-gourmande on s'arretait au
+// premier tome, d'ou 33 chapitres remontes sur 907 presents.
+function sliceByDataTitle(html, title) {
+  var anchor = 'data-title="' + title + '"';
+  var start = html.indexOf(anchor);
+  if (start === -1) return "";
+  start += anchor.length;
+  var next = html.indexOf('data-title="', start);
+  return next === -1 ? html.substring(start) : html.substring(start, next);
+}
+
 var MATURE_CATEGORIES = ["adulte", "yaoi", "yuri", "roman pour adulte", "adult"];
 
 class DefaultExtension extends MProvider {
@@ -185,66 +230,45 @@ class DefaultExtension extends MProvider {
 
       var chapters = [];
 
-      // Chapters are in div[data-title=Tomes] > div (last child) > .chpt elements
-      var tomesMatch = res.match(/<div[^>]*data-title="Tomes"[^>]*>(.*?)<\/div>\s*<\/div>\s*<\/div>/s);
-      if (!tomesMatch) {
-        // Broader fallback
-        tomesMatch = res.match(/<div[^>]*data-title="Tomes"[^>]*>(.*)/s);
-        if (tomesMatch) {
-          // Find a reasonable end
-          var endIdx = tomesMatch[1].indexOf('data-title="Synopsis"');
-          if (endIdx !== -1) {
-            tomesMatch[1] = tomesMatch[1].substring(0, endIdx);
-          }
-        }
-      }
+      // La table des matieres vit dans la section data-title="Tomes". On la borne
+      // sur le data-title suivant plutot que sur une suite de </div> : les tomes
+      // sont des accordeons imbriques, et la borne par </div></div></div>
+      // s'arretait au premier tome (33 chapitres remontes sur 907 presents).
+      var tomesHtml = sliceByDataTitle(res, "Tomes");
+      if (!tomesHtml) return [];
 
-      if (!tomesMatch) return [];
-
-      var tomesHtml = tomesMatch[1];
-
-      // Find all .chpt elements
-      var chptMatches = tomesHtml.match(/<[^>]*class="[^"]*chpt[^"]*"[^>]*>[^]*?(?=<[^>]*class="[^"]*chpt[^"]*"|$)/gs);
-      if (!chptMatches) {
-        // Fallback: find all links in tomes section
-        chptMatches = [tomesHtml];
-      }
-
+      // Tous les chapitres vivent sous /chapitre/. On prend les liens dans l'ordre
+      // du document, sans passer par les blocs .chpt : leur decoupage variait d'un
+      // tome a l'autre et faisait perdre des entrees.
+      var linkRx = /<a[^>]*href="([^"]+\/chapitre\/[^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+      var seen = {};
       var chapterIndex = 0;
-      for (var i = 0; i < chptMatches.length; i++) {
-        var chpt = chptMatches[i];
+      var lm;
+      while ((lm = linkRx.exec(tomesHtml)) !== null) {
+        var chapUrl = lm[1];
+        var chapTitle = decodeHtml(stripTags(lm[2])).trim();
+        if (!chapUrl || !chapTitle) continue;
+        // Un meme chapitre peut etre liste deux fois (raccourci de tome et entree
+        // de partie) ; on garde la premiere occurrence.
+        if (seen[chapUrl]) continue;
+        seen[chapUrl] = true;
 
-        // Find all links within this chpt
-        var linkMatches = chpt.match(/<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gs);
-        if (!linkMatches) continue;
-
-        for (var j = 0; j < linkMatches.length; j++) {
-          var lm = linkMatches[j];
-          var hrefMatch = lm.match(/href="([^"]+)"/);
-          var textMatch = lm.match(/>(.*?)<\/a>/s);
-          if (!hrefMatch || !textMatch) continue;
-
-          var chapUrl = hrefMatch[1];
-          var chapTitle = stripTags(textMatch[1]).trim();
-          if (!chapUrl || !chapTitle) continue;
-
-          // Try to extract date: text between () after </a>
-          var dateUpload = Date.now();
-          var afterLink = chpt.substring(chpt.indexOf(lm) + lm.length, chpt.indexOf(lm) + lm.length + 100);
-          var dateMatch = afterLink.match(/\(([^)]+)\)/);
-          if (dateMatch) {
-            var d = new Date(dateMatch[1]);
-            if (!isNaN(d.getTime())) dateUpload = d.getTime();
-          }
-
-          chapterIndex++;
-          chapters.push({
-            title: chapTitle,
-            url: chapUrl,
-            number: chapterIndex,
-            dateUpload: dateUpload,
-          });
+        // Date eventuelle, entre parentheses juste apres le lien.
+        var dateUpload = Date.now();
+        var afterLink = tomesHtml.substring(linkRx.lastIndex, linkRx.lastIndex + 100);
+        var dateMatch = afterLink.match(/\(([^)]+)\)/);
+        if (dateMatch) {
+          var d = new Date(dateMatch[1]);
+          if (!isNaN(d.getTime())) dateUpload = d.getTime();
         }
+
+        chapterIndex++;
+        chapters.push({
+          title: chapTitle,
+          url: chapUrl,
+          number: chapterIndex,
+          dateUpload: dateUpload,
+        });
       }
 
       return chapters;
@@ -258,31 +282,22 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + "/" + url;
       var res = await fetchv2(fullUrl, { "Accept-Encoding": "deflate" });
 
-      // Chapter content: .chapter-content or .entry-content
-      var contentMatch = res.match(/<div class="chapter-content"[^>]*>(.*?)<\/div>\s*(?:<\/div>|<div class="mistape)/s);
-      if (contentMatch) {
-        return contentMatch[1];
+      // Le corps du chapitre porte plusieurs classes depuis la refonte du theme :
+      // class="entry-content-chapitre chapter-inner chapter-content". On cherche
+      // donc la classe PRESENTE dans l'attribut, pas un attribut qui lui soit egal.
+      var html = extractDivByClass(res, "chapter-content");
+      if (!html) html = extractDivByClass(res, "entry-content-chapitre");
+      if (!html) html = extractDivByClass(res, "entry-content");
+      if (!html) return "<p>Contenu non disponible</p>";
+
+      // Coupe ce qui suit le texte : navigation, signalement de coquille, commentaires.
+      var endMarkers = ["<footer", '<div class="comment', '<div class="mistape', '<div class="post-nav', "<nav"];
+      for (var i = 0; i < endMarkers.length; i++) {
+        var idx = html.indexOf(endMarkers[i]);
+        if (idx !== -1) html = html.substring(0, idx);
       }
 
-      var altMatch = res.match(/<div class="entry-content"[^>]*>(.*?)<\/div>\s*<\/article>/s);
-      if (altMatch) {
-        return altMatch[1];
-      }
-
-      // Broader fallback
-      var broadMatch = res.match(/<div class="chapter-content"[^>]*>(.*)/s) ||
-                       res.match(/<div class="entry-content"[^>]*>(.*)/s);
-      if (broadMatch) {
-        var html = broadMatch[1];
-        var endMarkers = ["<footer", '<div class="comment', '<div class="mistape', '<div class="post-nav'];
-        for (var i = 0; i < endMarkers.length; i++) {
-          var idx = html.indexOf(endMarkers[i]);
-          if (idx !== -1) return html.substring(0, idx);
-        }
-        return html.substring(0, 50000); // Safety limit
-      }
-
-      return "<p>Contenu non disponible</p>";
+      return html.substring(0, 200000);
     } catch (e) {
       return "<p>Erreur de chargement</p>";
     }

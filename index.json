@@ -314,21 +314,6 @@
             "sha256": "484b81a15d79df1c3e453d402d6a319cfe664ea81580427fcaedb76a1883ac9e"
         },
         {
-            "id": "light_novel_fr",
-            "name": "LightNovelFR",
-            "lang": "fr",
-            "space": "light_novel",
-            "version": 4.11,
-            "mature": false,
-            "cloudflare": false,
-            "jsUrl": "src/novel/light_novel_fr.js",
-            "iconUrl": "https://lightnovelfr.com/favicon.ico",
-            "status": "active",
-            "obsolescenceRisk": "medium",
-            "note": "v4.1: ReDoS hardening + OOM guard for large novels. parseChapter ads-strip uses {0,5000}? bound to prevent catastrophic backtrack. parseNovelAndChapters fallback UL search bounded to 500KB window anchored on 'eplister' substring. v4.11: edge-case fix anchorIdx >= 0 (eplister at offset 0).",
-            "sha256": "4f235fdf6be4ab06b85d0fb4a8b53c86120e245156e6cb6b8e21353de765d639"
-        },
-        {
             "id": "massnovel",
             "name": "NovelFrance",
             "lang": "fr",
@@ -348,44 +333,45 @@
             "name": "Chireads",
             "lang": "fr",
             "space": "light_novel",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/chireads.js",
             "iconUrl": "https://chireads.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "Popular (swiper) works. Latest via /category/translatedtales/page/N — HTML article elements may require JS rendering. Needs in-app verification.",
-            "sha256": "ae875e02bd850df632f9fab2e998a55bdeeec877e7355798f1d584cfbf3552ee"
+            "note": "v4 (2026-09-04) : le repli de getChapterList parcourait la page entiere sans filtrer, donc la liste ramassait le menu du site (accueil, Traductions, Original, A Propos de Nous) comme des chapitres ; le premier element pointait sur la page d'accueil. Filtre sur la forme reelle /<rubrique>/<slug-serie>/<slug-chapitre>/. La date se lit desormais depuis /AAAA/MM/JJ/ (l'ancien motif AAAA-MM-JJ ne trouvait jamais rien). Mesure : 733 chapitres reels, 3/3 lisibles.",
+            "sha256": "44e8418e531939780797e604286788b04eecb4c56d3f9c22fe96ddff3a338fb0"
         },
         {
             "id": "novhell",
             "name": "Novhell",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/novhell.js",
             "iconUrl": "https://novhell.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "Live site returns 200, figure selector finds 11 items. Small catalog (~7 novels). Status upgraded from broken to active — figure[href+img] selector confirmed matching live DOM 2026-05-10.",
-            "sha256": "6a6f243f56d2a9812b3696b970ec27873b25e199c26ba3624a2a2b85098a823e"
+            "note": "v3 (2026-09-04) : le filtre annonce en commentaire (only chapter-like links) n'etait pas applique, donc la liste ramassait les liens du menu vers les autres romans du site (Emperor of the Cosmos, Star Rank Hunter), qui rendent une page de presentation. Filtre pose + normalisation des adresses http en https. Mesure : 398 chapitres reels au lieu de 411 pollues, 3/3 lisibles.",
+            "sha256": "fadc8e1540a5e60394bd41caa7139235c98424d22e93b2a6cfebd4a74f17281c"
         },
         {
             "id": "noveldeglace",
             "name": "NovelDeGlace",
             "lang": "fr",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/noveldeglace.js",
             "iconUrl": "https://noveldeglace.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "7e7ea8d0555e827789c8ca15dbc9044690331433e2a23cd0d94fc8f40fd434de"
+            "sha256": "70842313b64d6f0b339496d2573658e303e872abcd53a0061c137aa3d4560a21",
+            "note": "v2 (2026-09-04) : deux defauts corriges. getContent ancrait sur class=\"chapter-content\" en correspondance exacte, or le theme sert desormais class=\"entry-content-chapitre chapter-inner chapter-content\" : tous les chapitres rendaient le message d'indisponibilite. Et getChapterList bornait la table des matieres sur </div></div></div>, ce qui s'arretait au premier tome (33 chapitres sur 907). Extraction par comptage d'imbrication + bornage sur le data-title suivant. Mesure : 907 chapitres, 3/3 lisibles."
         },
         {
             "id": "novelupdates",
@@ -406,14 +392,15 @@
             "name": "Xiaowaz",
             "lang": "fr",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/xiaowaz.js",
             "iconUrl": "https://xiaowaz.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "91383f4cf2e6847f34895c94a4db8da55566523e1a36edabe1a095dc27072ff7"
+            "sha256": "3ce64da6db41a788eb2528e94730894ae9d1dd7ecbe1aafb868ad6ca1574db27",
+            "note": "v2 (2026-09-04) : le decoupage du texte bornait entre wp-post-navigation et l'un de abh_box / ko-fi / sharedaddy. Les trois marqueurs de fin ont disparu du site, la regex ne fermait plus son bloc et tous les chapitres rendaient le message d'indisponibilite. Remplace par une extraction de entry-content par comptage d'imbrication, insensible aux encarts optionnels. Mesure : 190 chapitres, 3/3 lisibles."
         },
         {
             "id": "kisswood",
@@ -434,28 +421,30 @@
             "name": "WuxiaLnScantrad",
             "lang": "fr",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/wuxialnscantrad.js",
             "iconUrl": "https://wuxialnscantrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "66b6e38cb32e16f2d73af0f98c987da33b868f15f3071b1c5820757c5f790db8"
+            "sha256": "a72d4ef5a0fb9b8e7ab1d8e85c5971428786460e07b500488c0aa9ce57af5f64",
+            "note": "v2 (2026-09-04) : getContent fermait le conteneur sur le premier </div>, qui appartenait au widget de notation en tete de contenu. L'extension rendait 76 caracteres de decor. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 107 chapitres, 3/3 lisibles."
         },
         {
             "id": "warriorlegendtrad",
             "name": "WarriorLegendTrad",
             "lang": "fr",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/warriorlegendtrad.js",
             "iconUrl": "https://warriorlegendtrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "4b3c829cdefd8189742889bf9519e8f66e48d9d125f4aead379e65cf3d3be557"
+            "sha256": "8be633e8236698ce52b2e2c630f352d429cf4127d1d11156540179c64cf0f423",
+            "note": "v2 (2026-09-04) : meme defaut que wuxialnscantrad. getContent fermait sur le premier </div>, celui de la barre de boutons, et rendait 303 caracteres de navigation. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 36 chapitres, 3/3 lisibles."
         },
         {
             "id": "scribblehub",
@@ -507,28 +496,15 @@
             "name": "NovelBuddy",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/novel/novelbuddy.js",
-            "iconUrl": "https://novelbuddy.com/favicon.ico",
-            "status": "dead",
-            "obsolescenceRisk": "medium",
-            "sha256": "7f4515cc3261ec0e2f32c33d4279aec56b09f02a04a324c4b87cfb6884242440"
-        },
-        {
-            "id": "allnovel",
-            "name": "AllNovel",
-            "lang": "en",
-            "space": "light_novel",
-            "version": 1,
-            "mature": true,
-            "cloudflare": false,
-            "jsUrl": "src/novel/allnovel.js",
-            "iconUrl": "https://allnovel.org/favicon.ico",
+            "iconUrl": "https://novelbuddy.me/static/sites/novelbuddy-me/icons/favicon-32x32.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "a1bf76d8e90047d9868e5b35a40a6cad2263f124bd35efe7c8281ade0a267225"
+            "sha256": "2b55dfd9f30b0f54818b1d0e58711ae9064fc58738fabe20fcc43d9052aac134",
+            "note": "v2 (2026-09-04) : reecriture complete. Le domaine .com n'a plus de DNS et redirige vers novelbuddy.me, ET le site est devenu une application Next.js : les blocs .book-detailed-item, div.chapter__content et /api/manga/{id}/chapters ont tous disparu. On lit desormais le JSON embarque (__NEXT_DATA__). LIMITE MESUREE : la fiche n'expose que les 50 derniers chapitres ; les points d'entree de pagination essayes le 2026-09-04 rendent 400 ou 404. Le chapitre 1 est repeche via firstChapter. Mesure : 3/3 chapitres lisibles."
         },
         {
             "id": "novelbin",
@@ -542,7 +518,7 @@
             "iconUrl": "https://novelbin.com/favicon.ico",
             "status": "dead",
             "obsolescenceRisk": "medium",
-            "note": "CF 403 confirmed (cf-ray present). cloudflare: true required for app WebView bypass.",
+            "note": "Mesure 2026-09-04 : novelbin.com n'a plus AUCUN enregistrement DNS. novelbin.net repond mais sert une redirection JavaScript a jeton, et une fois le defi franchi la page ne contient zero caractere de texte visible et aucun lien d'oeuvre — rien ne prouve qu'il s'agisse du meme service. novelbin.org, novelbin.io et novelbin.me sont sans DNS. Laisse en dead faute de domaine de remplacement etabli.",
             "sha256": "885076f85c9b947048c45a0a55fdba764e622d95e26e50b6666de3b65cab6367"
         },
         {
@@ -660,9 +636,9 @@
             "cloudflare": true,
             "jsUrl": "src/novel/lightnovelpub.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=lightnovelpub.com&sz=64",
-            "status": "dead",
+            "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "CF managed (cType='managed') confirmed on all endpoints 2026-05-27. Harness RED from curl (CF blocks native HTTP, expected). In-app WebView resolves managed challenge. Selectors [HYPOTHESIS] -- CF prevents curl verification. Mandatory in-app validation before marking GREEN. Structure derived from platform documentation + lightnovelworld.com (same codebase, defunct).",
+            "note": "Cloudflare en mode managed confirme sur tous les points d'entree (403 + cf-ray, revalide le 2026-09-04). Le harnais rend BLOCKED-CF depuis du HTTP natif : c'est attendu, ce n'est pas une panne d'extension. Le navigateur embarque de l'app resout le defi, d'ou cloudflare: true. Statut repasse de dead a active : l'extension n'a jamais ete fautive.",
             "sha256": "218609f20566cccb43d28082ff27d8dcf45ec5e8601f9bcd72a6b6ab2f0d0f2f"
         },
         {

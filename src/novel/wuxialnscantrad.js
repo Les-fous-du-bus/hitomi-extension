@@ -20,6 +20,56 @@
 
 var BASE_URL = "https://wuxialnscantrad.wordpress.com";
 
+// Extrait le contenu d'un <div> dont l'attribut class CONTIENT le nom donne.
+// POURQUOI un compteur d'imbrication : le corps d'un chapitre commence ici par un
+// encart (widget de notation, barre de boutons). Une regex non-gourmande
+// "([\s\S]*?)</div>" se fermait donc sur cet encart et rendait 76 a 303 caracteres
+// de decor au lieu du texte. Seul le comptage rend le bloc exact.
+function extractDivByClass(html, className) {
+  if (!html || !className) return "";
+  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', "i");
+  var m = open.exec(html);
+  if (!m) return "";
+  var start = m.index + m[0].length;
+  var depth = 1;
+  var tagRx = /<\/?div\b[^>]*>/gi;
+  tagRx.lastIndex = start;
+  var t;
+  while ((t = tagRx.exec(html)) !== null) {
+    if (t[0].charAt(1) === "/") {
+      depth--;
+      if (depth === 0) return html.substring(start, t.index);
+    } else {
+      depth++;
+    }
+  }
+  return html.substring(start);
+}
+
+// Retire un <div> entier (balises comprises) repere par une classe.
+function removeDivByClass(html, className) {
+  if (!html || !className) return html || "";
+  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', "i");
+  var m = open.exec(html);
+  if (!m) return html;
+  var start = m.index;
+  var after = m.index + m[0].length;
+  var depth = 1;
+  var tagRx = /<\/?div\b[^>]*>/gi;
+  tagRx.lastIndex = after;
+  var t;
+  while ((t = tagRx.exec(html)) !== null) {
+    if (t[0].charAt(1) === "/") {
+      depth--;
+      if (depth === 0) return html.substring(0, start) + html.substring(t.index + t[0].length);
+    } else {
+      depth++;
+    }
+  }
+  return html.substring(0, start);
+}
+
+
 function stripTags(str) {
   if (!str) return "";
   return str.replace(/<[^>]*>/g, "");
@@ -223,26 +273,32 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, { "Accept-Encoding": "deflate" });
 
-      // Content in entry-content, removing scripts and navigation elements
-      var entryMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<div[^>]*class="[^"]*(?:sharedaddy|entry-footer|wpcnt)|<footer)/);
-      if (!entryMatch) {
-        entryMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+      // POURQUOI cette reecriture (2026-09-04) : le decoupage precedent fermait le
+      // conteneur sur "([\s\S]*?)</div>", donc sur le PREMIER </div> rencontre. Le
+      // contenu commencant par un encart (notation, boutons de partage), le texte
+      // du chapitre n'etait jamais atteint : l'extension rendait le decor, et le
+      // harnais le comptait pour un succes puisqu'il n'etait pas vide.
+      var content = extractDivByClass(res, "entry-content");
+      if (!content) return "<p>Contenu non disponible</p>";
+
+      // Encarts a retirer, ou qu'ils soient dans le bloc.
+      var strip = ["cs-rating", "pd-rating", "sharedaddy", "wp-block-buttons", "jp-relatedposts", "wpcnt"];
+      for (var s = 0; s < strip.length; s++) {
+        var before;
+        do { before = content; content = removeDivByClass(content, strip[s]); } while (content !== before);
       }
 
-      if (entryMatch) {
-        var content = entryMatch[1];
-        // Remove scripts
-        content = content.replace(/<script[\s\S]*?<\/script>/g, "");
-        // Remove hr tags
-        content = content.replace(/<hr[^>]*\/?>/g, "");
-        // Remove empty paragraphs
-        content = content.replace(/<p>&nbsp;<\/p>/g, "");
-        // Remove nav images (data-attachment-id="480")
-        content = content.replace(/<[^>]*data-attachment-id="480[^>]*>/g, "");
-        return content;
+      // Bornes de fin ancrees sur des attributs, jamais sur un mot nu.
+      var endMarkers = ['<div id="comments"', '<div class="comments', 'id="respond"', "<footer"];
+      for (var i = 0; i < endMarkers.length; i++) {
+        var idx = content.indexOf(endMarkers[i]);
+        if (idx !== -1) content = content.substring(0, idx);
       }
 
-      return "<p>Contenu non disponible</p>";
+      content = content.replace(/<script[\s\S]*?<\/script>/g, "");
+      content = content.replace(/<hr[^>]*\/?>/g, "");
+      content = content.replace(/<p>&nbsp;<\/p>/g, "");
+      return content;
     } catch (e) {
       return "<p>Erreur de chargement</p>";
     }

@@ -223,6 +223,16 @@ class DefaultExtension extends MProvider {
       var linkMatches = chapterSection[1].match(/<a[^>]*href="([^"]+)"[^>]*>(.*?)<\/a>/gs);
       if (!linkMatches) return [];
 
+      // Le repli parcourt la page entiere, menu de navigation compris. Sans ce
+      // garde-fou la liste ramassait l'accueil, "Traductions", "Original" et
+      // "A Propos de Nous" comme s'il s'agissait de chapitres : le premier element
+      // de la liste pointait sur la page d'accueil, donc sur du vide.
+      // Un vrai chapitre vit sous /<rubrique>/<slug-serie>/<slug-chapitre>/...,
+      // ou <slug-serie> est le dernier segment de l'URL de la serie.
+      var seriesParts = fullUrl.replace(/[?#].*$/, "").split("/").filter(function (p) { return p.length > 0; });
+      var seriesSlug = seriesParts.length ? seriesParts[seriesParts.length - 1] : "";
+      var seen = {};
+
       for (var i = 0; i < linkMatches.length; i++) {
         var m = linkMatches[i];
         var hrefMatch = m.match(/href="([^"]+)"/);
@@ -232,14 +242,23 @@ class DefaultExtension extends MProvider {
         var chapUrl = hrefMatch[1];
         var chapTitle = stripTags(textMatch[1]).trim();
 
-        // Skip non-chapter links
         if (!chapUrl || chapUrl.indexOf(BASE_URL) === -1) continue;
+        if (!seriesSlug) continue;
+        var slugAt = chapUrl.indexOf("/" + seriesSlug + "/");
+        if (slugAt === -1) continue;
+        // Il faut au moins un segment APRES le slug de la serie, sinon c'est le
+        // lien vers la serie elle-meme, pas vers un chapitre.
+        if (chapUrl.substring(slugAt + seriesSlug.length + 2).replace(/\//g, "").length === 0) continue;
+        if (seen[chapUrl]) continue;
+        seen[chapUrl] = true;
 
-        // Try to extract date from URL (format: YYYY-MM-DD at end)
+        // Date : elle est portee par l'URL sous la forme /AAAA/MM/JJ/, pas
+        // AAAA-MM-JJ. L'ancien motif ne trouvait jamais rien et toutes les entrees
+        // recevaient la date du jour.
         var dateUpload = Date.now();
-        var dateMatch = chapUrl.match(/(\d{4}-\d{2}-\d{2})/);
+        var dateMatch = chapUrl.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
         if (dateMatch) {
-          var d = new Date(dateMatch[1]);
+          var d = new Date(dateMatch[1] + "-" + dateMatch[2] + "-" + dateMatch[3]);
           if (!isNaN(d.getTime())) dateUpload = d.getTime();
         }
 
