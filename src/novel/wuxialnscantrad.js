@@ -95,6 +95,46 @@ function decodeHtml(str) {
     .replace(/&raquo;/g, '"');
 }
 
+
+// Remplit les couvertures manquantes de la liste.
+//
+// POURQUOI c'est necessaire ici : la liste de ce site est batie sur des liens
+// qui ne portent aucune image. Le harnais l'a mesure le 2026-09-05 —
+// liste=5, couvertures=0. L'application affichait donc autant de cadres vides.
+//
+// POURQUOI passer par la fiche plutot que de recopier une expression : la fiche
+// sait DEJA extraire la couverture, et elle est la seule page du site a la
+// porter. Reutiliser sa logique evite une deuxieme regle a maintenir, et si la
+// fiche est corrigee un jour, la liste en profite sans rien changer.
+//
+// POURQUOI par groupes de quatre : une requete par oeuvre, en file indienne,
+// ferait attendre l'utilisateur le temps de toutes les additionner. Quatre de
+// front ramenent l'attente au quart sans marteler un petit site.
+//
+// Un echec n'est jamais fatal : l'oeuvre garde une couverture vide, la liste
+// reste complete et juste.
+async function enrichCovers(ext, list) {
+  var GROUP = 4;
+  for (var start = 0; start < list.length; start += GROUP) {
+    var slice = list.slice(start, start + GROUP);
+    var jobs = [];
+    for (var i = 0; i < slice.length; i++) {
+      jobs.push(
+        (function (item) {
+          return ext
+            .getMangaDetail(item.url)
+            .then(function (d) {
+              if (d && d.imageUrl) item.imageUrl = d.imageUrl;
+            })
+            .catch(function () {});
+        })(slice[i])
+      );
+    }
+    await Promise.all(jobs);
+  }
+  return list;
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "WuxiaLnScantrad"; }
   get lang() { return "fr"; }
@@ -107,7 +147,9 @@ class DefaultExtension extends MProvider {
       if (page > 1) return { list: [], hasNextPage: false };
 
       var res = await fetchv2(BASE_URL, { "Accept-Encoding": "deflate" });
-      return this._parseNavNovels(res);
+      var parsed = this._parseNavNovels(res);
+      await enrichCovers(this, parsed.list);
+      return parsed;
     } catch (e) {
       return { list: [], hasNextPage: false };
     }

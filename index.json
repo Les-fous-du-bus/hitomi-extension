@@ -31,7 +31,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "runtime-audit 2026-05-10: RUNTIME-OK. API v5 stable, search + chapters verified.",
-            "sha256": "eae5215c52b06379f224b7badbba4ec07be346dc5b88bc9b04cde15ed435f038"
+            "sha256": "23938967edf6a24b928b92791c02e914672356b55273c540ee3352957f6abd35"
         },
         {
             "id": "weebcentral",
@@ -179,7 +179,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v2.1: scheme validation + ReDoS pre-slicing. imageUrl/chapUrl reject non-http(s) schemes. getMangaDetail anchors each dotAll pattern to a 3-10KB window to prevent backtracking on 300KB+ Madara pages.",
-            "sha256": "19f34669a2c8041cce26be7fbffb1658ef76d92a62a54f0120e984ad362cb8ff"
+            "sha256": "f0d54297e532000c3c3a21954779f75ef94d455837caa0d1d3d01c37e90de049"
         },
         {
             "id": "manga_scantrad",
@@ -414,7 +414,7 @@
             "iconUrl": "https://kisswood.eu/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "2753a5a4449b75205bfe7ac374c1078487075a2da47ecf9aeaebba100d5fc90e"
+            "sha256": "99cd7f6bea76d5318b657998a8e53b950b604bd20f2efb5ab3cc9ff9d516d8ef"
         },
         {
             "id": "wuxialnscantrad",
@@ -428,7 +428,7 @@
             "iconUrl": "https://wuxialnscantrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "a72d4ef5a0fb9b8e7ab1d8e85c5971428786460e07b500488c0aa9ce57af5f64",
+            "sha256": "24b9f7de35002f248c4bb49384a3c1258da53bbaae0f0009b135b583216060d8",
             "note": "v2 (2026-09-04) : getContent fermait le conteneur sur le premier </div>, qui appartenait au widget de notation en tete de contenu. L'extension rendait 76 caracteres de decor. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 107 chapitres, 3/3 lisibles."
         },
         {
@@ -443,7 +443,7 @@
             "iconUrl": "https://warriorlegendtrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "8be633e8236698ce52b2e2c630f352d429cf4127d1d11156540179c64cf0f423",
+            "sha256": "6b6ff49c1548f49af6226cd69e1220b3aae841b04d9337ff63db1bd254f71520",
             "note": "v2 (2026-09-04) : meme defaut que wuxialnscantrad. getContent fermait sur le premier </div>, celui de la barre de boutons, et rendait 303 caracteres de navigation. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 36 chapitres, 3/3 lisibles."
         },
         {

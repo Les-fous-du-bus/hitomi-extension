@@ -274,39 +274,62 @@ class DefaultExtension extends MProvider {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, {});
 
-      var pages = [];
-      // Extract reading-content block first
+      // Le conteneur de lecture d'abord ; a defaut, la page entiere.
       var readingContent = res.match(/<div class="?reading-content"?[^>]*>([\s\S]*?)<\/div>\s*<\/div>/);
       var contentHtml = readingContent ? readingContent[1] : res;
 
-      // Match img tags with wp-manga-chapter-img class
-      var imgMatches = contentHtml.match(/<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?[^>]*class="?[^"]*wp-manga-chapter-img[^"]*"?/g);
-      if (!imgMatches) {
-        // Fallback: all img in reading-content
-        if (readingContent) {
-          imgMatches = readingContent[1].match(/<img[^>]*(?:data-src|data-lazy-src|src)\s*=\s*"?([^\s"'>]+)"?/g);
+      // POURQUOI cette reecriture (2026-09-05, extension rendue "aucune page").
+      //
+      // Le site charge ses images en differe : l'attribut `src` ne porte qu'une
+      // image de remplacement encodee dans l'adresse, et la VRAIE adresse vit
+      // dans `data-src`. Deux details faisaient tout rater :
+      //
+      //   1. L'ancienne expression cherchait `[^\s"'>]+` — elle EXCLUAIT les
+      //      espaces. Or le site ecrit `data-src=" https://..."`, avec une
+      //      espace juste apres le guillemet. La valeur reelle etait donc
+      //      illisible pour elle.
+      //   2. En balayant `(?:data-src|src)`, elle tombait d'abord sur le `src`
+      //      de remplacement, qui apparait AVANT `data-src` dans la balise. Ce
+      //      remplacement etait ensuite ecarte a juste titre — et la vraie
+      //      adresse n'etait jamais atteinte.
+      //
+      // On decoupe donc balise par balise, et pour chaque balise on demande les
+      // attributs dans l'ordre de confiance. C'est aussi ce qui rend le code
+      // insensible a l'ordre des attributs, que le theme peut changer.
+      var attrs = ["data-src", "data-lazy-src", "data-original", "srcset", "src"];
+
+      function pickUrl(tag) {
+        for (var a = 0; a < attrs.length; a++) {
+          var m = tag.match(new RegExp(attrs[a] + '\\s*=\\s*"([^"]*)"'));
+          if (!m) m = tag.match(new RegExp(attrs[a] + "\\s*=\\s*'([^']*)'"));
+          if (!m) continue;
+          // `srcset` liste plusieurs tailles : la premiere suffit.
+          var v = m[1].split(",")[0].trim().split(/\s+/)[0];
+          if (!v) continue;
+          if (v.indexOf("data:") === 0) continue;      // image de remplacement
+          if (v.indexOf("dflazy") !== -1) continue;     // remplacement du theme
+          if (!/^https?:\/\//.test(v)) {
+            if (v.charAt(0) === "/") v = BASE_URL + v; else continue;
+          }
+          if (!/\.(jpe?g|png|webp|gif|avif)(\?|$)/i.test(v)) continue;
+          return v;
         }
-      }
-      if (!imgMatches) {
-        // page-break fallback
-        imgMatches = res.match(/<div class="?page-break[^"]*"?[^>]*>[^]*?<img[^>]*(?:data-src|src)\s*=\s*"?([^\s"'>]+)"?/g);
+        return null;
       }
 
-      if (imgMatches) {
-        for (var i = 0; i < imgMatches.length; i++) {
-          // Handle both quoted and unquoted src
-          var srcMatch = imgMatches[i].match(/(?:data-src|data-lazy-src|src)\s*=\s*"?(https?[^\s"'>]+)"?/);
-          if (srcMatch) {
-            var imgUrl = srcMatch[1].trim();
-            // Skip placeholder images
-            if (imgUrl.indexOf("dflazy.jpg") !== -1 || imgUrl.indexOf("data:image") !== -1) continue;
-            pages.push({
-              index: pages.length,
-              imageUrl: imgUrl,
-              headers: { "Referer": BASE_URL },
-            });
-          }
-        }
+      var pages = [];
+      var seen = {};
+      var tags = contentHtml.match(/<img[^>]*>/g) || [];
+      for (var i = 0; i < tags.length; i++) {
+        var imgUrl = pickUrl(tags[i]);
+        if (!imgUrl || seen[imgUrl]) continue;
+        seen[imgUrl] = true;
+        pages.push({
+          index: pages.length,
+          imageUrl: imgUrl,
+          // La provenance est exigee par l'hebergeur des images.
+          headers: { "Referer": BASE_URL + "/" },
+        });
       }
 
       return pages;

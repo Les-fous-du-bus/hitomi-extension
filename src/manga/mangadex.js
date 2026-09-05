@@ -294,6 +294,23 @@ class DefaultExtension extends MProvider {
 
       for (const ch of json.data || []) {
         const a = ch.attributes || {};
+
+        // MangaDex REFERENCE des chapitres qu'il n'heberge pas : les oeuvres
+        // sous licence pointent vers l'editeur officiel (webnovel, Manga Plus).
+        // Ces entrees portent `externalUrl` et `pages: 0`, et leur appel
+        // at-home/server rend `result: ok` avec une liste d'images VIDE — pas
+        // une erreur, un succes vide.
+        //
+        // Sans ce filtre, le lecteur recevait des chapitres qu'il ne pouvait
+        // par construction jamais afficher. Mesure du 2026-09-05 sur
+        // "Na Honjaman Level-Up" : 24 chapitres listes, 24 externes, zero
+        // lisible. C'est ce qui faisait rendre "aucun contenu" au harnais sur
+        // une extension par ailleurs saine.
+        //
+        // Mieux vaut une liste plus courte et vraie qu'une liste complete dont
+        // une partie ne s'ouvre pas.
+        if (a.externalUrl || !a.pages) continue;
+
         const vol = a.volume ? `Vol.${a.volume} ` : "";
         const chapNum = a.chapter || "";
         const chapTitle = a.title || "";
