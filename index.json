@@ -241,6 +241,21 @@
       "sha256": "289a074cb3211e243ed781e7a71ca9d7221267fec52180b680873a26df5662e8"
     },
     {
+      "id": "trad-index",
+      "name": "Trad-Index",
+      "lang": "fr",
+      "space": "light_novel",
+      "version": 1,
+      "mature": false,
+      "cloudflare": false,
+      "jsUrl": "src/novel/trad-index.js",
+      "iconUrl": "https://trad-index.com/favicon.ico",
+      "status": "active",
+      "obsolescenceRisk": "medium",
+      "note": "v1 (2026-09-08) : source francaise, 24 fiches par page sur 24 pages. Le site est un index de traductions mais il HEBERGE ses chapitres, contrairement a Novel-Index qui redirige. Trois choix mesures : le titre vient d un span du corps de la carte (ni attribut title, ni alt, et le slug perdrait les accents), la couverture est ramenee a sa source en decodant /_next/image?url=, et la liste de chapitres est deduite du plus haut numero (contigus sans trou sur trois oeuvres de 155, 38 et 3 chapitres). Le parametre de recherche est q : recherche, search et titre rendent le catalogue entier non filtre. Mesure : 24 oeuvres, 94 chapitres, 3/3 lisibles (10023 a 11434 caracteres), 3/3 couvertures joignables.",
+      "sha256": "531d97ab97ecdfb19bd1d5ad49cab3aacbb813ff2b4fa2c97fe37d93309ba774"
+    },
+    {
       "id": "warriorlegendtrad",
       "name": "WarriorLegendTrad",
       "lang": "fr",
