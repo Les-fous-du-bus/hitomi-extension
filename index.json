@@ -657,6 +657,21 @@
             "sha256": "6b9ce2a68efe46bead6616a4b6608242fea6b6e7a2b860bc808424387332d96c"
         },
         {
+            "id": "tcbscans",
+            "name": "TCB Scans",
+            "lang": "en",
+            "space": "manga",
+            "version": 2,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/tcbscans.js",
+            "iconUrl": "https://www.tcbscans.net/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v2 (2026-09-08) : REMISE AU CATALOGUE. Elle en avait disparu au commit de0f750 du 2026-05-27, un commit qui AJOUTAIT deux extensions et ne mentionne aucun retrait : perdue lors d une reecriture en bloc de l index. Le fichier etait reste en place et marchait. Mesure du 2026-09-08 sur www.tcbscans.net : 20 oeuvres, 84 resultats de recherche, 30 chapitres, 3 chapitres sur 3 lisibles (17 a 24 pages), 3 couvertures sur 3 joignables. Verdict vert 3/3. Le controle tools/index-coverage.js empeche desormais une perte silencieuse.",
+            "sha256": "dc80e2ea80215c6bfc0589b9f3f5af74c2c33211e90a537f27836b3cae2e6643"
+        },
+        {
             "id": "toonily",
             "name": "Toonily",
             "lang": "en",
