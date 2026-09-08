@@ -1,4 +1,22 @@
 /**
+ * SOURCE MORTE — NE PAS REPARER.
+ *
+ * Le domaine novel-fr.net n a plus aucun enregistrement DNS (verifie le
+ * 2026-09-08 : `dig +short novel-fr.net A` ne rend rien). Le site a ete repris
+ * sous le nom NovelFrance, sur novelfrance.fr.
+ *
+ * Ce site EST DEJA COUVERT par l extension `massnovel` (identifiant historique,
+ * nom d affichage « NovelFrance »), qui declare exactement https://novelfrance.fr
+ * et rend un verdict vert 3/3 au harnais : 3178 chapitres, 3 sur 3 lisibles.
+ * Reparer ce fichier creerait une seconde source sur le meme site.
+ *
+ * L entree de cette extension a DEJA ete retiree d index.json le 2026-09-05
+ * (commit 85780b8), avec le meme constat. Elle n est donc plus installable, et
+ * il n y a rien a retirer de plus. Le fichier est conserve pour la tracabilite,
+ * pas pour etre remis en service.
+ */
+
+/**
  * LightNovelFR — Extension Hitomi Reader Ultimate
  * Source : https://novel-fr.net
  * Type : Scraping HTML (theme Themesia)
