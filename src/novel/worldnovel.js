@@ -60,6 +60,14 @@
 
 var BASE_URL = "https://world-novel.fr";
 
+// Nombre de paragraphes en dessous duquel un DOM ne porte pas un chapitre.
+// Trois suffit a ecarter un synopsis sans recaler un chapitre tres court.
+var MIN_PARAGRAPHES_CHAPITRE = 3;
+
+// Meme plancher de texte que le reste du fichier : un chapitre court depasse
+// mille caracteres, le rebut qu'on ecarte tient sous deux cents.
+var MIN_TEXTE_CHAPITRE = 600;
+
 var HEADERS = {
   Referer: BASE_URL + "/",
   "Accept-Language": "fr-FR,fr;q=0.9",
@@ -214,6 +222,48 @@ function normalize(s) {
     res += idx === -1 ? out.charAt(i) : to.charAt(idx);
   }
   return res;
+}
+
+// Texte nu d'un fragment : sert a MESURER, pas a afficher. On garde le HTML
+// d'origine pour la lecture, et on ne compte que ce qui se lit vraiment.
+function texteNu(fragment) {
+  if (!fragment) return "";
+  return fragment
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Extrait les paragraphes d'un DOM rendu, ou rend une chaine vide.
+ *
+ * POURQUOI exiger PLUSIEURS paragraphes et pas seulement de la longueur : c'est
+ * la lecon des extensions reparees le 2026-09-04. Prendre « le plus long texte
+ * de la page » attrape le SYNOPSIS de l'oeuvre et le presente comme un
+ * chapitre. Un texte faux affiche comme vrai est pire qu'un message d'attente.
+ *
+ * Un chapitre compte des dizaines de paragraphes ; un synopsis en compte un ou
+ * deux, meme long. Le nombre de paragraphes discrimine la ou la longueur seule
+ * echoue.
+ */
+function paragraphesDuDom(dom) {
+  if (typeof dom !== "string" || !dom) return "";
+
+  var blocs = dom.match(/<p\b[^>]*>[\s\S]*?<\/p>/g) || [];
+  var gardes = [];
+  var longueur = 0;
+  for (var i = 0; i < blocs.length; i++) {
+    var texte = texteNu(blocs[i]);
+    if (!texte) continue;
+    gardes.push(blocs[i]);
+    longueur += texte.length;
+  }
+
+  if (gardes.length < MIN_PARAGRAPHES_CHAPITRE) return "";
+  if (longueur < MIN_TEXTE_CHAPITRE) return "";
+  return gardes.join("\n");
 }
 
 class DefaultExtension extends LNProvider {
@@ -398,13 +448,36 @@ class DefaultExtension extends LNProvider {
         return best.charAt(0) === "<" ? best : "<p>" + best + "</p>";
       }
 
+      // La page servie ne porte pas le texte : on paie le navigateur.
+      //
+      // POURQUOI seulement maintenant : `fetchRendered` occupe une instance de
+      // navigateur (environ 50 a 100 Mo, trois au maximum). La page servie ne
+      // coute rien, et si une session signee y faisait un jour apparaitre le
+      // texte, cette extension le lirait sans ouvrir de navigateur.
+      //
+      // Ce que ce chemin apporte, et que rien d'autre ne peut apporter : le
+      // texte vient de Firestore, appele par le JavaScript du site avec un jeton
+      // de session Firebase. Ce jeton vit dans le stockage du navigateur et part
+      // en en-tete ; aucun cookie ne le porte, donc ni fetchv2 ni Dio ne peuvent
+      // le rejouer. Il faut laisser le site faire l'appel lui-meme.
+      var rendu = "";
+      try {
+        rendu = await fetchRendered(fullUrl, { minVisibleText: 600 });
+      } catch (_) {
+        rendu = "";
+      }
+
+      var duRendu = paragraphesDuDom(rendu);
+      if (duRendu) return duRendu;
+
       return (
         "<p><strong>Ce chapitre demande d'etre connecte.</strong></p>" +
         "<p>Le texte de World Novel n'est pas dans la page : le site le charge " +
         "depuis sa base Firebase, qui refuse toute lecture non authentifiee " +
         "(erreur 403, permissions insuffisantes). Le compte est gratuit sur " +
-        "world-novel.fr — une fois connecte dans le navigateur de " +
-        "l'application, la lecture pourra suivre la session.</p>" +
+        "world-novel.fr.</p>" +
+        "<p>Dans la liste des sources de l'application, le bouton de connexion " +
+        "ouvre le site : une fois connecte, la lecture suit la session.</p>" +
         "<p>La navigation, la recherche et la liste des chapitres, elles, " +
         "fonctionnent sans compte.</p>"
       );
