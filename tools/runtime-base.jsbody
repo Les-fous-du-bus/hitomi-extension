@@ -1,0 +1,455 @@
+
+    // Bridge fetchv2 : returns result.body directly (string).
+    //
+    // Contract — THREE shapes accepted for `options`, all backward compatible:
+    //
+    //   1. Legacy nested headers (recommended, same as Mangayomi):
+    //        fetchv2(url, { headers: { Referer: '...', Cookie: '...' } })
+    //
+    //   2. Legacy flat headers (some extensions, e.g. noveldeglace):
+    //        fetchv2(url, { 'Accept-Encoding': 'deflate' })
+    //
+    //   3. POST / PUT / PATCH with body (new — for WP admin-ajax, JSON APIs):
+    //        fetchv2(url, {
+    //          method: 'POST',
+    //          body:   'action=foo&id=123',           // string (urlencoded)
+    //          // or:  { action: 'foo', id: 123 },    // Map auto-serialised
+    //          // or:  JSON.stringify({ foo: 'bar' }), // for JSON APIs
+    //          headers: {
+    //            'X-Requested-With': 'XMLHttpRequest',
+    //            // Content-Type defaults to application/x-www-form-urlencoded
+    //            // when absent. Override here for JSON / multipart.
+    //          },
+    //        })
+    //
+    // Detection on the Dart side is based on the presence of `method` in
+    // `options`. Without `method`, the request stays a GET and `options` is
+    // treated as headers (nested or flat). The JS wrapper stays a thin
+    // pass-through on purpose: all the routing happens in one place (Dart),
+    // so extensions don't have to care about the legacy/new ambiguity.
+    async function fetchv2(url, options) {
+      const result = await sendMessage('fetchv2', JSON.stringify([url, options || {}]));
+      if (result.error) throw new Error('Network error: ' + result.error);
+      return result.body || '';
+    }
+
+    // Bridge fetchBinary : retourne le corps de la reponse HTTP encode en base64.
+    // Utilise pour les ressources binaires (images chiffrees, etc.).
+    // Retourne une string base64 pure (sans prefixe data:).
+    async function fetchBinary(url, options) {
+      const result = await sendMessage('fetchBinary', JSON.stringify([url, options || {}]));
+      if (result.error) throw new Error('Network error: ' + result.error);
+      return result.base64 || '';
+    }
+
+    // Polyfill atob/btoa pour QuickJS (absent du runtime de base).
+    // Implementation RFC 4648 standard — couvre tous les caracteres base64.
+    const _b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    function btoa(str) {
+      let result = '';
+      const len = str.length;
+      for (let i = 0; i < len; i += 3) {
+        const a = str.charCodeAt(i) & 0xFF;
+        const b = (i + 1 < len) ? (str.charCodeAt(i + 1) & 0xFF) : 0;
+        const c = (i + 2 < len) ? (str.charCodeAt(i + 2) & 0xFF) : 0;
+        result += _b64chars[a >> 2];
+        result += _b64chars[((a & 3) << 4) | (b >> 4)];
+        result += (i + 1 < len) ? _b64chars[((b & 15) << 2) | (c >> 6)] : '=';
+        result += (i + 2 < len) ? _b64chars[c & 63] : '=';
+      }
+      return result;
+    }
+    function atob(b64) {
+      const lookup = {};
+      for (let i = 0; i < _b64chars.length; i++) lookup[_b64chars[i]] = i;
+      const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+      let result = '';
+      for (let i = 0; i < clean.length; i += 4) {
+        const a = (lookup[clean[i]]     !== undefined) ? lookup[clean[i]]     : 0;
+        const b = (lookup[clean[i + 1]] !== undefined) ? lookup[clean[i + 1]] : 0;
+        const c = (lookup[clean[i + 2]] !== undefined) ? lookup[clean[i + 2]] : 0;
+        const d = (lookup[clean[i + 3]] !== undefined) ? lookup[clean[i + 3]] : 0;
+        result += String.fromCharCode((a << 2) | (b >> 4));
+        if (i + 2 < clean.length && clean[i + 2] !== '=') {
+          result += String.fromCharCode(((b & 15) << 4) | (c >> 2));
+        }
+        if (i + 3 < clean.length && clean[i + 3] !== '=') {
+          result += String.fromCharCode(((c & 3) << 6) | d);
+        }
+      }
+      return result;
+    }
+
+    // -- Polyfill DOMParser pour QuickJS (pas de DOM navigateur) --
+    // Supports: tag, .class, #id, [attr], [attr=val], [attr*=val],
+    // compound (div.class#id), descendant (div .class), child (div > a),
+    // comma (div.a, div.b). Handles nested tags via depth counting.
+    const _VOID_TAGS = new Set(['br','hr','img','input','meta','link','area','base','col','embed','source','track','wbr']);
+
+    function _parseSimpleSelector(sel) {
+      let tag = null, classes = [], id = null, attrs = [];
+      const tagM = sel.match(/^([a-zA-Z][a-zA-Z0-9]*)/);
+      if (tagM) { tag = tagM[1].toLowerCase(); sel = sel.slice(tagM[0].length); }
+      const tokRe = /([#.])([a-zA-Z_-][a-zA-Z0-9_-]*)|(\[([a-zA-Z_-][a-zA-Z0-9_-]*)(?:([~|^$*]?=)["']?([^"'\]]*)["']?)?\])/g;
+      let m;
+      while ((m = tokRe.exec(sel)) !== null) {
+        if (m[1] === '#') id = m[2];
+        else if (m[1] === '.') classes.push(m[2]);
+        else if (m[3]) attrs.push({ name: m[4], op: m[5] || null, value: m[6] || null });
+      }
+      return { tag, classes, id, attrs };
+    }
+
+    function _matchesSelector(tagName, attrsStr, parsed) {
+      if (parsed.tag && parsed.tag !== tagName.toLowerCase()) return false;
+      if (parsed.classes.length > 0) {
+        const cm = attrsStr.match(/class\s*=\s*["']([^"']*)["']/i);
+        if (!cm) return false;
+        const cl = cm[1].split(/\s+/);
+        for (let i = 0; i < parsed.classes.length; i++) {
+          if (cl.indexOf(parsed.classes[i]) === -1) return false;
+        }
+      }
+      if (parsed.id) {
+        const im = attrsStr.match(/id\s*=\s*["']([^"']*)["']/i);
+        if (!im || im[1] !== parsed.id) return false;
+      }
+      for (let i = 0; i < parsed.attrs.length; i++) {
+        const a = parsed.attrs[i];
+        const ar = new RegExp(a.name + '\\s*=\\s*["\']([^"\']*)["\']', 'i');
+        const am = attrsStr.match(ar);
+        if (!am) return false;
+        if (a.op === '=' && am[1] !== a.value) return false;
+        if (a.op === '*=' && am[1].indexOf(a.value) === -1) return false;
+        if (a.op === '^=' && am[1].indexOf(a.value) !== 0) return false;
+        if (a.op === '$=' && am[1].slice(-a.value.length) !== a.value) return false;
+        if (a.op === '~=' && am[1].split(/\s+/).indexOf(a.value) === -1) return false;
+      }
+      return true;
+    }
+
+    function _findClosingTag(html, tagName, startFrom) {
+      const re = new RegExp('<(/?)(' + tagName + ')(?:\\s[^>]*)?\\/?>','gi');
+      re.lastIndex = startFrom;
+      let depth = 1, m;
+      while ((m = re.exec(html)) !== null) {
+        if (m[1] === '/') { depth--; if (depth === 0) return m.index + m[0].length; }
+        else if (!m[0].endsWith('/>')) depth++;
+      }
+      return -1;
+    }
+
+    function _findMatching(html, parsed) {
+      const results = [];
+      const openRe = /<([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*?)?)(\s*\/)?>/g;
+      let m;
+      while ((m = openRe.exec(html)) !== null) {
+        const tn = m[1], as2 = m[2], sc = m[3];
+        if (!_matchesSelector(tn, as2, parsed)) continue;
+        const si = m.index;
+        if (sc || _VOID_TAGS.has(tn.toLowerCase())) {
+          results.push(m[0]);
+        } else {
+          const ei = _findClosingTag(html, tn, si + m[0].length);
+          results.push(ei >= 0 ? html.slice(si, ei) : m[0]);
+        }
+      }
+      return results;
+    }
+
+    function _querySelectorAll(html, selector) {
+      // Handle comma-separated selectors
+      if (selector.indexOf(',') !== -1) {
+        const parts = selector.split(',');
+        const seen = new Set();
+        const results = [];
+        for (let i = 0; i < parts.length; i++) {
+          const sub = _querySelectorAll(html, parts[i].trim());
+          for (let j = 0; j < sub.length; j++) {
+            if (!seen.has(sub[j]._html)) { seen.add(sub[j]._html); results.push(sub[j]); }
+          }
+        }
+        return results;
+      }
+      // Split by descendant/child combinators
+      const tokens = selector.trim().split(/\s*>\s*|\s+/);
+      let contexts = [html];
+      for (let t = 0; t < tokens.length; t++) {
+        const parsed = _parseSimpleSelector(tokens[t]);
+        if (!parsed.tag && parsed.classes.length === 0 && !parsed.id && parsed.attrs.length === 0) continue;
+        const next = [];
+        for (let c = 0; c < contexts.length; c++) {
+          const matches = _findMatching(contexts[c], parsed);
+          for (let j = 0; j < matches.length; j++) next.push(matches[j]);
+        }
+        contexts = next;
+      }
+      return contexts.map(function(h) { return new _FakeElement(h, null); });
+    }
+
+    class DOMParser {
+      parseFromString(html, type) {
+        return new _FakeDocument(html);
+      }
+    }
+
+    class _FakeDocument {
+      constructor(html) { this._html = html || ''; }
+      querySelector(selector) {
+        const r = _querySelectorAll(this._html, selector);
+        return r.length > 0 ? r[0] : null;
+      }
+      querySelectorAll(selector) { return _querySelectorAll(this._html, selector); }
+      getElementById(id) { return this.querySelector('#' + id); }
+    }
+
+    class _FakeElement {
+      constructor(html, _unused) { this._html = html || ''; }
+
+      get textContent() { return this._html.replace(/<[^>]+>/g, '').trim(); }
+
+      get innerHTML() {
+        const m = this._html.match(/^<[a-zA-Z][^>]*>([\s\S]*)/);
+        if (!m) return this._html;
+        const inner = m[1];
+        const closeIdx = inner.lastIndexOf('</');
+        return closeIdx >= 0 ? inner.slice(0, closeIdx) : inner;
+      }
+
+      getAttribute(name) {
+        const m = this._html.match(new RegExp(name + '\\s*=\\s*["\']([^"\']*)["\']', 'i'));
+        return m ? m[1] : null;
+      }
+
+      querySelector(selector) {
+        const inner = this.innerHTML;
+        const r = _querySelectorAll(inner, selector);
+        return r.length > 0 ? r[0] : null;
+      }
+
+      querySelectorAll(selector) { return _querySelectorAll(this.innerHTML, selector); }
+
+      closest(selector) { return null; }
+      get children() {
+        const r = [];
+        const re = /<([a-zA-Z][a-zA-Z0-9]*)(\s[^>]*)?\/?>/g;
+        const inner = this.innerHTML;
+        let m;
+        while ((m = re.exec(inner)) !== null) {
+          const tn = m[1], si = m.index;
+          if (_VOID_TAGS.has(tn.toLowerCase()) || m[0].endsWith('/>')) {
+            r.push(new _FakeElement(m[0], null));
+          } else {
+            const ei = _findClosingTag(inner, tn, si + m[0].length);
+            const full = ei >= 0 ? inner.slice(si, ei) : m[0];
+            r.push(new _FakeElement(full, null));
+            if (ei > 0) re.lastIndex = ei;
+          }
+        }
+        return r;
+      }
+      get src() { return this.getAttribute('src'); }
+      get href() { return this.getAttribute('href'); }
+      get alt() { return this.getAttribute('alt'); }
+      get outerHTML() { return this._html; }
+      remove() {}
+    }
+    // -----------------------------------------------------------------
+
+    // -- Storage cloisonne par extension --
+    // Chaque extension accede a un namespace isole via ce bridge.
+    // Les cles sont prefixees cote Dart — le JS ne peut pas sortir de son espace.
+    const Storage = {
+      async get(key) {
+        return await sendMessage('storage_get', JSON.stringify({ key }));
+      },
+      async set(key, value) {
+        return await sendMessage('storage_set', JSON.stringify({ key, value }));
+      },
+      async remove(key) {
+        return await sendMessage('storage_remove', JSON.stringify({ key }));
+      },
+      async clear() {
+        return await sendMessage('storage_clear', '{}');
+      }
+    };
+    // ------------------------------------------------------------------
+
+    class MProvider {
+      get name() { return ""; }
+      get lang() { return ""; }
+      get baseUrl() { return ""; }
+      get supportsLatest() { return false; }
+      get isMature() { return false; }
+      get hasCloudflare() { return false; }
+      get contentType() { return "manga"; }
+
+      async getPopular(page) { throw new Error("getPopular not implemented"); }
+      async getLatestUpdates(page) { throw new Error("getLatestUpdates not implemented"); }
+      async search(query, page, filters) { throw new Error("search not implemented"); }
+      async getMangaDetail(url) { throw new Error("getMangaDetail not implemented"); }
+      async getChapterList(url) { throw new Error("getChapterList not implemented"); }
+      async getPageList(url) { throw new Error("getPageList not implemented"); }
+      async getHtmlContent(name, url) { return ""; }
+      getFilterList() { return []; }
+
+      // LN bridge methods — allow MProvider extensions typed as itemType 'ln'
+      // to be called with LNProvider API. Delegates to MProvider methods with
+      // response format conversion (imageUrl->cover, authors->author, etc.).
+      // genres propage depuis item.genres (default []) pour filtrage NSFW cote Dart.
+      async popularNovels(page) {
+        var result = await this.getPopular(page);
+        var list = [];
+        if (result && result.list) {
+          for (var i = 0; i < result.list.length; i++) {
+            var item = result.list[i];
+            list.push({
+              title: item.title,
+              url: item.url,
+              cover: item.imageUrl || '',
+              isMature: item.isMature || false,
+              genres: Array.isArray(item.genres) ? item.genres : [],
+            });
+          }
+        }
+        return { list: list, hasNextPage: result ? result.hasNextPage : false };
+      }
+
+      async searchNovels(searchTerm, page) {
+        var result = await this.search(searchTerm, page, []);
+        var list = [];
+        if (result && result.list) {
+          for (var i = 0; i < result.list.length; i++) {
+            var item = result.list[i];
+            list.push({
+              title: item.title,
+              url: item.url,
+              cover: item.imageUrl || '',
+              isMature: item.isMature || false,
+              genres: Array.isArray(item.genres) ? item.genres : [],
+            });
+          }
+        }
+        return { list: list, hasNextPage: result ? result.hasNextPage : false };
+      }
+
+      async parseNovelAndChapters(url) {
+        var detail = await this.getMangaDetail(url);
+        var chapters = await this.getChapterList(url);
+        var lnChapters = [];
+        if (chapters) {
+          for (var i = 0; i < chapters.length; i++) {
+            var ch = chapters[i];
+            lnChapters.push({
+              name: ch.title,
+              url: ch.url,
+              chapterNumber: ch.number || 0,
+              releaseTime: ch.dateUpload ? new Date(ch.dateUpload).toISOString() : '',
+            });
+          }
+        }
+        return {
+          title: detail.title || '',
+          url: detail.url || url,
+          cover: detail.imageUrl || '',
+          author: (detail.authors && detail.authors.length > 0) ? detail.authors[0] : '',
+          description: detail.description || '',
+          status: detail.status || '',
+          genres: detail.genres || [],
+          isMature: detail.isMature || false,
+          chapters: lnChapters,
+        };
+      }
+
+      async parseChapter(url) {
+        if (typeof this.getContent === 'function') {
+          return await this.getContent(url);
+        }
+        return await this.getHtmlContent('', url);
+      }
+
+      // Custom CSS par plugin — a surcharger dans DefaultExtension.
+      // Le CSS retourne est injecte dans le reader LN avant le rendu HTML.
+      // Contraintes de securite appliquees cote Dart :
+      //   - Aucun <script> ne sera execute dans le CSS
+      //   - Le contenu est isole dans un <style class="plugin-css"> dedie
+      // TECH-003 (2026-03-06) : getCustomJS() retire — vecteur injection.
+      async getCustomCSS() { return ""; }
+    }
+
+    class LNProvider {
+      get id()      { return ""; }
+      get name()    { return ""; }
+      get lang()    { return ""; }
+      get baseUrl() { return ""; }
+      get iconUrl() { return ""; }
+      get supportsLatest() { return false; }
+      get isMature() { return false; }
+      get hasCloudflare() { return false; }
+
+      async popularNovels(page)            { throw new Error("popularNovels not implemented"); }
+      async parseNovelAndChapters(url)     { throw new Error("parseNovelAndChapters not implemented"); }
+      async parseChapter(url)              { throw new Error("parseChapter not implemented"); }
+      async searchNovels(searchTerm, page) { throw new Error("searchNovels not implemented"); }
+      getFilterList() { return []; }
+
+      // MProvider bridge — allow LNProvider extensions to be called with MProvider API.
+      // genres propage depuis item.genres (default []) pour filtrage NSFW cote Dart.
+      async getPopular(page) {
+        var result = await this.popularNovels(page);
+        var list = [];
+        if (result && result.list) {
+          for (var i = 0; i < result.list.length; i++) {
+            var item = result.list[i];
+            list.push({
+              title: item.title,
+              url: item.url,
+              imageUrl: item.cover || '',
+              isMature: item.isMature || false,
+              genres: Array.isArray(item.genres) ? item.genres : [],
+            });
+          }
+        }
+        return { list: list, hasNextPage: result ? result.hasNextPage : false };
+      }
+
+      async getLatestUpdates(page) { return this.getPopular(page); }
+
+      async search(query, page, filters) {
+        var result = await this.searchNovels(query, page);
+        var list = [];
+        if (result && result.list) {
+          for (var i = 0; i < result.list.length; i++) {
+            var item = result.list[i];
+            list.push({
+              title: item.title,
+              url: item.url,
+              imageUrl: item.cover || '',
+              isMature: item.isMature || false,
+              genres: Array.isArray(item.genres) ? item.genres : [],
+            });
+          }
+        }
+        return { list: list, hasNextPage: result ? result.hasNextPage : false };
+      }
+
+      async getMangaDetail(url) { return this.parseNovelAndChapters(url); }
+      async getChapterList(url) {
+        var detail = await this.parseNovelAndChapters(url);
+        var chapters = [];
+        if (detail && detail.chapters) {
+          for (var i = 0; i < detail.chapters.length; i++) {
+            var ch = detail.chapters[i];
+            chapters.push({ title: ch.name, url: ch.url, number: ch.chapterNumber || 0, dateUpload: 0 });
+          }
+        }
+        return chapters;
+      }
+      async getPageList(url) { return []; }
+      async getHtmlContent(name, url) { return this.parseChapter(url); }
+
+      // Custom CSS par plugin — a surcharger dans DefaultExtension.
+      // TECH-003 (2026-03-06) : getCustomJS() retire — vecteur injection.
+      async getCustomCSS() { return ""; }
+    }
+  

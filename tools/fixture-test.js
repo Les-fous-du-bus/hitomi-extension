@@ -50,18 +50,35 @@ function fixtureFor(url) {
   return null;
 }
 
-async function fetchv2(url) {
+// Le socle de l'app definit `fetchv2` en termes de `sendMessage`, et sa
+// declaration masque toute fonction du meme nom posee dans le bac a sable. On
+// branche donc les captures sur `sendMessage`, au meme endroit que le pont
+// reseau — sinon l'extension appellerait le fetchv2 du socle et ne trouverait
+// aucun pont.
+//
+// Meme forme de retour que le pont Dart : une capture absente rend un champ
+// `error`, elle ne leve pas.
+async function sendMessage(canal, charge) {
+  if (canal === 'storage_get') return null;
+  if (canal.startsWith('storage_')) return true;
+
+  const [url] = typeof charge === 'string' ? JSON.parse(charge) : charge;
   const f = fixtureFor(url);
   served.push({ url, fixture: f ? path.basename(f) : null });
-  if (!f) throw new Error(`aucune capture pour ${url}`);
-  return fs.readFileSync(f, 'utf8');
+  if (!f) return { status: 0, headers: {}, body: '', error: `aucune capture pour ${url}` };
+
+  const contenu = fs.readFileSync(f, 'utf8');
+  if (canal === 'fetchBinary') {
+    return { status: 200, headers: {}, base64: Buffer.from(contenu).toString('base64') };
+  }
+  return { status: 200, headers: {}, body: contenu };
 }
 
 const sandbox = {
-  fetchv2, fetchBinary: fetchv2, console, setTimeout, clearTimeout, Promise, Date, Math, JSON,
+  sendMessage, console, setTimeout, clearTimeout, Promise, Date, Math, JSON,
   RegExp, Error, Object, Array, String, Number, Boolean, Symbol, Map, Set,
   encodeURIComponent, decodeURIComponent, encodeURI, decodeURI, parseInt, parseFloat, isNaN, isFinite,
-  URL, URLSearchParams,
+  URL, URLSearchParams, Buffer,
 };
 vm.createContext(sandbox);
 vm.runInContext(RUNTIME_BASE_JS, sandbox);

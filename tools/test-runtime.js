@@ -19,6 +19,8 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const { RUNTIME_BASE_JS } = require('./runtime-base.js');
+const { creerPont } = require('./bridge.js');
 
 const args = process.argv.slice(2);
 const extId = args[0];
@@ -42,65 +44,17 @@ if (!fs.existsSync(extPath)) {
 
 const extSource = fs.readFileSync(extPath, 'utf8');
 
-// ── MProvider base class (mirrors lib/data/extensions/runtime/m_provider_wrapper.dart) ──
-const mProviderBase = `
-class MProvider {
-  get name() { return ""; }
-  get lang() { return ""; }
-  get baseUrl() { return ""; }
-  get supportsLatest() { return false; }
-  get isMature() { return false; }
-  get hasCloudflare() { return false; }
-  get contentType() { return "manga"; }
+// Le socle vient de tools/runtime-base.js, recopie du code de l'app.
+//
+// POURQUOI ce n'est plus une copie en dur : ce fichier definissait son propre
+// socle ou chaque methode levait une erreur et ou DOMParser n'existait pas. Il
+// mesurait donc l'absence de son socle plutot que l'extension. Meme correctif
+// que pour ext-test.js le 2026-09-08.
 
-  async getPopular(page) { throw new Error("getPopular not implemented"); }
-  async getLatestUpdates(page) { throw new Error("getLatestUpdates not implemented"); }
-  async search(query, page, filters) { throw new Error("search not implemented"); }
-  async getMangaDetail(url) { throw new Error("getMangaDetail not implemented"); }
-  async getChapterList(url) { throw new Error("getChapterList not implemented"); }
-  async getPageList(url) { throw new Error("getPageList not implemented"); }
-  async getHtmlContent(name, url) { return ""; }
-  getFilterList() { return []; }
-}
-`;
-
-// ── fetchv2 wrapper: mirrors bridge contract ──
-// Bridge returns {status, headers, body, error?}; JS wrapper returns body string or throws.
-async function fetchv2(url, options) {
-  const opts = options || {};
-  const method = (opts.method || 'GET').toUpperCase();
-  let headers = {};
-  if (opts.headers && typeof opts.headers === 'object') {
-    headers = { ...opts.headers };
-  } else {
-    // Flat headers shape (some extensions, e.g. noveldeglace)
-    for (const [k, v] of Object.entries(opts)) {
-      if (!['method', 'body', 'responseType', 'headers'].includes(k) && typeof v === 'string') {
-        headers[k] = v;
-      }
-    }
-  }
-  if (!Object.keys(headers).some(k => k.toLowerCase() === 'user-agent')) {
-    headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
-  }
-  let body = opts.body;
-  if (body && typeof body === 'object' && !(body instanceof ArrayBuffer)) {
-    body = Object.entries(body).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v ?? ''))}`).join('&');
-    if (!Object.keys(headers).some(k => k.toLowerCase() === 'content-type')) {
-      headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
-    }
-  }
-  const res = await fetch(url, { method, headers, body: body || undefined, redirect: 'follow' });
-  const text = await res.text();
-  return text;
-}
-
-async function fetchBinary(url, options) {
-  const opts = options || {};
-  const res = await fetch(url, { method: opts.method || 'GET', headers: opts.headers || {} });
-  const buf = Buffer.from(await res.arrayBuffer());
-  return buf.toString('base64');
-}
+// Le socle definit `fetchv2` en termes de `sendMessage` : on fournit le pont,
+// pas un fetchv2 concurrent (que la declaration du socle masquerait de toute
+// facon). Meme pont que ext-test.js, donc meme chemin teste.
+const sendMessage = creerPont({});
 
 // ── Validators ──
 function check(cond, msg) {
@@ -162,8 +116,8 @@ function validatePages(list) {
 
 // ── Runner ──
 const sandbox = {
-  fetchv2,
-  fetchBinary,
+  sendMessage,
+  Buffer,
   console,
   setTimeout,
   clearTimeout,
@@ -189,10 +143,12 @@ const sandbox = {
   parseFloat,
   isNaN,
   isFinite,
+  URL,
+  URLSearchParams,
 };
 
 vm.createContext(sandbox);
-vm.runInContext(mProviderBase, sandbox);
+vm.runInContext(RUNTIME_BASE_JS, sandbox);
 // Class declarations don't auto-attach to global in vm contexts.
 // Append an export line so we can pick up the class from the sandbox.
 const extSourceWithExport =

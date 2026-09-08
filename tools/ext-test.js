@@ -28,6 +28,7 @@ const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
 const { RUNTIME_BASE_JS } = require('./runtime-base.js');
+const { creerPont } = require('./bridge.js');
 
 const file = process.argv[2];
 const query = process.argv[3] || 'a';
@@ -48,44 +49,23 @@ const src = fs.readFileSync(file, 'utf8');
 // site reellement muet.
 const net = { lastStatus: 0, cloudflare: false, statuses: [] };
 
-async function fetchv2(url, options) {
-  const opts = options || {};
-  const method = (opts.method || 'GET').toUpperCase();
-  let headers = {};
-  if (opts.headers && typeof opts.headers === 'object') headers = { ...opts.headers };
-  else for (const [k, v] of Object.entries(opts))
-    if (!['method', 'body', 'responseType', 'headers'].includes(k) && typeof v === 'string') headers[k] = v;
-  if (!Object.keys(headers).some(k => k.toLowerCase() === 'user-agent'))
-    headers['User-Agent'] = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
-  let body = opts.body;
-  if (body && typeof body === 'object' && !(body instanceof ArrayBuffer)) {
-    body = Object.entries(body).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v ?? ''))}`).join('&');
-    if (!Object.keys(headers).some(k => k.toLowerCase() === 'content-type'))
-      headers['Content-Type'] = 'application/x-www-form-urlencoded; charset=UTF-8';
-  }
-  const ctl = new AbortController();
-  const to = setTimeout(() => ctl.abort(), 25000);
-  try {
-    const res = await fetch(url, { method, headers, body: body || undefined, redirect: 'follow', signal: ctl.signal });
-    net.lastStatus = res.status;
-    net.statuses.push(res.status);
-    if (res.headers.get('cf-ray') || /cloudflare/i.test(res.headers.get('server') || '')) {
-      if (res.status === 403 || res.status === 503) net.cloudflare = true;
-    }
-    const text = await res.text();
-    // Page d'attente Cloudflare : le code peut etre 200 tout en ne contenant
-    // aucune donnee utile.
-    if (/Just a moment|cf-browser-verification|challenge-platform|Attention Required/i.test(text.slice(0, 4000)))
-      net.cloudflare = true;
-    return text;
-  } finally { clearTimeout(to); }
-}
+// Le socle de l'app definit lui-meme `fetchv2` en termes de `sendMessage` ; on
+// fournit donc le pont, pas un fetchv2 concurrent. Poser un fetchv2 dans le bac
+// a sable ne servirait a rien : la declaration du socle le masque, et le harnais
+// testerait un chemin que le telephone n'emprunte pas.
+const sendMessage = creerPont({
+  observer: (info) => {
+    net.lastStatus = info.status;
+    net.statuses.push(info.status);
+    if (info.cloudflare) net.cloudflare = true;
+  },
+});
 
 const sandbox = {
-  fetchv2, fetchBinary: fetchv2, console, setTimeout, clearTimeout, Promise, Date, Math, JSON,
+  sendMessage, console, setTimeout, clearTimeout, Promise, Date, Math, JSON,
   RegExp, Error, Object, Array, String, Number, Boolean, Symbol, Map, Set,
   encodeURIComponent, decodeURIComponent, encodeURI, decodeURI, parseInt, parseFloat, isNaN, isFinite,
-  URL, URLSearchParams,
+  URL, URLSearchParams, Buffer,
 };
 vm.createContext(sandbox);
 vm.runInContext(RUNTIME_BASE_JS, sandbox);
