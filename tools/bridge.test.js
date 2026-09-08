@@ -173,3 +173,39 @@ test('une page d attente Cloudflare est reconnue', () => {
   assert.ok(estPageCloudflare('<h1>Attention Required!</h1>'));
   assert.ok(!estPageCloudflare('<html><body>un vrai catalogue</body></html>'));
 });
+
+test('le canal fetchRendered dit franchement que le harnais n a pas de navigateur', async (t) => {
+  // POURQUOI : le socle de l'app expose `fetchRendered`, qui lit une page APRES
+  // execution de son JavaScript, dans un navigateur portant la session de
+  // l'utilisateur. Le harnais n'a pas de navigateur — il ne peut donc ni le
+  // simuler, ni juger une extension qui l'appelle.
+  //
+  // Rendre « canal inconnu » ferait remonter « Render error: canal inconnu:
+  // fetchRendered » jusqu'au verdict, ce qui ressemble a un defaut d'extension.
+  // Le message doit nommer la limite du harnais, pas accuser le code teste.
+  const sendMessage = creerPont({});
+  const r = await sendMessage('fetchRendered', JSON.stringify(['https://exemple.test/x', {}]));
+
+  await t.test('un champ error est rendu, pas une exception', () => {
+    assert.ok(r.error, 'le pont Dart ne leve pas, il renseigne error');
+  });
+
+  await t.test('le message nomme la limite du harnais', () => {
+    assert.match(r.error, /harnais|navigateur/i);
+  });
+
+  await t.test('le message ne dit pas que le canal est inconnu', () => {
+    assert.doesNotMatch(r.error, /inconnu/i);
+  });
+
+  await t.test('la forme de retour reste celle du pont Dart', () => {
+    assert.strictEqual(r.status, 0);
+    assert.strictEqual(r.body, '');
+  });
+});
+
+test('un canal reellement inconnu reste signale comme tel', async () => {
+  const sendMessage = creerPont({});
+  const r = await sendMessage('canal_qui_n_existe_pas', '{}');
+  assert.match(r.error, /inconnu/i);
+});

@@ -15,10 +15,20 @@ const vm = require('node:vm');
 const { RUNTIME_BASE_JS } = require('./runtime-base.js');
 
 // Les reponses sont decrites par motif d'adresse. Le motif le plus long gagne,
-// pour qu'une adresse precise prime sur une adresse generique.
-function trouverReponse(reponses, url) {
+// pour qu'une adresse precise prime sur une adresse generique. Un motif peut
+// etre prefixe du canal (« fetchRendered:/lecture/ ») quand une meme adresse
+// doit repondre differemment selon le chemin emprunte.
+function trouverReponse(reponses, url, canal) {
   const motifs = Object.keys(reponses).sort((a, b) => b.length - a.length);
+  // Un motif portant un canal ne repond qu'a ce canal ; les autres repondent a
+  // tout, pour que les tests existants restent ecrits sans prefixe.
   for (const motif of motifs) {
+    const sep = motif.indexOf(':');
+    const prefixe = sep > 0 ? motif.slice(0, sep) : '';
+    if (prefixe === 'fetchv2' || prefixe === 'fetchRendered' || prefixe === 'fetchBinary') {
+      if (prefixe === canal && url.includes(motif.slice(sep + 1))) return reponses[motif];
+      continue;
+    }
     if (url.includes(motif)) return reponses[motif];
   }
   return null;
@@ -40,9 +50,12 @@ function chargerExtension(cheminExtension, reponses) {
     if (canal.startsWith('storage_')) return true;
 
     const [url, options] = typeof charge === 'string' ? JSON.parse(charge) : charge;
-    appels.push({ url, options: options || {} });
+    // Le canal est retenu : une extension peut lire la meme adresse par
+    // `fetchv2` ou par `fetchRendered`, et ces deux chemins n'ont pas le meme
+    // cout. Un test doit pouvoir affirmer lequel a servi.
+    appels.push({ canal, url, options: options || {} });
 
-    const reponse = trouverReponse(reponses, url);
+    const reponse = trouverReponse(reponses, url, canal);
     if (reponse === null) {
       return { status: 404, headers: {}, body: '', error: `aucune reponse posee pour ${url}` };
     }

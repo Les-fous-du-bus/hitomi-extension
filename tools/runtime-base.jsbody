@@ -42,6 +42,23 @@
       return result.base64 || '';
     }
 
+    // Lit une page APRES execution de son JavaScript, dans un navigateur portant
+    // la session de l'utilisateur.
+    //
+    // A n'utiliser que sur les pages qui en ont besoin : chaque hote occupe une
+    // instance de navigateur (environ 50 a 100 Mo, trois au maximum). Les deux
+    // cas legitimes mesures sont une page d'attente qui redirige en JavaScript
+    // en repondant 200, et un texte charge d'une base externe par le JavaScript
+    // du site avec un jeton de session que rien d'autre ne peut rejouer.
+    //
+    // `options.minVisibleText` regle la quantite de texte attendue avant de
+    // considerer le DOM comme lisible (400 par defaut).
+    async function fetchRendered(url, options) {
+      const result = await sendMessage('fetchRendered', JSON.stringify([url, options || {}]));
+      if (result.error) throw new Error('Render error: ' + result.error);
+      return result.body || '';
+    }
+
     // Polyfill atob/btoa pour QuickJS (absent du runtime de base).
     // Implementation RFC 4648 standard — couvre tous les caracteres base64.
     const _b64chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';

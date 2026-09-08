@@ -10,7 +10,9 @@
 // CE QUE CE PONT NE FAIT PAS, et c'est assume : il n'a pas de navigateur
 // embarque, donc il ne franchit pas une page d'attente Cloudflare. Il la
 // RECONNAIT et la signale, pour que le harnais distingue "site protege" de
-// "extension fautive". Il n'a pas non plus la protection contre les adresses
+// "extension fautive". Pour la meme raison, le canal `fetchRendered` — qui lit
+// une page apres execution de son JavaScript, avec la session de l'utilisateur —
+// rend un message nommant cette limite, et non un verdict. Il n'a pas non plus la protection contre les adresses
 // privees de l'app (inutile ici : les adresses viennent de fichiers relus, pas
 // d'un tiers).
 //
@@ -132,6 +134,26 @@ function creerPont({ observer, timeoutMs = 25000 } = {}) {
       case 'fetchBinary': {
         const [url, options] = lireArguments(charge);
         return appelHttp(url, options || {}, true);
+      }
+      case 'fetchRendered': {
+        // Le socle de l'app expose ce canal pour lire une page APRES execution
+        // de son JavaScript, dans un navigateur portant la session de
+        // l'utilisateur. Le harnais n'a pas de navigateur : il ne peut ni le
+        // simuler, ni juger une extension qui l'appelle.
+        //
+        // On le dit franchement plutot que de rendre « canal inconnu », qui
+        // remonterait jusqu'au verdict sous la forme « Render error: canal
+        // inconnu » et ressemblerait a un defaut de l'extension testee.
+        const [urlDemandee] = lireArguments(charge);
+        if (observer) observer({ url: urlDemandee, status: 0, cloudflare: false, rendu: true });
+        return {
+          status: 0,
+          headers: {},
+          body: '',
+          error: 'le harnais n a pas de navigateur : fetchRendered ne peut pas etre ' +
+            'mesure ici. Cette page demande un rendu avec la session de l utilisateur, ' +
+            'donc une verification dans l app.',
+        };
       }
       case 'storage_get': {
         const { key } = lireArguments(charge);
