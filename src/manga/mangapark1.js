@@ -261,6 +261,52 @@ class DefaultExtension extends MProvider {
     return detail.chapters;
   }
 
+  /**
+   * Explique POURQUOI une page de chapitre n'a rendu aucune image.
+   *
+   * POURQUOI cette methode existe : le message d'origine accusait Cloudflare ou
+   * un changement de CDN. Mesure du 2026-09-08 sur « Yuan Du Fu Shu » : les deux
+   * sont faux. Le site ANNONCE dans sa liste des chapitres qu'il n'heberge pas,
+   * et sert alors l'echafaudage du lecteur sans une seule adresse d'image —
+   * 48161 octets contre 76000 a 79000 pour un chapitre reel. Aucune de ces pages
+   * ne porte de marqueur Cloudflare, et le CDN n'a pas bouge.
+   *
+   * Ce ne sont pas les vieux chapitres qui manquent : dans la meme oeuvre, 47
+   * fonctionne alors que 51 et 42 non. Ce sont des trous isoles, cote site.
+   *
+   * Un message qui envoie chercher au mauvais endroit coute plus cher que pas de
+   * message du tout, d'ou ces trois cas distincts.
+   */
+  _pourquoiAucuneImage(html, chapterUrl) {
+    var page = typeof html === 'string' ? html : '';
+
+    var marqueursCf = ['Just a moment', 'cf-browser-verification', '_cf_chl_opt',
+      'cf_chl_prog', 'Checking if the site connection is secure'];
+    for (var i = 0; i < marqueursCf.length; i++) {
+      if (page.indexOf(marqueursCf[i]) !== -1) {
+        return 'MangaPark1: page d attente Cloudflare sur ' + chapterUrl +
+          ' — l app doit passer par son navigateur embarque';
+      }
+    }
+
+    // Des images externes presentes mais toutes ecartees comme elements du site :
+    // le repli generique de getPageList les aurait prises sinon, donc ce cas ne
+    // survient que si les filtres /assets/ et /banner/ ont tout mange.
+    var externes = page.match(/data-src=["'](https?:\/\/[^"']+)["']/g) || [];
+    if (externes.length > 0) {
+      var hote = String(externes[0]).replace(/^[\s\S]*?(https?:\/\/[^\/"']+)[\s\S]*$/, '$1');
+      return 'MangaPark1: ' + externes.length + ' image(s) trouvee(s) sur ' + hote +
+        ' mais toutes ecartees comme elements du site, sur ' + chapterUrl +
+        ' — verifier les filtres de chemin';
+    }
+
+    // Aucune adresse d'image du tout : le site sert la page et n'heberge rien.
+    return 'MangaPark1: la source n heberge pas ce chapitre — ' + chapterUrl +
+      ' rend l echafaudage du lecteur sans aucune image. Le site le liste quand ' +
+      'meme dans ses chapitres ; il ne s agit ni d un blocage ni d un defaut ' +
+      'de l extension';
+  }
+
   async getPageList(chapterUrl) {
     var html = await fetchv2(chapterUrl, {});
 
@@ -307,8 +353,7 @@ class DefaultExtension extends MProvider {
     }
 
     if (imgs.length === 0) {
-      throw new Error('MangaPark1: no chapter images found at ' + chapterUrl
-        + '. Cloudflare challenge may be blocking content or CDN URL pattern changed.');
+      throw new Error(this._pourquoiAucuneImage(html, chapterUrl));
     }
 
     return imgs.map(function(imgUrl, i) {
