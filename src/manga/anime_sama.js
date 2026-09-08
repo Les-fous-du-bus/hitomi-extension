@@ -21,7 +21,17 @@
  * de l'URL chapitre. Format : {base}/catalogue/{slug}/scan/vf/#ch={N}&o={enc(o)}&n={N}
  *
  * @author @khun — Extension Strategist
- * @version 2.2.0
+ * @version 2.3.0
+ *
+ * Fix v2.3.0 (2026-09-08):
+ *  - Une erreur du site ne se deguise plus en liste de chapitres vide. Le
+ *    catalogue annonce dans la categorie Scans des oeuvres que l'arriere-plan de
+ *    scans ne connait pas : « 07 Ghost » a une page /scan/vf/ valide et
+ *    l'interface repond, en code 200, {"error":"Oeuvre '07 Ghost' not found"}.
+ *    Traversee en silence, cette reponse se lisait comme « pas encore de
+ *    chapitre ». Les deux cas sont maintenant distincts.
+ *  - Le nom d'oeuvre et l'appel a l'interface sont sortis en deux methodes, pour
+ *    que getChapterList et getPageList aient exactement le meme comportement.
  *
  * Fix v2.2.0 (2026-04-29):
  *  - Supprime CANDIDATE_DOMAINS, _resolveBase(), _resolvedBase : la resolution
@@ -219,43 +229,67 @@ class DefaultExtension extends MProvider {
   // CHAPITRES
   // ─────────────────────────────────────────────
 
+  /**
+   * Lit le nom d'oeuvre exact attendu par l'interface de chapitres.
+   * Ce nom n'est PAS le slug : il porte ses espaces et sa casse d'origine, et
+   * c'est la cle sur laquelle l'interface indexe. Il ne se devine pas.
+   */
+  async _nomOeuvre(slug, scanPath) {
+    var html = await fetchv2(BASE_URL + scanPath, { headers: this._headers(scanPath) });
+    var doc = new DOMParser().parseFromString(typeof html === "string" ? html : "", "text/html");
+    var titreEl = doc.querySelector("#titreOeuvre");
+    if (!titreEl) {
+      throw new Error("AnimeSama: pas de #titreOeuvre sur " + scanPath +
+        " — la page de scans a change de forme, ou l'oeuvre n'en a pas");
+    }
+    // textContent brut — espaces conserves, c'est la cle exacte.
+    var nom = (titreEl.textContent || "").trim();
+    if (!nom) throw new Error("AnimeSama: #titreOeuvre vide sur " + scanPath);
+    return nom;
+  }
+
+  /**
+   * Interroge l'interface de chapitres et rend l'objet {chapitre: nbPages}.
+   *
+   * POURQUOI cette methode leve au lieu de rendre un objet vide : le catalogue
+   * annonce dans la categorie Scans des oeuvres que l'arriere-plan de scans ne
+   * connait pas. Mesure du 2026-09-08 sur « 07 Ghost » : la page de scans rend
+   * 200 avec un #titreOeuvre valide, et l'interface repond, en code 200,
+   * {"error":"Oeuvre '07 Ghost' not found"}. Traversee en silence, cette reponse
+   * donnait une liste vide, qui se lit comme « pas encore de chapitre ». Une
+   * erreur du site et une oeuvre neuve ne doivent pas se ressembler.
+   */
+  async _chapitresDeLApi(nomOeuvre, scanPath) {
+    var apiUrl = BASE_URL + "/s2/scans/get_nb_chap_et_img.php?oeuvre=" +
+      encodeURIComponent(nomOeuvre);
+    var corps = await fetchv2(apiUrl, { headers: this._headers(scanPath) });
+
+    var json;
+    try {
+      json = JSON.parse(corps);
+    } catch (_) {
+      throw new Error("AnimeSama: reponse illisible de l'interface de chapitres pour \"" +
+        nomOeuvre + "\" (ce n'est pas du JSON)");
+    }
+    if (!json || typeof json !== "object") {
+      throw new Error("AnimeSama: reponse inattendue pour \"" + nomOeuvre + "\"");
+    }
+    if (json.error) {
+      throw new Error("AnimeSama: le site ne connait pas \"" + nomOeuvre +
+        "\" cote scans (" + json.error + ")");
+    }
+    return json;
+  }
+
   async getChapterList(url) {
     var slug = this._slugFromUrl(url);
-    if (!slug) return [];
+    if (!slug) throw new Error("AnimeSama: adresse sans slug de catalogue: " + url);
 
     var scanPath = "/catalogue/" + slug + "/scan/vf/";
     var scanUrl = BASE_URL + scanPath;
 
-    var html;
-    try {
-      html = await fetchv2(scanUrl, { headers: this._headers(scanPath) });
-    } catch (_) {
-      return [];
-    }
-
-    var doc = new DOMParser().parseFromString(typeof html === "string" ? html : "", "text/html");
-    var titreEl = doc.querySelector("#titreOeuvre");
-    if (!titreEl) return [];
-
-    // textContent brut — espaces conserves, c'est la cle d'API exacte.
-    var nomOeuvre = (titreEl.textContent || "").trim();
-    if (!nomOeuvre) return [];
-
-    var apiUrl = BASE_URL + "/s2/scans/get_nb_chap_et_img.php?oeuvre=" + encodeURIComponent(nomOeuvre);
-    var apiBody;
-    try {
-      apiBody = await fetchv2(apiUrl, { headers: this._headers(scanPath) });
-    } catch (_) {
-      return [];
-    }
-
-    var json;
-    try {
-      json = JSON.parse(apiBody);
-    } catch (_) {
-      return [];
-    }
-    if (!json || typeof json !== "object") return [];
+    var nomOeuvre = await this._nomOeuvre(slug, scanPath);
+    var json = await this._chapitresDeLApi(nomOeuvre, scanPath);
 
     // Encode nomOeuvre + pageCount dans le fragment pour eviter un re-fetch
     // lors de getPageList. Cle conservee en string pour supporter les decimaux.
@@ -305,20 +339,17 @@ class DefaultExtension extends MProvider {
     var pageCount = parseInt(params.n || "0", 10);
 
     var scanPath = "/catalogue/" + slug + "/scan/vf/";
-    var referer = BASE_URL + scanPath;
 
-    // Si fragment incomplet : rejoue le flow HTML+API.
+    // Fragment incomplet : on rejoue le meme chemin que getChapterList, donc
+    // avec les memes messages quand le site repond de travers.
     if (!nomOeuvre || !pageCount) {
-      var html = await fetchv2(referer, { headers: this._headers(scanPath) });
-      var doc = new DOMParser().parseFromString(typeof html === "string" ? html : "", "text/html");
-      var titreEl = doc.querySelector("#titreOeuvre");
-      if (!titreEl) throw new Error("AnimeSama: titreOeuvre introuvable");
-      nomOeuvre = (titreEl.textContent || "").trim();
-      var apiUrl = BASE_URL + "/s2/scans/get_nb_chap_et_img.php?oeuvre=" + encodeURIComponent(nomOeuvre);
-      var apiBody = await fetchv2(apiUrl, { headers: this._headers(scanPath) });
-      var json = JSON.parse(apiBody);
+      nomOeuvre = await this._nomOeuvre(slug, scanPath);
+      var json = await this._chapitresDeLApi(nomOeuvre, scanPath);
       pageCount = parseInt(json[chapterKey] || "0", 10);
-      if (!pageCount) throw new Error("AnimeSama: chapitre " + chapterKey + " sans pages");
+      if (!pageCount) {
+        throw new Error("AnimeSama: le chapitre " + chapterKey + " de \"" + nomOeuvre +
+          "\" n'a aucune page declaree");
+      }
     }
 
     // nomOeuvre dans le path : encodeURI (espaces -> %20, pas encodeURIComponent).
