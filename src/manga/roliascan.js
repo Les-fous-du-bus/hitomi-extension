@@ -31,7 +31,7 @@
  *   - chapter-content endpoint has no auth = may be rate-limited in future
  *
  * @author @khun -- Extension Strategist
- * @version 1
+ * @version 2
  */
 
 var BASE_URL = "https://roliascan.com";
@@ -383,9 +383,28 @@ class DefaultExtension extends MProvider {
     if (!data.success || !data.images || data.images.length === 0) {
       throw new Error('RoliaScan: no images for chapter ' + chapterId + '. Response: ' + html.substring(0, 100));
     }
-    return data.images.map(function(imgUrl, i) {
-      return { index: i, imageUrl: imgUrl };
-    });
+    var pages = [];
+    for (var i = 0; i < data.images.length; i++) {
+      var imgUrl = data.images[i];
+      if (typeof imgUrl !== 'string') continue;
+      imgUrl = imgUrl.trim();
+      if (!/^https?:\/\//i.test(imgUrl)) continue;
+
+      // L'API RoliaScan sert encore Hand Jumper (chapitres 1-134 mesures le
+      // 2026-09-13) avec des URL http://mangataro.yachts. Android interdit le
+      // cleartext dans Hitomi, tandis que ce CDN sert exactement les memes
+      // fichiers en HTTPS et redirige deja HTTP -> HTTPS. Normaliser ici evite
+      // de remettre au telechargeur une requete que la politique Android refuse.
+      if (/^http:\/\/mangataro\.yachts\//i.test(imgUrl)) {
+        imgUrl = 'https://' + imgUrl.substring('http://'.length);
+      }
+
+      pages.push({ index: pages.length, imageUrl: imgUrl });
+    }
+    if (pages.length === 0) {
+      throw new Error('RoliaScan: no valid image URL for chapter ' + chapterId);
+    }
+    return pages;
   }
 
   getFilterList() {

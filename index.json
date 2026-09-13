@@ -617,15 +617,15 @@
             "name": "RoliaScan",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/roliascan.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=roliascan.com&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "WordPress REST API (wp-json/wp/v2/manga). Chapter images via /auth/chapter-content?chapter_id={id} with MD5 token (md5(timestamp+mng_ch_+YYYYMMDDhh).substring(0,16)). Token window=1h. If chapter API returns 403, re-verify token algorithm against manga.js.",
-            "sha256": "7722bb22be0f27c823989b61e7c648dde68d6eb8a50b28d29968e1946d535b77"
+            "note": "v2 (2026-09-13) : normalise en HTTPS les images http://mangataro.yachts renvoyees par l API (Hand Jumper ch.97 mesure a 106 pages) et rejette les URL image invalides. v1 : WordPress REST API, chapitres via /auth/chapter-content et jeton MD5 horaire.",
+            "sha256": "4c31610b558d438326b2842810ab1ec01b8adb7346347f953c92d4bf465f10f6"
         },
         {
             "id": "scan_vf",
