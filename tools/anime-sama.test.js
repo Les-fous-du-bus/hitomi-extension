@@ -162,3 +162,32 @@ test('le catalogue se lit malgre les adresses absolues', async (t) => {
     assert.ok(resultat.list.every((o) => o.imageUrl.startsWith('https://')));
   });
 });
+
+test('un interstitiel ou un echec reseau bascule le catalogue vers le navigateur', async () => {
+  const { ext, appels } = chargerExtension(EXTENSION, {
+    'fetchv2:/catalogue/?': {
+      status: 403,
+      error: 'Cloudflare a refuse la requete native',
+    },
+    'fetchRendered:/catalogue/?': `
+      <a href="https://anime-sama.to/catalogue/07-ghost">
+        <img src="https://cdn.jsdelivr.net/gh/Anime-Sama/IMG@img/contenu/thumb/07-ghost.webp">
+        <h2 class="card-title">07 Ghost</h2>
+      </a>`,
+  });
+
+  const resultat = await ext.getPopular(1);
+  assert.strictEqual(resultat.list.length, 1);
+  assert.deepStrictEqual(appels.map((appel) => appel.canal), ['fetchv2', 'fetchRendered']);
+});
+
+test('un catalogue inaccessible ne se deguise jamais en liste vide', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    'fetchv2:/catalogue/?': { status: 403, error: 'Cloudflare a refuse la requete native' },
+    'fetchRendered:/catalogue/?': { status: 0, error: 'Aucun navigateur disponible' },
+  });
+
+  await assert.rejects(
+    () => ext.getPopular(1),
+    /catalogue inaccessible.*Acces direct.*Acces navigateur/i);
+});

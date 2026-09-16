@@ -320,15 +320,15 @@
             "name": "AnimeSama",
             "lang": "fr",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/anime_sama.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v4 (2026-09-08) : une erreur du site ne se deguise plus en liste de chapitres vide. Le catalogue annonce dans la categorie Scans des oeuvres que l arriere-plan de scans ne connait pas — sur « 07 Ghost », get_nb_chap_et_img.php rend 200 avec {\"error\":\"Oeuvre not found\"}, que l extension traversait en silence. Trois autres silences fermes : page sans #titreOeuvre, reponse qui n est pas du JSON, chapitre sans page. Mesure : 48 oeuvres, 49 chapitres, 3/3 lisibles.",
-            "sha256": "bcc22ed1457902b0e708bfd5d38783a8f029abe67706fc030590205ab724515c"
+            "note": "v5 (2026-09-16) : le catalogue ne disparait plus en silence quand l acces direct echoue. fetchv2 reste le chemin par defaut ; une erreur, ou une premiere page d accueil sans aucune fiche - signature d un interstitiel JavaScript repondu en 200 - bascule sur fetchRendered, qui execute la page dans le navigateur et porte la vraie empreinte TLS. Les deux chemins en echec rendent une erreur qui les nomme tous les deux, au lieu d une liste vide. Mesure : 48 oeuvres, 49 chapitres, 3/3 lisibles, 3/3 couvertures servies.",
+            "sha256": "d92abf67e90cc6c135cf0089d0081df675ef17e9f787f21e6b8465b21fd762c2"
         },
         {
             "id": "astral_manga",

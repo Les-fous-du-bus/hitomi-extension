@@ -21,7 +21,15 @@
  * de l'URL chapitre. Format : {base}/catalogue/{slug}/scan/vf/#ch={N}&o={enc(o)}&n={N}
  *
  * @author @khun — Extension Strategist
- * @version 2.3.0
+ * @version 2.4.0
+ *
+ * Fix v2.4.0 (2026-09-10):
+ *  - Le catalogue ne disparaît plus silencieusement quand Dio/Cloudflare
+ *    échoue sur le téléphone. On essaie d'abord `fetchv2`, qui est le chemin
+ *    léger. Une erreur, ou une première page d'accueil vide, bascule sur
+ *    `fetchRendered`: le navigateur exécute la page et porte la vraie
+ *    empreinte TLS. Si les deux chemins échouent, l'erreur nomme les deux
+ *    causes au lieu de se déguiser en catalogue vide.
  *
  * Fix v2.3.0 (2026-09-08):
  *  - Une erreur du site ne se deguise plus en liste de chapitres vide. Le
@@ -105,11 +113,33 @@ class DefaultExtension extends MProvider {
     var pageNum = Math.max(1, parseInt(page || 1, 10));
     var q = encodeURIComponent(query || "");
     var url = BASE_URL + "/catalogue/?search=" + q + "&type%5B0%5D=Scans&page=" + pageNum;
+    var directError = null;
     try {
       var html = await fetchv2(url, { headers: this._headers("/catalogue/") });
-      return this._parseList(typeof html === "string" ? html : "");
-    } catch (_) {
-      return { list: [], hasNextPage: false };
+      var direct = this._parseList(typeof html === "string" ? html : "");
+      // Une recherche sans resultat et les pages suivantes peuvent etre vides
+      // legitimement. En revanche, la premiere page d'accueil Anime-Sama a
+      // toujours des dizaines de fiches : vide ici est le signal d'un
+      // interstitiel JavaScript repondu en HTTP 200.
+      if (direct.list.length || pageNum > 1 || query) return direct;
+      directError = "la page directe ne contient aucune fiche";
+    } catch (error) {
+      directError = error && error.message ? error.message : String(error);
+    }
+
+    try {
+      var renderedHtml = await fetchRendered(url, { minVisibleText: 200 });
+      var rendered = this._parseList(
+        typeof renderedHtml === "string" ? renderedHtml : "");
+      if (rendered.list.length) return rendered;
+      throw new Error("le navigateur rendu ne contient aucune fiche");
+    } catch (renderedError) {
+      var renderedReason = renderedError && renderedError.message
+        ? renderedError.message
+        : String(renderedError);
+      throw new Error(
+        "AnimeSama: catalogue inaccessible. Acces direct: " + directError +
+        ". Acces navigateur: " + renderedReason);
     }
   }
 
