@@ -99,24 +99,54 @@ function parseList(html) {
 }
 
 /**
- * Parse search results. Different structure: .novel-list.chapters .novel-item
- * with a[title] and novel-cover > img[src]
+ * Parse search results (/search). Meme classe `li.novel-item` que le catalogue,
+ * mais la fiche n'a PAS la meme forme : le lien enveloppe toute la fiche, porte
+ * `title` AVANT `href`, et le titre h4 n'a plus d'ancre. Le catalogue, lui, met
+ * l'ancre dans le titre. Une seule lecture ne couvre donc pas les deux.
+ *
+ * Releve du 2026-09-16 :
+ *   <li class="novel-item">
+ *     <a title="My House of Horrors" href="/book/my-house-of-horrors">
+ *       ... <h4 class="novel-title text1row">My House of Horrors</h4> ...
+ *     </a>
+ *   </li>
  */
 function parseSearchList(html) {
   var list = [];
 
-  var itemRegex =
-    /<div\s+class="[^"]*novel-item[^"]*">([\s\S]*?)<\/div>\s*<\/div>/gi;
-  var m;
-  while ((m = itemRegex.exec(html)) !== null) {
-    var block = m[0];
+  // La page de recherche affiche DEUX listes : les resultats dans
+  // `ul.novel-list...chapters`, puis douze recommandations « Some Popular
+  // Novels » dans `ul.novel-list.col6`. Lire la page entiere rendait treize
+  // oeuvres pour un seul resultat reel. On se limite donc au conteneur des
+  // resultats ; sans lui, on relit tout plutot que de ne rien rendre.
+  var scope = html;
+  var results = html.match(
+    /<ul\s+class="[^"]*novel-list[^"]*chapters[^"]*"[^>]*>([\s\S]*?)<\/ul>/i
+  );
+  if (results) scope = results[1];
 
-    var titleMatch = block.match(
-      /<a[^>]+href=["']([^"']+)["'][^>]*title=["']([^"']+)["']/i
+  var itemRegex = /<li\s+class="[^"]*novel-item[^"]*"[^>]*>([\s\S]*?)<\/li>/gi;
+  var m;
+  while ((m = itemRegex.exec(scope)) !== null) {
+    var block = m[1];
+
+    var anchor = block.match(/<a\s[^>]*>/i);
+    if (!anchor) continue;
+    var hrefMatch = anchor[0].match(/href=["']([^"']+)["']/i);
+    if (!hrefMatch) continue;
+    var url = absoluteUrl(hrefMatch[1]);
+
+    // Le titre visible du h4 prime : c'est celui que le site affiche. L'attribut
+    // `title` de l'ancre sert de repli quand le h4 manque.
+    var title = "";
+    var h4Match = block.match(
+      /class="[^"]*novel-title[^"]*"[^>]*>([\s\S]*?)<\/h4>/i
     );
-    if (!titleMatch) continue;
-    var url = absoluteUrl(titleMatch[1]);
-    var title = stripHtml(titleMatch[2]);
+    if (h4Match) title = stripHtml(h4Match[1]);
+    if (!title) {
+      var titleAttr = anchor[0].match(/title=["']([^"']+)["']/i);
+      if (titleAttr) title = stripHtml(titleAttr[1]);
+    }
     if (!title || !url) continue;
 
     var imgTag = block.match(/<img[^>]+>/i);
@@ -126,8 +156,8 @@ function parseSearchList(html) {
   }
 
   var hasNextPage =
-    /class="[^"]*next[^"]*"/i.test(html) ||
-    /rel=["']next["']/i.test(html);
+    /rel=["']next["']/i.test(html) ||
+    /class="[^"]*next[^"]*"/i.test(html);
 
   return { list: list, hasNextPage: hasNextPage };
 }
@@ -170,10 +200,12 @@ class DefaultExtension extends LNProvider {
       "&page=" +
       page;
     var html = await fetchv2(url, { headers: HEADERS });
-    // Search page uses a different item structure
-    var result = parseList(html);
+    // La page de recherche a sa propre forme de fiche : on la lit d'abord. La
+    // lecture du catalogue reste en repli au cas ou le site reunifierait ses
+    // deux gabarits.
+    var result = parseSearchList(html);
     if (result.list.length === 0) {
-      result = parseSearchList(html);
+      result = parseList(html);
     }
     return result;
   }
@@ -239,6 +271,9 @@ class DefaultExtension extends LNProvider {
 
     // Load chapters from paginated HTML pages
     var chapters = [];
+    // Les pages de la liste se chevauchent d'un chapitre : sans ce garde, le
+    // chapitre 101 apparaitrait deux fois.
+    var vues = {};
     var pageNum = 1;
     var hasMore = true;
 
@@ -267,21 +302,34 @@ class DefaultExtension extends LNProvider {
           ? parseInt(chNumMatch[1])
           : chapters.length + 1;
 
-        chapters.push({
-          name: chName || "Chapter " + chapterNumber,
-          url: chUrl,
-          chapterNumber: chapterNumber,
-        });
+        if (!vues[chUrl]) {
+          vues[chUrl] = true;
+          chapters.push({
+            name: chName || "Chapter " + chapterNumber,
+            url: chUrl,
+            chapterNumber: chapterNumber,
+          });
+        }
         foundAny = true;
       }
 
       if (!foundAny) {
         hasMore = false;
       } else {
-        // Check for next page in pagination
-        hasMore =
-          /class="[^"]*next[^"]*"/i.test(chapHtml) &&
-          pageNum < 100; // safety limit
+        // La pagination du site ne porte AUCUNE classe « next » : ses liens sont
+        // des `page-item`/`page-link` et le bouton suivant ne se reconnait qu'a
+        // son aria-label. L'ancien test cherchait « next » et ne trouvait jamais
+        // rien : la liste s'arretait a la premiere page. Mesure du 2026-09-16 :
+        // « My House of Horrors » rendait 101 chapitres sur 1215.
+        // On lit donc le plus grand numero de page annonce par la pagination.
+        var derniere = pageNum;
+        var pageRegex = /chapters\?page=(\d+)/gi;
+        var pm;
+        while ((pm = pageRegex.exec(chapHtml)) !== null) {
+          var n = parseInt(pm[1], 10);
+          if (n > derniere) derniere = n;
+        }
+        hasMore = pageNum < derniere && pageNum < 100; // garde-fou
         pageNum++;
       }
     }

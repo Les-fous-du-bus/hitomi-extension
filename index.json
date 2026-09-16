@@ -82,15 +82,15 @@
             "name": "NovelFrance",
             "lang": "fr",
             "space": "light_novel",
-            "version": 8,
+            "version": 9,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/massnovel.js",
             "iconUrl": "https://novelfrance.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "v8: unescapeRsc single-pass regex replaces naive sequential replace — fixes JSON.parse failure on RSC payloads with French-dialogue escaped quotes (e.g. Shadow Slave ch2506).",
-            "sha256": "aaa34b0fd34eb22ef71e06609153c36a474ec36b6a27dadd3bb9ef4220683922"
+            "note": "v9 (2026-09-16) : la recherche ne cherchait pas. Elle demandait UNE page du classement populaire (vingt titres) et filtrait ces vingt titres cote client : toute oeuvre hors du haut de classement etait introuvable, quoi qu'on tape. L'API n'a effectivement pas de recherche cote serveur (search=, q=, s=, title=, keyword= tous ignores, verifie le 2026-09-16), mais elle accepte limit=100 : les 637 titres du catalogue tiennent en sept requetes, parcourues une fois puis gardees en memoire pour la session. Second defaut corrige : les sequences \\\\uXXXX du payload perdaient leur barre oblique inverse avant JSON.parse, donc le lecteur affichait « u003cstrongu003eTraducteur : » au lieu du texte en gras. Mesure : « My House of Horrors » passe de introuvable a trouve en 0,8 s (0,00 s ensuite), 1215 chapitres, chapitre 1 lisible en 13 809 caracteres propres.",
+            "sha256": "0afe1bec92ddbd44a6503401a2ee9342fe977120be4ed704a7f0bd04124c9b40"
         },
         {
             "id": "novelbin",
@@ -142,15 +142,15 @@
             "name": "NovelFire",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/novel/novelfire.js",
             "iconUrl": "https://novelfire.net/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "Requires full query params on /search-adv URL (ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top). Stripped URL returns a different page with 0 results.",
-            "sha256": "e0e52f242183a8d1908292ef6eee8f1c41b851c36fe8891e0ee55c7d4cfafca5"
+            "note": "v2 (2026-09-16) : la recherche rendait zero resultat pour n'importe quelle requete. Le site sert deux gabarits sous la meme classe li.novel-item — le catalogue met l'ancre DANS le titre, la recherche l'enveloppe autour de la fiche avec title= avant href= — et l'extension ne lisait que le premier, son repli cherchant un conteneur div la ou le site rend un li. La lecture de la recherche est desormais propre et bornee au conteneur des resultats (ul.novel-list...chapters), sinon les douze recommandations « Some Popular Novels » de la page comptaient comme des trouvailles. Deuxieme defaut corrige au passage : la liste de chapitres s'arretait a la premiere page, car sa condition de suite cherchait une classe « next » que la pagination du site n'a pas (elle numerote ses pages). Mesure : « My House of Horrors » passe de introuvable a 1 resultat exact, et de 101 chapitres a 1215 sur 1215, sans doublon, en 2,1 s. Requires full query params on /search-adv URL (ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top). Stripped URL returns a different page with 0 results.",
+            "sha256": "5a11f2abe4509906a2cd7d3ae5d29ba706a5a33282964c4a6316760bf47bf768"
         },
         {
             "id": "novelfull",

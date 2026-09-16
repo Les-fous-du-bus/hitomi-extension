@@ -78,6 +78,10 @@ function unescapeRsc(str) {
     if (c === 'n')  return '\n';
     if (c === 't')  return '\t';
     if (c === 'r')  return '\r';
+    // \uXXXX est une sequence JSON valide : on la laisse INTACTE pour que
+    // JSON.parse la decode. La renvoyer sans sa barre oblique inverse donnait
+    // « u003cstrongu003e » en plein milieu du texte affiche au lecteur.
+    if (c === 'u')  return m;
     return c;
   });
 }
@@ -111,29 +115,67 @@ class DefaultExtension extends MProvider {
     }
   }
 
+  /**
+   * L'API n'a pas de recherche cote serveur — verifie le 2026-09-16 : search=,
+   * q=, s=, title= et keyword= sont tous ignores et rendent la meme premiere
+   * page. On cherche donc dans le catalogue, cote client.
+   *
+   * L'ancienne version ne demandait qu'UNE page du classement populaire et
+   * filtrait ces vingt titres : une oeuvre hors du haut de classement etait
+   * introuvable quoi qu'on tape. « My House of Horrors » existe pourtant sur le
+   * site et la recherche rendait zero.
+   *
+   * L'API accepte limit=100 (plafonne la), donc les 637 titres du catalogue
+   * tiennent en sept requetes au lieu de trente-deux. On les parcourt une fois
+   * et on garde la liste pour la session : la deuxieme recherche ne coute rien.
+   */
   async search(query, page, filters) {
     try {
-      // NovelFrance API ne supporte pas la recherche server-side.
-      // On filtre cote client sur la liste populaire.
-      var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
-      var res = await fetchv2(url, { headers: API_HEADERS });
-      var result = this._parseApiList(res);
-
-      if (query && query.trim()) {
-        var q = query.trim().toLowerCase();
-        var filtered = [];
-        for (var i = 0; i < result.list.length; i++) {
-          if (result.list[i].title.toLowerCase().indexOf(q) !== -1) {
-            filtered.push(result.list[i]);
-          }
-        }
-        return { list: filtered, hasNextPage: result.hasNextPage };
+      if (!query || !query.trim()) {
+        var url = BASE_URL + "/api/novels?page=" + page + "&sort=popular";
+        var res = await fetchv2(url, { headers: API_HEADERS });
+        return this._parseApiList(res);
       }
 
-      return result;
+      var catalogue = await this._catalogueComplet();
+      var q = query.trim().toLowerCase();
+      var trouves = [];
+      for (var i = 0; i < catalogue.length; i++) {
+        if (catalogue[i].title.toLowerCase().indexOf(q) !== -1) {
+          trouves.push(catalogue[i]);
+        }
+      }
+      // Tout le catalogue a ete lu : il n'y a pas de page suivante a proposer.
+      return { list: trouves, hasNextPage: false };
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
+  }
+
+  async _catalogueComplet() {
+    if (this._catalogue) return this._catalogue;
+
+    var tout = [];
+    var page = 1;
+    var pages = 1;
+    // Garde-fou : si le site se mettait a annoncer un nombre de pages absurde,
+    // on s'arrete plutot que de boucler. Vingt pages de cent couvrent large.
+    while (page <= pages && page <= 20) {
+      var res = await fetchv2(
+        BASE_URL + "/api/novels?limit=100&page=" + page,
+        { headers: API_HEADERS }
+      );
+      var lot = this._parseApiList(res);
+      for (var i = 0; i < lot.list.length; i++) tout.push(lot.list[i]);
+
+      var data = {};
+      try { data = JSON.parse(res); } catch (e) { data = {}; }
+      pages = data.totalPages || 1;
+      page++;
+    }
+
+    this._catalogue = tout;
+    return tout;
   }
 
   async getMangaDetail(url) {
