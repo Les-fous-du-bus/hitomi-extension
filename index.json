@@ -512,15 +512,15 @@
             "name": "MangaPark1",
             "lang": "en",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangapark1.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=mangapark1.com&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v2 (2026-09-08) : le message d erreur accusait Cloudflare ou un changement de CDN quand une page ne rendait aucune image. Les deux etaient faux : le site ANNONCE des chapitres qu il n heberge pas et sert alors l echafaudage du lecteur sans une seule adresse (48161 octets contre 76000 a 79000 pour un chapitre reel), sans marqueur Cloudflare. Ce ne sont pas les vieux chapitres : sur Yuan Du Fu Shu, 47 rend 53 pages alors que 51 et 42 sont vides. Trois causes maintenant distinguees. Le verdict PARTIEL du triage vient de ces trous cote site, pas de l extension.",
-            "sha256": "67743f3c16a524ab37d910abaad69962ebf2266add2bbb2dfe7fb348dd871b6e"
+            "note": "v3 (2026-09-24) : une page de defi Cloudflare rendait une liste VIDE, sans erreur, sur la fiche comme au catalogue et a la recherche. Le disjoncteur de l'actualisation ne voyait jamais d'echec et relancait un defi pour chaque oeuvre MangaPark de la bibliotheque ; dans Decouverte, la source paraissait simplement vide. Une page de defi leve desormais une erreur explicite, avec la meme detection que le lecteur. v2 (2026-09-08) : le message d erreur accusait Cloudflare ou un changement de CDN quand une page ne rendait aucune image. Les deux etaient faux : le site ANNONCE des chapitres qu il n heberge pas et sert alors l echafaudage du lecteur sans une seule adresse (48161 octets contre 76000 a 79000 pour un chapitre reel), sans marqueur Cloudflare. Ce ne sont pas les vieux chapitres : sur Yuan Du Fu Shu, 47 rend 53 pages alors que 51 et 42 sont vides. Trois causes maintenant distinguees. Le verdict PARTIEL du triage vient de ces trous cote site, pas de l extension.",
+            "sha256": "71cb5059eaeda6bcd6461b858fde61d24288d515e99cc1fd3072efee689fd62d"
         },
         {
             "id": "mangapill",

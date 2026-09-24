@@ -141,3 +141,45 @@ test('un changement de CDN nomme le nouvel hote', async (t) => {
     assert.match(pages[0].imageUrl, /nouveau-cdn/);
   });
 });
+
+// POURQUOI (2026-09-24) : « beaucoup de challenges Cloudflare qui
+// s'enchainent ». Sur une page de defi, la liste des chapitres revenait VIDE,
+// sans erreur : parseChapterList ne trouvait pas son bloc et rendait []. Le
+// disjoncteur de l'actualisation ne voyait donc jamais d'echec, et relancait
+// un defi pour chaque oeuvre MangaPark de la bibliotheque. L'extension savait
+// deja reconnaitre une page de defi — pour les images, pas pour la liste.
+const PAGE_DEFI = '<html><head><title>Just a moment...</title></head>' +
+  '<body><div id="cf-browser-verification"></div>' +
+  '<script>window._cf_chl_opt={}</script></body></html>';
+
+test('une page de defi sur la fiche est une erreur, pas une liste vide', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/title/12345-yuan-du-fu-shu': PAGE_DEFI,
+  });
+
+  await assert.rejects(
+    () => ext.getChapterList('https://mangapark1.com/title/12345-yuan-du-fu-shu'),
+    /cloudflare/i,
+    'le disjoncteur de l actualisation doit voir un echec');
+});
+
+test('une fiche normale sans chapitre reste une liste vide', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/title/1-neuve': '<html><body><h3>Oeuvre neuve</h3></body></html>',
+  });
+
+  const chapitres = await ext.getChapterList('https://mangapark1.com/title/1-neuve');
+
+  assert.strictEqual(chapitres.length, 0,
+    'une oeuvre sans chapitre n est pas une erreur');
+});
+
+test('une page de defi sur le catalogue ou la recherche est une erreur', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/newest': PAGE_DEFI,
+    '/filter': PAGE_DEFI,
+  });
+
+  await assert.rejects(() => ext.getPopular(1), /cloudflare/i);
+  await assert.rejects(() => ext.search('one piece', 1, []), /cloudflare/i);
+});

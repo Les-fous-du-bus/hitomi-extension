@@ -45,6 +45,17 @@ var BASE_URL = "https://mangapark1.com";
  *     </div>
  *   </div>
  */
+// Une page de catalogue qui est en realite une page de defi Cloudflare doit
+// lever, pas rendre une liste vide : sinon la source parait simplement vide
+// dans Decouverte, et l'utilisateur ne sait pas qu'il faut un defi.
+function catalogueOuErreur(html, url) {
+  if (estPageCloudflare(html)) {
+    throw new Error('MangaPark1: page d attente Cloudflare sur ' + url +
+      ' — l app doit passer par son navigateur embarque');
+  }
+  return parseCatalogPage(html);
+}
+
 function parseCatalogPage(html) {
   var list = [];
   var seen = {};
@@ -88,6 +99,19 @@ function parseCatalogPage(html) {
  * IMPORTANT: The page also contains a dynamic section loaded via JS.
  * The static HTML includes the first batch. We parse only <a> within .chapter-list li elements.
  */
+// Marqueurs d'une page d'attente Cloudflare. Partages entre la fiche et le
+// lecteur : les deux doivent reconnaitre la meme page de la meme facon.
+var MARQUEURS_CLOUDFLARE = ['Just a moment', 'cf-browser-verification', '_cf_chl_opt',
+  'cf_chl_prog', 'Checking if the site connection is secure'];
+
+function estPageCloudflare(html) {
+  var page = typeof html === 'string' ? html : '';
+  for (var i = 0; i < MARQUEURS_CLOUDFLARE.length; i++) {
+    if (page.indexOf(MARQUEURS_CLOUDFLARE[i]) !== -1) return true;
+  }
+  return false;
+}
+
 function parseChapterList(html, mangaSlug) {
   var chapters = [];
   var seen = {};
@@ -236,23 +260,32 @@ class DefaultExtension extends MProvider {
     // No unauthenticated "popular" sort; use /newest (most recently updated)
     var url = BASE_URL + '/newest?page=' + page;
     var html = await fetchv2(url, {});
-    return parseCatalogPage(html);
+    return catalogueOuErreur(html, url);
   }
 
   async getLatestUpdates(page) {
     var url = BASE_URL + '/newest?page=' + page;
     var html = await fetchv2(url, {});
-    return parseCatalogPage(html);
+    return catalogueOuErreur(html, url);
   }
 
   async search(query, page, filters) {
     var url = BASE_URL + '/filter?keyword=' + encodeURIComponent(query) + '&page=' + page;
     var html = await fetchv2(url, {});
-    return parseCatalogPage(html);
+    return catalogueOuErreur(html, url);
   }
 
   async getMangaDetail(mangaUrl) {
     var html = await fetchv2(mangaUrl, {});
+    // POURQUOI lever ici (2026-09-24) : sur une page de defi, parseChapterList
+    // ne trouve pas son bloc et rend une liste VIDE, sans erreur. Le
+    // disjoncteur de l'actualisation ne voyait jamais d'echec et relancait un
+    // defi pour chaque oeuvre MangaPark de la bibliotheque — la chaine de
+    // defis rapportee. Une page de defi est un echec, et doit se lire comme tel.
+    if (estPageCloudflare(html)) {
+      throw new Error('MangaPark1: page d attente Cloudflare sur ' + mangaUrl +
+        ' — l app doit passer par son navigateur embarque');
+    }
     return parseMangaDetail(html, mangaUrl);
   }
 
@@ -280,13 +313,9 @@ class DefaultExtension extends MProvider {
   _pourquoiAucuneImage(html, chapterUrl) {
     var page = typeof html === 'string' ? html : '';
 
-    var marqueursCf = ['Just a moment', 'cf-browser-verification', '_cf_chl_opt',
-      'cf_chl_prog', 'Checking if the site connection is secure'];
-    for (var i = 0; i < marqueursCf.length; i++) {
-      if (page.indexOf(marqueursCf[i]) !== -1) {
-        return 'MangaPark1: page d attente Cloudflare sur ' + chapterUrl +
-          ' — l app doit passer par son navigateur embarque';
-      }
+    if (estPageCloudflare(page)) {
+      return 'MangaPark1: page d attente Cloudflare sur ' + chapterUrl +
+        ' — l app doit passer par son navigateur embarque';
     }
 
     // Des images externes presentes mais toutes ecartees comme elements du site :
