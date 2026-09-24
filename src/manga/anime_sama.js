@@ -272,9 +272,18 @@ class DefaultExtension extends MProvider {
       throw new Error("AnimeSama: pas de #titreOeuvre sur " + scanPath +
         " — la page de scans a change de forme, ou l'oeuvre n'en a pas");
     }
-    // textContent brut — espaces conserves, c'est la cle exacte.
-    var nom = (titreEl.textContent || "").trim();
-    if (!nom) throw new Error("AnimeSama: #titreOeuvre vide sur " + scanPath);
+    // POURQUOI innerHTML et pas textContent (2026-09-24) : le site lit ce nom
+    // par `document.getElementById('titreOeuvre').innerHTML`, BRUT, et son
+    // interface de chapitres attend la cle a l'identique. La page de « Billy
+    // Bat » porte `>Billy Bat </h3>`, espace final compris : sans lui, l'interface
+    // repond « not found ». L'ancienne ligne affirmait conserver les espaces puis
+    // appelait .trim() — et le socle de l'app retire lui-meme les espaces de
+    // textContent. Seul innerHTML rend le contenu tel quel.
+    var brut = titreEl.innerHTML;
+    var nom = typeof brut === "string" ? brut : (titreEl.textContent || "");
+    // Le test de vacuite se fait sur une copie : un titre fait d'espaces n'est
+    // pas un nom, mais la cle envoyee garde ses blancs.
+    if (!nom.trim()) throw new Error("AnimeSama: #titreOeuvre vide sur " + scanPath);
     return nom;
   }
 

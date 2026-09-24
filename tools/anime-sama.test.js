@@ -191,3 +191,39 @@ test('un catalogue inaccessible ne se deguise jamais en liste vide', async () =>
     () => ext.getPopular(1),
     /catalogue inaccessible.*Acces direct.*Acces navigateur/i);
 });
+
+// POURQUOI ce test (2026-09-24) : « Billy Bat » echouait avec « le site ne
+// connait pas "Billy Bat" cote scans ». Le site, lui, lit le nom de l'oeuvre par
+// `document.getElementById('titreOeuvre').innerHTML` — BRUT — et sa page porte
+// `<h3 id="titreOeuvre" ...>Billy Bat </h3>`, espace final compris. L'interface
+// de chapitres attend cette cle a l'identique : interrogee le 2026-09-24,
+// « Billy Bat » rend {"error":...not found} et « Billy Bat » suivi d'un espace
+// rend la liste des chapitres.
+//
+// L'extension appliquait `.trim()`, sous un commentaire qui affirmait l'inverse.
+// Et le socle d'execution de l'app retire lui-meme les espaces de `textContent` :
+// seul `innerHTML` rend le contenu tel quel. On lit donc `innerHTML`, comme le
+// site.
+test('le nom de l oeuvre garde son espace final, comme sur le site', async () => {
+  const { ext, appels } = chargerExtension(EXTENSION, {
+    '/catalogue/billy-bat/scan/vf/': PAGE_SCAN('Billy Bat '),
+    'get_nb_chap_et_img.php?oeuvre=Billy%20Bat%20': JSON.stringify({ 1: 20, 2: 20 }),
+    'get_nb_chap_et_img.php': JSON.stringify({ error: "Oeuvre 'Billy Bat' not found" }),
+  });
+
+  const chapitres = await ext.getChapterList('https://anime-sama.to/catalogue/billy-bat/');
+
+  assert.strictEqual(chapitres.length, 2, 'la cle exacte, espace compris, doit etre envoyee');
+  const appelApi = appels.find((a) => a.url.includes('get_nb_chap_et_img.php'));
+  assert.ok(appelApi.url.endsWith('oeuvre=Billy%20Bat%20'), `cle envoyee : ${appelApi.url}`);
+});
+
+test('un titre vide reste une erreur explicite', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/catalogue/vide/scan/vf/': PAGE_SCAN('   '),
+  });
+
+  await assert.rejects(
+    () => ext.getChapterList('https://anime-sama.to/catalogue/vide/'),
+    /titreOeuvre vide/);
+});

@@ -320,15 +320,15 @@
             "name": "AnimeSama",
             "lang": "fr",
             "space": "manga",
-            "version": 5,
+            "version": 6,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/anime_sama.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v5 (2026-09-16) : le catalogue ne disparait plus en silence quand l acces direct echoue. fetchv2 reste le chemin par defaut ; une erreur, ou une premiere page d accueil sans aucune fiche - signature d un interstitiel JavaScript repondu en 200 - bascule sur fetchRendered, qui execute la page dans le navigateur et porte la vraie empreinte TLS. Les deux chemins en echec rendent une erreur qui les nomme tous les deux, au lieu d une liste vide. Mesure : 48 oeuvres, 49 chapitres, 3/3 lisibles, 3/3 couvertures servies.",
-            "sha256": "d92abf67e90cc6c135cf0089d0081df675ef17e9f787f21e6b8465b21fd762c2"
+            "note": "v6 (2026-09-24) : « Billy Bat » echouait avec « le site ne connait pas cote scans ». Le site lit le nom de l'oeuvre par innerHTML BRUT et sa page porte « Billy Bat » suivi d'un espace ; son interface de chapitres attend cette cle a l'identique. L'extension appliquait .trim() — et le socle de l'app retire deja les espaces de textContent. On lit innerHTML, comme le site. « 07 Ghost », lui, reste reellement absent de l'arriere-plan de scans du site. v5 (2026-09-16) : le catalogue ne disparait plus en silence quand l acces direct echoue. fetchv2 reste le chemin par defaut ; une erreur, ou une premiere page d accueil sans aucune fiche - signature d un interstitiel JavaScript repondu en 200 - bascule sur fetchRendered, qui execute la page dans le navigateur et porte la vraie empreinte TLS. Les deux chemins en echec rendent une erreur qui les nomme tous les deux, au lieu d une liste vide. Mesure : 48 oeuvres, 49 chapitres, 3/3 lisibles, 3/3 couvertures servies.",
+            "sha256": "c905d96f119558d82d511d11603365a8cbbebc820effc22ad369806f1824c8cd"
         },
         {
             "id": "astral_manga",
