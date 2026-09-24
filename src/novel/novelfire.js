@@ -31,6 +31,49 @@ var HEADERS = {
   "Accept-Language": "en-US,en;q=0.9",
 };
 
+// Cloudflare limite le debit de novelfire. Releve du 2026-09-24 : apres vingt-cinq
+// a trente pages lues d'affilee, le site repond 429 avec l'en-tete
+// retry-after: 10, et un corps de l'une de deux formes selon les en-tetes de la
+// requete — le texte seul « error code: 1015 », ou une page HTML « Access
+// denied » qui porte le meme code. fetchv2 ne transmet que le corps, c'est donc
+// lui qu'on reconnait. Sans cette garde, ce corps passait pour une page
+// ordinaire : la liste de Shadow Slave s'arretait a 701 chapitres sur 3 194 sans
+// erreur, et le chapitre s'affichait « Content not available ».
+function estLimiteDeDebit(html) {
+  if (/^\s*error code:\s*1015\s*$/i.test(html)) return true;
+  // Le seul « 1015 » ne suffit pas : c'est aussi un numero de chapitre. On exige
+  // le bloc d'erreur de Cloudflare et sa phrase.
+  return (
+    /id=["']cf-error-details["']/i.test(html) &&
+    /You are being rate limited/i.test(html)
+  );
+}
+// Les 10 s annoncees par le site, plus une seconde de marge.
+var ATTENTE_SOUS_LIMITE_MS = 11000;
+
+function attendre(ms) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, ms);
+  });
+}
+
+// Une seule attente : la liste des chapitres doit tenir dans le budget de 25 s
+// que l'app accorde a l'appel, et une limite encore active apres 11 s ne se
+// levera pas dans ce budget.
+async function lirePage(url) {
+  var html = await fetchv2(url, { headers: HEADERS });
+  if (!estLimiteDeDebit(html)) return html;
+  await attendre(ATTENTE_SOUS_LIMITE_MS);
+  html = await fetchv2(url, { headers: HEADERS });
+  if (estLimiteDeDebit(html)) {
+    throw new Error(
+      "NovelFire : le site limite le nombre de requetes (erreur 1015) et " +
+        "la limite dure encore apres 11 s. Reessaie dans une minute."
+    );
+  }
+  return html;
+}
+
 function absoluteUrl(href) {
   if (!href) return "";
   if (href.startsWith("http")) return href;
@@ -188,7 +231,7 @@ class DefaultExtension extends LNProvider {
       BASE_URL +
       "/search-adv?ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top&page=" +
       page;
-    var html = await fetchv2(url, { headers: HEADERS });
+    var html = await lirePage(url);
     return parseList(html);
   }
 
@@ -199,7 +242,7 @@ class DefaultExtension extends LNProvider {
       encodeURIComponent(searchTerm || "") +
       "&page=" +
       page;
-    var html = await fetchv2(url, { headers: HEADERS });
+    var html = await lirePage(url);
     // La page de recherche a sa propre forme de fiche : on la lit d'abord. La
     // lecture du catalogue reste en repli au cas ou le site reunifierait ses
     // deux gabarits.
@@ -215,7 +258,7 @@ class DefaultExtension extends LNProvider {
   // -----------------------------------------------
 
   async parseNovelAndChapters(novelUrl) {
-    var html = await fetchv2(novelUrl, { headers: HEADERS });
+    var html = await lirePage(novelUrl);
 
     // Extract the novel path from URL (e.g. /book/shadow-slave)
     var pathMatch = novelUrl.match(/\/book\/([^\/\?#]+)/i);
@@ -275,17 +318,16 @@ class DefaultExtension extends LNProvider {
     // chapitre 101 apparaitrait deux fois.
     var vues = {};
     var pageNum = 1;
+    var derniereAnnoncee = 1;
     var hasMore = true;
 
     while (hasMore) {
       var chapUrl =
         BASE_URL + "/" + novelPath + "/chapters?page=" + pageNum;
-      var chapHtml;
-      try {
-        chapHtml = await fetchv2(chapUrl, { headers: HEADERS });
-      } catch (e) {
-        break;
-      }
+      // Plus de `break` sur une erreur reseau : il rendait une liste coupee
+      // comme si elle etait complete, et la mise a jour ne voyait jamais les
+      // derniers chapitres, ceux de la fin de liste.
+      var chapHtml = await lirePage(chapUrl);
 
       // Parse chapter-list li > a[href][title]
       var chRegex =
@@ -314,6 +356,21 @@ class DefaultExtension extends LNProvider {
       }
 
       if (!foundAny) {
+        // On n'atteint une page au-dela de la premiere que si la precedente
+        // l'annoncait : vide, c'est une reponse anormale, pas la fin de liste.
+        if (pageNum > 1) {
+          throw new Error(
+            "NovelFire : la liste de chapitres s'est interrompue a la page " +
+              pageNum + " sur " + derniereAnnoncee + " (page sans chapitre)."
+          );
+        }
+        // Une oeuvre sans chapitre garde son conteneur de liste, vide. Sans
+        // lui, c'est une autre page qui a repondu (defi, erreur du site).
+        if (!/class=["'][^"']*chapter-list/i.test(chapHtml)) {
+          throw new Error(
+            "NovelFire : la premiere page de la liste de chapitres n'en est pas une."
+          );
+        }
         hasMore = false;
       } else {
         // La pagination du site ne porte AUCUNE classe « next » : ses liens sont
@@ -329,6 +386,7 @@ class DefaultExtension extends LNProvider {
           var n = parseInt(pm[1], 10);
           if (n > derniere) derniere = n;
         }
+        if (derniere > derniereAnnoncee) derniereAnnoncee = derniere;
         hasMore = pageNum < derniere && pageNum < 100; // garde-fou
         pageNum++;
       }
@@ -356,15 +414,20 @@ class DefaultExtension extends LNProvider {
   // -----------------------------------------------
 
   async parseChapter(chapterUrl) {
-    var html = await fetchv2(chapterUrl, { headers: HEADERS });
+    var html = await lirePage(chapterUrl);
 
     // Content from div#content
     var contentMatch = html.match(
       /<div[^>]*id=["']content["'][^>]*>([\s\S]*?)<\/div>/i
     );
 
+    // Rendre un texte de remplacement faisait passer une panne pour un
+    // chapitre : le lecteur affichait « Content not available » et la
+    // traduction n'avait rien a traduire. Une erreur, elle, se reessaie.
     if (!contentMatch) {
-      return "<p>Content not available</p>";
+      throw new Error(
+        "NovelFire : pas de texte dans la page du chapitre " + chapterUrl
+      );
     }
 
     var content = contentMatch[1];

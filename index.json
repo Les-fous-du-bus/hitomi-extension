@@ -142,15 +142,15 @@
             "name": "NovelFire",
             "lang": "en",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/novel/novelfire.js",
             "iconUrl": "https://novelfire.net/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v2 (2026-09-16) : la recherche rendait zero resultat pour n'importe quelle requete. Le site sert deux gabarits sous la meme classe li.novel-item — le catalogue met l'ancre DANS le titre, la recherche l'enveloppe autour de la fiche avec title= avant href= — et l'extension ne lisait que le premier, son repli cherchant un conteneur div la ou le site rend un li. La lecture de la recherche est desormais propre et bornee au conteneur des resultats (ul.novel-list...chapters), sinon les douze recommandations « Some Popular Novels » de la page comptaient comme des trouvailles. Deuxieme defaut corrige au passage : la liste de chapitres s'arretait a la premiere page, car sa condition de suite cherchait une classe « next » que la pagination du site n'a pas (elle numerote ses pages). Mesure : « My House of Horrors » passe de introuvable a 1 resultat exact, et de 101 chapitres a 1215 sur 1215, sans doublon, en 2,1 s. Requires full query params on /search-adv URL (ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top). Stripped URL returns a different page with 0 results.",
-            "sha256": "5a11f2abe4509906a2cd7d3ae5d29ba706a5a33282964c4a6316760bf47bf768"
+            "note": "v3 (2026-09-24) : Cloudflare limite le debit du site. Apres vingt-cinq a trente pages lues d'affilee, il repond 429 avec retry-after: 10, et un corps que l'extension prenait pour une page : la liste de chapitres s'arretait net sans erreur (Shadow Slave : 701 chapitres sur 3 194) et le chapitre s'affichait « Content not available ». L'extension reconnait desormais les deux formes du refus (texte « error code: 1015 » ou page HTML « Access denied »), patiente 11 s et relit la page. Une limite qui dure, une page annoncee mais vide ou une erreur reseau en pleine liste rendent une erreur explicite au lieu d'une liste coupee. Mesure en direct : Shadow Slave 3 194 chapitres en 16,6 s avec un refus absorbe, My House of Horrors 1 215 chapitres, premier et dernier chapitres lisibles. v2 (2026-09-16) : la recherche rendait zero resultat pour n'importe quelle requete. Le site sert deux gabarits sous la meme classe li.novel-item — le catalogue met l'ancre DANS le titre, la recherche l'enveloppe autour de la fiche avec title= avant href= — et l'extension ne lisait que le premier, son repli cherchant un conteneur div la ou le site rend un li. La lecture de la recherche est desormais propre et bornee au conteneur des resultats (ul.novel-list...chapters), sinon les douze recommandations « Some Popular Novels » de la page comptaient comme des trouvailles. Deuxieme defaut corrige au passage : la liste de chapitres s'arretait a la premiere page, car sa condition de suite cherchait une classe « next » que la pagination du site n'a pas (elle numerote ses pages). Mesure : « My House of Horrors » passe de introuvable a 1 resultat exact, et de 101 chapitres a 1215 sur 1215, sans doublon, en 2,1 s. Requires full query params on /search-adv URL (ctgcon=and&totalchapter=0&ratcon=min&rating=0&status=-1&sort=rank-top). Stripped URL returns a different page with 0 results.",
+            "sha256": "37d873ed51dd917c425acaad5bd988cec14e45039f9b3e3239833d0ef3a563e5"
         },
         {
             "id": "novelfull",

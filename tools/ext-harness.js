@@ -42,7 +42,10 @@ function normaliser(valeur) {
   return JSON.parse(JSON.stringify(valeur));
 }
 
-function chargerExtension(cheminExtension, reponses) {
+// `reglages.setTimeout` remplace la minuterie du bac a sable : un test peut ainsi
+// verifier qu'une extension patiente, et combien de temps, sans attendre pour de
+// vrai.
+function chargerExtension(cheminExtension, reponses, reglages = {}) {
   const appels = [];
 
   async function sendMessage(canal, charge) {
@@ -55,8 +58,13 @@ function chargerExtension(cheminExtension, reponses) {
     // cout. Un test doit pouvoir affirmer lequel a servi.
     appels.push({ canal, url, options: options || {} });
 
-    const reponse = trouverReponse(reponses, url, canal);
-    if (reponse === null) {
+    let reponse = trouverReponse(reponses, url, canal);
+    // Un tableau decrit des reponses successives pour la meme adresse : un site
+    // qui refuse d'abord puis accepte. La derniere se repete ensuite.
+    if (Array.isArray(reponse)) {
+      reponse = reponse.length > 1 ? reponse.shift() : reponse[0];
+    }
+    if (reponse === null || reponse === undefined) {
       return { status: 404, headers: {}, body: '', error: `aucune reponse posee pour ${url}` };
     }
     // Une reponse peut etre une simple chaine (le corps, code 200) ou un objet
@@ -68,7 +76,7 @@ function chargerExtension(cheminExtension, reponses) {
   }
 
   const sandbox = {
-    sendMessage, console, setTimeout, clearTimeout, Promise, Date, Math, JSON,
+    sendMessage, console, setTimeout: reglages.setTimeout || setTimeout, clearTimeout, Promise, Date, Math, JSON,
     RegExp, Error, Object, Array, String, Number, Boolean, Symbol, Map, Set,
     encodeURIComponent, decodeURIComponent, encodeURI, decodeURI,
     parseInt, parseFloat, isNaN, isFinite, URL, URLSearchParams, Buffer,

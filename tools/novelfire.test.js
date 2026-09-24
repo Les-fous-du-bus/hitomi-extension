@@ -179,3 +179,160 @@ test('un chapitre deja vu ne compte pas deux fois', async () => {
 
   assert.strictEqual(fiche.chapters.length, 150);
 });
+
+// ---------------------------------------------------------------------------
+// Limite de debit. Releve du 2026-09-24 : apres vingt-cinq a trente pages lues
+// d'affilee, novelfire repond 429 avec l'en-tete retry-after: 10. Le corps prend
+// deux formes selon les en-tetes envoyes : le texte seul « error code: 1015 »,
+// ou la page HTML « Access denied » de Cloudflare, gardee telle quelle dans
+// fixtures/novelfire-1015.html (adresse IP remplacee par 2001:db8::1). fetchv2
+// ne transmet que le corps : l'extension prenait l'une comme l'autre pour une
+// page. La liste de Shadow Slave s'arretait a 701 chapitres sur 3 194 sans
+// erreur, et le chapitre s'affichait « Content not available ».
+// ---------------------------------------------------------------------------
+
+const fs = require('node:fs');
+
+const LIMITE_1015 = { status: 429, body: 'error code: 1015' };
+const LIMITE_1015_HTML = {
+  status: 429,
+  body: fs.readFileSync(path.join(__dirname, 'fixtures', 'novelfire-1015.html'), 'utf8'),
+};
+
+// Minuterie factice : note chaque attente demandee et rend la main aussitot.
+function minuterieFactice() {
+  const attentes = [];
+  return {
+    attentes,
+    setTimeout: (fn, ms) => { attentes.push(ms); fn(); return 0; },
+  };
+}
+
+const PAGE_CHAPITRE = `<html><body><div id="content" class="clearfix font_default">
+<p>Chapter 1: Dying House of Horrors</p>
+<p>“This is the first time I’ve visited such an un-scary Haunted House.”</p>
+</div></body></html>`;
+
+test('une limite de debit en pleine liste fait patienter, puis la liste se termine', async () => {
+  const minuterie = minuterieFactice();
+  const { ext, appels } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': pageChapitres(1, 100, 3),
+    '/book/my-house-of-horrors/chapters?page=2': [LIMITE_1015_HTML, pageChapitres(101, 200, 3)],
+    '/book/my-house-of-horrors/chapters?page=3': pageChapitres(201, 250, 3),
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterie);
+
+  const fiche = normaliser(
+    await ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'));
+
+  assert.strictEqual(fiche.chapters.length, 250, 'aucune page ne doit manquer');
+  assert.deepStrictEqual(minuterie.attentes, [11000],
+    'une seule attente, un peu plus longue que les 10 s annoncees par le site');
+  const lecturesPage2 = appels.filter((a) => a.url.endsWith('chapters?page=2')).length;
+  assert.strictEqual(lecturesPage2, 2, 'la page refusee est relue une fois');
+});
+
+test('une limite qui ne se leve pas rend une erreur qui la nomme, pas une liste coupee', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': pageChapitres(1, 100, 3),
+    '/book/my-house-of-horrors/chapters?page=2': LIMITE_1015,
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterieFactice());
+
+  await assert.rejects(
+    ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'),
+    /1015/);
+});
+
+test('une page annoncee par la pagination mais sans chapitre rend une erreur', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': pageChapitres(1, 100, 3),
+    '/book/my-house-of-horrors/chapters?page=2': '<html><body><h1>Service Unavailable</h1></body></html>',
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterieFactice());
+
+  await assert.rejects(
+    ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'),
+    /page 2 sur 3/);
+});
+
+test('une erreur reseau en pleine liste n est plus avalee', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': pageChapitres(1, 100, 3),
+    '/book/my-house-of-horrors/chapters?page=2': { status: 0, error: 'Connection reset' },
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterieFactice());
+
+  await assert.rejects(
+    ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'),
+    /Connection reset/);
+});
+
+test('une oeuvre reellement sans chapitre reste une liste vide, sans erreur', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': '<ul class="chapter-list"></ul>',
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterieFactice());
+
+  const fiche = normaliser(
+    await ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'));
+  assert.strictEqual(fiche.chapters.length, 0);
+});
+
+test('une premiere page de liste qui n en est pas une rend une erreur', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapters?page=1': '<html><title>Just a moment...</title></html>',
+    '/book/my-house-of-horrors': FICHE_OEUVRE,
+  }, minuterieFactice());
+
+  await assert.rejects(
+    ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'),
+    /liste de chapitres/);
+});
+
+test('un chapitre sous limite de debit patiente, puis se lit', async () => {
+  const minuterie = minuterieFactice();
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapter-1': [LIMITE_1015, PAGE_CHAPITRE],
+  }, minuterie);
+
+  const html = await ext.parseChapter('https://novelfire.net/book/my-house-of-horrors/chapter-1');
+
+  assert.match(html, /un-scary Haunted House/);
+  assert.deepStrictEqual(minuterie.attentes, [11000]);
+});
+
+test('un chapitre sans texte rend une erreur, plus « Content not available »', async () => {
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapter-1': '<html><body><p>Oops</p></body></html>',
+  }, minuterieFactice());
+
+  await assert.rejects(
+    ext.parseChapter('https://novelfire.net/book/my-house-of-horrors/chapter-1'),
+    /pas de texte/);
+});
+
+test('le catalogue sous limite de debit patiente au lieu de rendre une page vide', async () => {
+  const minuterie = minuterieFactice();
+  const { ext } = chargerExtension(EXTENSION, {
+    '/search-adv?': [LIMITE_1015, PAGE_CATALOGUE],
+  }, minuterie);
+
+  const resultat = normaliser(await ext.popularNovels(1));
+
+  assert.ok(resultat.list.length > 0, 'la page du catalogue doit etre relue apres l attente');
+  assert.deepStrictEqual(minuterie.attentes, [11000]);
+});
+
+test('un chapitre qui cite le nombre 1015 n est pas pris pour une limite de debit', async () => {
+  const minuterie = minuterieFactice();
+  const { ext } = chargerExtension(EXTENSION, {
+    '/book/my-house-of-horrors/chapter-1015': PAGE_CHAPITRE.replace(
+      'Chapter 1: Dying House of Horrors', 'Chapter 1015: error code 1015 in the haunted house'),
+  }, minuterie);
+
+  const html = await ext.parseChapter('https://novelfire.net/book/my-house-of-horrors/chapter-1015');
+
+  assert.match(html, /Chapter 1015/);
+  assert.deepStrictEqual(minuterie.attentes, [], 'aucune attente pour une page normale');
+});
