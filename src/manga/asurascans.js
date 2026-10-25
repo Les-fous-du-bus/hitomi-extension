@@ -15,7 +15,7 @@
  *   - Pages lecture: Next.js RSC payload __next_f.push (inchange)
  *
  * @author @khun — Extension Strategist
- * @version 1.0.2
+ * @version 7
  *
  * Fix v1.0.2 (2026-04-29): replace dotAll /s flag with [\s\S] equivalents —
  * QuickJS (Flutter JS runtime) does not support the /s flag, causing all regex
@@ -265,30 +265,48 @@ class DefaultExtension extends MProvider {
           .replace(/&lt;/g, "<").replace(/&gt;/g, ">")
           .replace(/&#x27;/g, "'").replace(/&#39;/g, "'");
 
-        var pagesIdx = decoded.indexOf('"pages"');
-        var slice = pagesIdx >= 0 ? decoded.substring(pagesIdx) : decoded;
-        var urlRegex = /"url":\[0,"((?:https?:|\/)[^"]+\.(?:webp|jpg|jpeg|png))"\]/g;
+        // Astro serialise les valeurs en paires [type, valeur]. Ne lire que
+        // props.pages : les autres proprietes peuvent contenir une couverture.
+        var props;
+        try { props = JSON.parse(decoded); } catch (_) { continue; }
+        if (!props.pages) continue;
         var collected = [];
-        var u;
-        while ((u = urlRegex.exec(slice)) !== null) {
-          collected.push(u[1]);
-          if (collected.length > 500) break;
-        }
-        if (collected.length > 0) {
-          var out = [];
-          for (var k = 0; k < collected.length; k++) {
-            out.push({ index: k, imageUrl: collected[k], headers: { "Referer": BASE_URL } });
+        var seenPages = {};
+        function collectPages(value) {
+          if (!value || typeof value !== "object") return;
+          if (Array.isArray(value)) {
+            for (var n = 0; n < value.length; n++) collectPages(value[n]);
+            return;
           }
-          return out;
+          if (value.url) {
+            var candidate = Array.isArray(value.url) ? value.url[1] : value.url;
+            if (typeof candidate === "string" && /\.(?:webp|jpg|jpeg|png)(?:[?#]|$)/i.test(candidate)) {
+              if (candidate.indexOf("//") === 0) candidate = "https:" + candidate;
+              else if (candidate.charAt(0) === "/") candidate = BASE_URL + candidate;
+              if (/^https?:\/\//.test(candidate) && !seenPages[candidate]) {
+                seenPages[candidate] = true;
+                collected.push(candidate);
+              }
+            }
+          }
+          for (var key in value) if (key !== "url") collectPages(value[key]);
+        }
+        collectPages(props.pages);
+        if (collected.length > 0) {
+          return collected.map(function(imageUrl, index) {
+            return { index: index, imageUrl: imageUrl, headers: { "Referer": BASE_URL } };
+          });
         }
       }
 
-      // Strategie 2 : fallback brut sur les URLs CDN (si Astro change encore)
-      var cdnRegex = /https:\/\/cdn\.asurascans\.com\/asura-images\/chapters\/[^"\s)]+\.(?:webp|jpg|jpeg|png)/g;
+      // Repli HTML decode : une entite &quot; ne doit jamais faire partie
+      // d une adresse. Conserver les parametres des URL signees/versionnees.
+      var decodedHtml = decodeHtml(res);
+      var cdnRegex = /https:\/\/cdn\.asurascans\.com\/asura-images\/chapters\/[^"\s<>\\)]+?\.(?:webp|jpg|jpeg|png)(?:\?[^"\s<>\\)]*)?/g;
       var seen = {};
       var fallback = [];
       var c;
-      while ((c = cdnRegex.exec(res)) !== null) {
+      while ((c = cdnRegex.exec(decodedHtml)) !== null) {
         if (seen[c[0]]) continue;
         seen[c[0]] = true;
         fallback.push({ index: fallback.length, imageUrl: c[0], headers: { "Referer": BASE_URL } });

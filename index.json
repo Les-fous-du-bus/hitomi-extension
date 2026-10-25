@@ -349,15 +349,15 @@
             "name": "Asura Scans",
             "lang": "en",
             "space": "manga",
-            "version": 6,
+            "version": 7,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/asurascans.js",
             "iconUrl": "https://asurascans.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v6: QuickJS compat fix — replaced /s dotAll regexes with [\\s\\S] in getMangaDetail (title/img/desc/status/author) and getChapterList. The /s flag is unsupported in Flutter QuickJS runtime, causing blank detail pages.",
-            "sha256": "f20ab68ea9ea4e4f758595f0f20d344d42c99555b30ba799cf11722a89666bde"
+            "note": "v7 (2026-10-25) : extraction des pages Astro limitee a props.pages, parametres URL conserves, repli HTML decode sans fusion de plusieurs adresses. Verification HTTP : chapitre 1, 38 pages aux index uniques.",
+            "sha256": "0874a1316ce175de8e2ce7d8ca584aa552b9d4833f2bbab6a5438e8387afe411"
         },
         {
             "id": "bato",
@@ -632,15 +632,15 @@
             "name": "Scan-VF",
             "lang": "fr",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/scan_vf.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=www.scan-vf.net&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v1.1.0: harness GREEN 2026-05-27 (20 popular, 18 search, 81 chapters, 46 pages). Catalog via GET /filterList AJAX (page/sortBy/alpha params). Search via /search?query= JSON autocomplete. Cover URL derived from slug pattern (/uploads/manga/{slug}/cover/cover_250x350.jpg) to avoid QuickJS single-quote regex encoding issues.",
-            "sha256": "e581527cbf0f3129a2137b9859ae216b6e2ee8c7d338eae0c126e94d3304fa43"
+            "note": "v2 (2026-10-25) : index de page unique et contigu pour eviter les ecritures concurrentes sur page_000 lors du telechargement. Controle reel de trois chapitres avec octets des images.",
+            "sha256": "29686eba43792261a2b514683a296c6334db50887f85e565f0add316f057dc24"
         },
         {
             "id": "sushi_scan",

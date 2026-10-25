@@ -283,7 +283,7 @@ function parseChapterImages(html, chapterUrl) {
   }
 
   // Return MProvider page objects
-  return imageUrls.map(function(u) { return { imageUrl: u }; });
+  return imageUrls.map(function(u, index) { return { index: index, imageUrl: u }; });
 }
 
 // -----------------------------------------------

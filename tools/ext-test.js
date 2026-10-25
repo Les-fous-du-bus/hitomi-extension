@@ -103,28 +103,7 @@ const coverOf = (o) => (o && (o.cover || o.imageUrl || o.image || o.thumbnail ||
 //     defaut cote site, et le correctif est ailleurs.
 // D'ou une mesure en deux temps : on compte les adresses, puis on va vraiment
 // en chercher quelques-unes.
-async function probeImage(url, headers) {
-  const ctl = new AbortController();
-  const to = setTimeout(() => ctl.abort(), 15000);
-  try {
-    // On demande le premier kilo-octet : assez pour connaitre le type de
-    // contenu et le code, sans telecharger l'image entiere.
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: { ...(headers || {}), Range: 'bytes=0-1023' },
-      redirect: 'follow',
-      signal: ctl.signal,
-    });
-    const ct = (res.headers.get('content-type') || '').toLowerCase();
-    return {
-      status: res.status,
-      type: ct.split(';')[0],
-      ok: (res.status === 200 || res.status === 206) && ct.startsWith('image/'),
-    };
-  } catch (e) {
-    return { status: 0, type: '', ok: false, err: String(e.message || e).slice(0, 60) };
-  } finally { clearTimeout(to); }
-}
+const { probeImage } = require('./image-probe.js');
 
 // Longueur du texte REEL : on retire scripts, styles et balises, on decode les
 // entites les plus courantes, on normalise les blancs. C'est cette valeur qui
@@ -305,7 +284,17 @@ function sampleIndices(n) {
     if (kr.via === 'getPageList') {
       rec.pages = (kr.val || []).length;
       pagesSeen += rec.pages;
-      if (rec.pages > 0) readable++;
+      const pages = kr.val || [];
+      const indices = pages.map(p => p.index);
+      rec.valid_indices = indices.every((index, i) => Number.isInteger(index) && index === i);
+      rec.image_probes = [];
+      for (const pageIndex of [...new Set([...sampleIndices(pages.length), ...(pages.length > 20 ? [20] : [])])]) {
+        const page = pages[pageIndex];
+        const image = await probeImage(page.imageUrl, page.headers || {});
+        rec.image_probes.push({ index: pageIndex, ...image });
+      }
+      rec.readable = rec.valid_indices && rec.image_probes.length > 0 && rec.image_probes.every(p => p.ok);
+      if (rec.readable) readable++;
     } else {
       const raw = contentOf(kr.val);
       rec.html = raw.length;
@@ -330,7 +319,7 @@ function sampleIndices(n) {
   // preface, autre roman) — c'etait le cas de novhell avant correction. La
   // position est donc le discriminant, pas le simple compte.
   const lastIdx = out.chapters_probed.length - 1;
-  const failures = out.chapters_probed.filter(c => (c.pages ? c.pages === 0 : (c.text || 0) < MIN_TEXT));
+  const failures = out.chapters_probed.filter(c => (c.via === 'getPageList' ? !c.readable : (c.text || 0) < MIN_TEXT));
   const onlyLastFailed = failures.length === 1 && out.chapters_probed.indexOf(failures[0]) === lastIdx;
 
   const canBrowse = out.stages.list > 0 || out.stages.search > 0;
@@ -338,7 +327,7 @@ function sampleIndices(n) {
   else if (!canBrowse) out.verdict = 'RED';
   else if (probed === 0) out.verdict = 'NO-CHAPTERS';
   else if (readable === probed) out.verdict = 'GREEN';
-  else if (readable > 0 && onlyLastFailed && probed >= 3) {
+  else if (out.kind === 'novel' && pagesSeen === 0 && readable > 0 && onlyLastFailed && probed >= 3) {
     out.verdict = 'GREEN';
     out.note = 'dernier chapitre non lisible : probablement en cours de publication cote site, a verifier si le cas se repete';
   } else if (readable > 0) out.verdict = 'PARTIAL';

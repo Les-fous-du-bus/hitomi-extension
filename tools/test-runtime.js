@@ -107,8 +107,8 @@ function validateChapters(list) {
 function validatePages(list) {
   check(Array.isArray(list), 'pages must be array');
   check(list.length > 0, 'pages list empty');
-  for (const p of list.slice(0, 3)) {
-    check(typeof p.index === 'number', `page.index must be number: ${JSON.stringify(p)}`);
+  for (const [i, p] of list.entries()) {
+    check(Number.isInteger(p.index) && p.index === i, `page.index must be unique and contiguous at ${i}: ${JSON.stringify(p)}`);
     check(typeof p.imageUrl === 'string' && p.imageUrl.length > 0, `page.imageUrl invalid: ${JSON.stringify(p)}`);
   }
   return { count: list.length, first: list[0] };
