@@ -43,7 +43,7 @@
  *     Oneshot/special (no digits in slug) -> 0 (no fabricated fallback).
  *
  * @author @khun -- Extension Strategist
- * @version 5
+ * @version 6
  */
 
 var BASE_URL = "https://www.mangaread.org";
@@ -421,14 +421,24 @@ class DefaultExtension extends MProvider {
       var pages = [];
       var seen = {};
 
-      // Madara reader: .reading-content img.wp-manga-chapter-img
-      // Note: src may contain leading/trailing whitespace due to template rendering.
-      // Use [\s\S]{0,300}? to capture src after class attribute.
-      var imgPattern = /class="wp-manga-chapter-img[^"]*"[\s\S]{0,300}?(?:data-src|src)="\s*(https?:\/\/[^\s"]+)\s*"/g;
+      // Lire chaque balise independamment : src precede souvent class.
+      // Une recherche demarrant a class attrapait le src de l image SUIVANTE.
+      var imgPattern = /<img\b[^>]*>/gi;
       var m;
       while ((m = imgPattern.exec(html)) !== null) {
-        var imgUrl = m[1].trim();
-        if (imgUrl && !imgUrl.includes("data:image") && !seen[imgUrl]) {
+        var tag = m[0];
+        if (!/\bclass\s*=\s*["'][^"']*\bwp-manga-chapter-img\b[^"']*["']/i.test(tag)) continue;
+        var lazySource = tag.match(/(?:^|\s)data-src\s*=\s*["']\s*([^"']+?)\s*["']/i);
+        var directSource = tag.match(/(?:^|\s)src\s*=\s*["']\s*([^"']+?)\s*["']/i);
+        var source = lazySource || directSource;
+        if (!source) continue;
+        var rawUrl = decodeHtml(source[1]).trim();
+        if (!/^(?:https?:\/\/|\/)/.test(rawUrl) && directSource) {
+          rawUrl = decodeHtml(directSource[1]).trim();
+        }
+        if (!/^(?:https?:\/\/|\/)/.test(rawUrl)) continue;
+        var imgUrl = rawUrl.indexOf("//") === 0 ? "https:" + rawUrl : absoluteUrl(rawUrl);
+        if (!seen[imgUrl]) {
           seen[imgUrl] = true;
           pages.push({ index: pages.length, imageUrl: imgUrl });
         }

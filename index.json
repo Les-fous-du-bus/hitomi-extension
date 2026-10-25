@@ -542,15 +542,15 @@
             "name": "MangaRead",
             "lang": "en",
             "space": "manga",
-            "version": 5,
+            "version": 6,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangaread.js",
             "iconUrl": "https://www.mangaread.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v5: extractChapNum now uses URL slug as authoritative fallback. Harness reported 3864/3864 chapters with number==0 (Martial Peak, non-standard title names). URL /chapter-N/ always encodes the number. Decimal: /chapter-12-5/ -> 12.5. Oneshot: 0. v4: itemPattern {0,5000} cover fix. v3: chapter shape. v2: imageUrl. v1: port from Mangayomi.",
-            "sha256": "ff7dac192bbb93dfba33658f12f0faf6162bf874da7941e08d463837c120c4fa"
+            "note": "v6 (2026-10-25) : extraction image par image, independante de l ordre src/class et priorite data-src. Superhuman Era chapitre 1 : 65 images comme sur le site, contre 64 auparavant (premiere image sautee). Certaines images sont toutefois des documents HTML 521 stockes sur MangaRead : elles restent indisponibles.",
+            "sha256": "54213aee69f008827deadb9b6b41adfb313dffce64287021f63b32873824cd02"
         },
         {
             "id": "mangas_origines",
