@@ -7,7 +7,7 @@
  * Mature : true (has adult content toggle)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.3
+ * @version 5
  *
  * 2026-07-14 fix (v1.0.3): covers were parsed correctly (70/70) but blank on
  * screen -- fmcdn.mangahere.com is Referer-gated (403 without a site Referer,
@@ -45,7 +45,7 @@ function decodeHtml(str) {
 // p,a,c,k,e,d unpacker -- standard Dean Edwards algorithm
 function unpackJs(packed) {
   // Extract: eval(function(p,a,c,k,e,d){...}('payload','radix','count','keywords'.split('|'),0,{}))
-  var match = packed.match(/\}\('(.*)',\s*(\d+),\s*(\d+),\s*'([^']*)'/s);
+  var match = packed.match(/\}\('([\s\S]*)',\s*(\d+),\s*(\d+),\s*'([^']*)'/);
   if (!match) return packed;
 
   var p = match[1];
@@ -81,6 +81,22 @@ function unpackJs(packed) {
   });
 
   return result;
+}
+
+// Lire uniquement les URL du tableau newImgs, sans executer le script distant.
+function parseMangaHereImages(source) {
+  var decoded = source.replace(/\\(['"\\/])/g, "$1");
+  var list = decoded.match(/\bnewImgs\s*=\s*\[([\s\S]*?)\]/);
+  if (!list) return [];
+  var images = [];
+  var pattern = /["']((?:https?:)?\/\/[^"']+)["']/g;
+  var match;
+  while ((match = pattern.exec(list[1])) !== null) {
+    var url = decodeHtml(match[1]);
+    if (url.indexOf("//") === 0) url = "https:" + url;
+    images.push({ index: images.length, imageUrl: url, headers: { "Referer": BASE_URL + "/" } });
+  }
+  return images;
 }
 
 function parseMangaHereDate(dateStr) {
@@ -304,6 +320,19 @@ class DefaultExtension extends MProvider {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, this._getHeaders());
+
+      // Les nouveaux chapitres embarquent toutes les URL dans newImgs.
+      // Lire le script complet : l ancien motif arretait la lecture au premier
+      // double-parenthese interne du packer.
+      var modernPages = parseMangaHereImages(res);
+      if (modernPages.length > 0) return modernPages;
+      var scriptPattern = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+      var script;
+      while ((script = scriptPattern.exec(res)) !== null) {
+        if (script[1].indexOf("eval(function(p,a,c,k,e,d)") === -1) continue;
+        modernPages = parseMangaHereImages(unpackJs(script[1]));
+        if (modernPages.length > 0) return modernPages;
+      }
 
       // Extract key variables
       var chapterIdMatch = res.match(/chapterid\s*=\s*(\d+)/);
