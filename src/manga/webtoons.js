@@ -19,7 +19,7 @@
  *     Working endpoint: /fr/search?keyword=... (no /originals). Still uses strong.title.
  *
  * @author @khun — Extension Strategist
- * @version 4.2.0
+ * @version 5.0.0
  *
  * Fix v4.2.0 (2026-07-14): covers parsed 122/122 but blank on screen --
  * webtoon-phinf.pstatic.net is Referer-gated and validates the origin (foreign
@@ -67,41 +67,34 @@ class DefaultExtension extends MProvider {
   get isMature() { return false; }
 
   async getPopular(page) {
-    try {
-      var url = BASE_URL + "/" + LANG_CODE + "/originals";
-      var res = await fetchv2(url, {});
-      return this._parseMangaListFromPage(res);
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    if (page > 1) return {list: [], hasNextPage: false};
+    var res = await fetchv2(BASE_URL + "/" + LANG_CODE + "/originals", {});
+    return this._parseMangaListFromPage(res);
   }
 
   async getLatestUpdates(page) {
-    try {
-      var url = BASE_URL + "/" + LANG_CODE + "/originals?sortOrder=UPDATE";
-      var res = await fetchv2(url, {});
-      return this._parseMangaListFromPage(res);
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    if (page > 1) return {list: [], hasNextPage: false};
+    var res = await fetchv2(BASE_URL + "/" + LANG_CODE + "/originals?sortOrder=UPDATE", {});
+    return this._parseMangaListFromPage(res);
   }
 
   async search(query, page, filters) {
-    try {
-      // /fr/search/originals returns HTTP 500. Working endpoint: /fr/search?keyword=<q>.
-      var keyword = encodeURIComponent(query.trim());
-      var url = BASE_URL + "/" + LANG_CODE + "/search?keyword=" + keyword;
-      var res = await fetchv2(url, { "Referer": BASE_URL + "/" + LANG_CODE + "/" });
-      var result = this._parseMangaListFromPage(res);
-      result.hasNextPage = result.list.length > 0;
-      return result;
-    } catch (e) {
-      return { list: [], hasNextPage: false };
+    if (page > 1) return { list: [], hasNextPage: false };
+    var lang = LANG_CODE;
+    for (var i = 0; filters && i < filters.length; i++) {
+      var filter = filters[i];
+      if (filter.name !== "Langue") continue;
+      var selected = filter.values && filter.values[filter.state || 0];
+      if (selected && /^(fr|en|es|de|id)$/.test(selected.value)) lang = selected.value;
     }
+    var keyword = encodeURIComponent((query || "").trim());
+    var url = BASE_URL + "/" + lang + "/search?keyword=" + keyword;
+    var res = await fetchv2(url, { "Referer": BASE_URL + "/" + lang + "/" });
+    // The website search endpoint has no pagination contract in this adapter.
+    return this._parseMangaListFromPage(res);
   }
 
   async getMangaDetail(url) {
-    try {
       // Normalize to www and append &page=1 (required for episodes and Referer gate).
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       fullUrl = fullUrl.replace(MOBILE_URL, BASE_URL);
@@ -166,114 +159,73 @@ class DefaultExtension extends MProvider {
         headers: { "Referer": BASE_URL + "/" },
         isMature: false,
       };
-    } catch (e) {
-      return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
-    }
   }
 
   async getChapterList(url) {
-    try {
-      // Normalize: replace mobile URL, add &page=1, add Referer.
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      fullUrl = fullUrl.replace(MOBILE_URL, BASE_URL);
-      if (fullUrl.indexOf("&page=") === -1 && fullUrl.indexOf("?page=") === -1) {
-        fullUrl += (fullUrl.indexOf("?") !== -1 ? "&" : "?") + "page=1";
+    var firstUrl = this._canonicalUrl(url).replace(/([?&])page=\d+(&|$)/, "$1").replace(/[?&]$/, "");
+    firstUrl += (firstUrl.indexOf("?") >= 0 ? "&" : "?") + "page=1";
+    var queue = [firstUrl], queued = {}, seen = {}, chapters = [];
+    queued[firstUrl] = true;
+    for (var pageIndex = 0; pageIndex < queue.length; pageIndex++) {
+      if (pageIndex >= 150) throw new Error("Webtoons : trop de pages de chapitres, liste incomplète.");
+      var res = await fetchv2(queue[pageIndex], { "Referer": BASE_URL + "/" });
+      var episodes = res.match(/<li\b[^>]*\bid=["']episode_\d+["'][^>]*>[\s\S]*?<\/li>/gi) || [];
+      if (!episodes.length) throw new Error("Webtoons : page de chapitres indisponible, liste incomplète.");
+      for (var i = 0; i < episodes.length; i++) {
+        var ep = episodes[i];
+        var href = ep.match(/<a\b[^>]*\bhref=["']([^"']+)["']/i);
+        if (!href) continue;
+        var chapterUrl = this._canonicalUrl(href[1]);
+        if (seen[chapterUrl]) continue;
+        seen[chapterUrl] = true;
+        var num = ep.match(/data-episode-no=["'](\d+)["']/i) || ep.match(/id=["']episode_(\d+)["']/i);
+        var number = num ? parseInt(num[1], 10) : chapters.length + 1;
+        var title = ep.match(/<span\b[^>]*class=["'][^"']*\bsubj\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i);
+        var date = ep.match(/<span\b[^>]*class=["']date["'][^>]*>([^<]+)<\/span>/i);
+        chapters.push({ title: title ? decodeHtml(stripTags(title[1]).trim()) : "Ep." + number,
+          url: chapterUrl, number: number, dateUpload: date ? (this._parseDate(stripTags(date[1]).trim()) || 0) : 0 });
       }
-      var referer = BASE_URL + "/" + LANG_CODE + "/";
-      var res = await fetchv2(fullUrl, { "Referer": referer });
-
-      var chapters = [];
-      // Desktop episode items: <li class="_episodeItem" id="episode_N" data-episode-no="N">
-      var episodeMatches = res.match(/<li[^>]*id="episode_\d+"[^>]*>[\s\S]*?<\/li>/g);
-      if (!episodeMatches) return [];
-
-      for (var i = 0; i < episodeMatches.length; i++) {
-        var ep = episodeMatches[i];
-
-        var hrefMatch = ep.match(/<a[^>]*href="([^"]+)"/);
-        if (!hrefMatch) continue;
-        var chapUrl = hrefMatch[1];
-        if (chapUrl.startsWith(MOBILE_URL)) {
-          chapUrl = chapUrl.replace(MOBILE_URL, BASE_URL);
-        }
-
-        // Chapter number from data-episode-no or from <span class="tx">#N</span>
-        var chapNum = 0;
-        var noMatch = ep.match(/data-episode-no="(\d+)"/);
-        if (noMatch) chapNum = parseInt(noMatch[1]);
-        if (!chapNum) {
-          var txMatch = ep.match(/<span class="tx"[^>]*>#(\d+)/);
-          if (txMatch) chapNum = parseInt(txMatch[1]);
-        }
-
-        // Title from subj span (e.g. "Ep.3") + inner label if any
-        var titleMatch = ep.match(/<span class="subj"[^>]*>\s*<span[^>]*>([^<]+)<\/span>/);
-        var chapTitle = titleMatch ? stripTags(titleMatch[1]).trim() : "";
-        if (!chapTitle && chapNum) chapTitle = "Ep." + chapNum;
-
-        // Date
-        var dateMatch = ep.match(/<span class="date"[^>]*>([^<]+)<\/span>/);
-        var dateUpload = Date.now();
-        if (dateMatch) {
-          var parsed = this._parseDate(stripTags(dateMatch[1]).trim());
-          if (parsed) dateUpload = parsed;
-        }
-
-        chapters.push({
-          title: chapTitle || "Episode " + (i + 1),
-          url: chapUrl,
-          number: chapNum || i + 1,
-          dateUpload: dateUpload,
-        });
+      var pagination = res.match(/<div\b[^>]*class=["'][^"']*\bpaginate\b[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      var link, links = /href=["']([^"']+)["']/gi;
+      while (pagination && (link = links.exec(pagination[1])) !== null) {
+        var next = this._canonicalUrl(link[1]);
+        var sameSeries = next.match(/[?&]title_no=(\d+)/);
+        var series = firstUrl.match(/[?&]title_no=(\d+)/);
+        if (!sameSeries || !series || sameSeries[1] !== series[1] || !/[?&]page=\d+/.test(next) || queued[next]) continue;
+        queued[next] = true; queue.push(next);
       }
-
-      return chapters;
-    } catch (e) {
-      return [];
     }
+    return chapters.sort(function(a, b) { return b.number - a.number; });
   }
 
   async getPageList(url) {
-    try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      // Webtoons viewer requires Referer to serve full page HTML.
-      var referer = BASE_URL + "/" + LANG_CODE + "/";
-      var res = await fetchv2(fullUrl, { "Referer": referer });
-
-      var pages = [];
-
-      // The _imageList div contains nested divs; a lazy (.*?)</div> match stops
-      // at the first nested closing tag. Instead, slice from the id anchor to the
-      // end of the document then match only chapter images (class _images).
-      // Thumbnail images have class _thumbnailImages and must be excluded.
-      var imageListIdx = res.indexOf('id="_imageList"');
-      var searchHtml = imageListIdx >= 0 ? res.substring(imageListIdx) : res;
-
-      // Primary: img with class _images (chapter images, not nav thumbnails)
-      var chapterImgPat = /<img[^>]*class="[^"]*_images[^"]*"[^>]*data-url="([^"]+)"/g;
-      var altChapterImgPat = /data-url="([^"]+)"[^>]*class="[^"]*_images[^"]*"/g;
-      var m;
-      while ((m = chapterImgPat.exec(searchHtml)) !== null) {
-        pages.push({
-          index: pages.length,
-          imageUrl: m[1],
-          headers: { "Referer": BASE_URL },
-        });
-      }
-      if (pages.length === 0) {
-        while ((m = altChapterImgPat.exec(searchHtml)) !== null) {
-          pages.push({
-            index: pages.length,
-            imageUrl: m[1],
-            headers: { "Referer": BASE_URL },
-          });
-        }
-      }
-
-      return pages;
-    } catch (e) {
-      return [];
+    var res = await fetchv2(this._canonicalUrl(url), { "Referer": BASE_URL + "/" });
+    var tags = res.match(/<img\b[^>]*>/gi) || [];
+    var pages = [], seen = {};
+    for (var i = 0; i < tags.length; i++) {
+      var tag = tags[i];
+      var cls = tag.match(/\bclass=["']([^"']+)["']/i);
+      if (!cls || !(" " + cls[1] + " ").match(/\s_images\s/)) continue;
+      var attr = tag.match(/\bdata-url=["']([^"']+)["']/i);
+      if (!attr) continue;
+      var imageUrl = this._normalizeCover(decodeHtml(attr[1]));
+      if (!/^https:\/\//.test(imageUrl) || seen[imageUrl]) continue;
+      seen[imageUrl] = true;
+      pages.push({index: pages.length, imageUrl: imageUrl, headers: {"Referer": BASE_URL + "/"}});
     }
+    if (!pages.length) throw new Error("Webtoons : cet épisode ne contient aucune page accessible sur le site web.");
+    return pages;
+  }
+
+  _canonicalUrl(value) {
+    var url = decodeHtml(value || "").trim();
+    if (url.charAt(0) === "#") return "";
+    if (url.indexOf("//") === 0) url = "https:" + url;
+    else if (url.charAt(0) === "/") url = BASE_URL + url;
+    else if (!/^https?:\/\//.test(url)) url = BASE_URL + "/" + url;
+    url = url.replace(/^http:/, "https:").replace(MOBILE_URL, BASE_URL);
+    if (!/^https:\/\/www\.webtoons\.com\//.test(url)) throw new Error("Webtoons : lien externe refusé.");
+    return url;
   }
 
   getFilterList() {
@@ -302,11 +254,11 @@ class DefaultExtension extends MProvider {
     // card: cover via data-src||data-url||data-lazy-src, then src (mobile may
     // lazy-load with a placeholder in src and the real URL in data-url); title
     // via strong.title (grid) or p.subj (search fallback).
-    var cardPat = /<a\s+href="([^"]*\/list\?title_no=\d+[^"]*)"[\s\S]*?<\/a>/g;
+    var cardPat = /<a\b[^>]*\bhref=["']([^"']*\/list\?title_no=\d+[^"']*)["'][\s\S]*?<\/a>/g;
     var card;
     while ((card = cardPat.exec(html)) !== null) {
       var block = card[0];
-      var url = card[1];
+      var url = this._canonicalUrl(card[1]);
       if (seen[url]) continue;
       var imgMatch =
         block.match(/<img[^>]*\bdata-(?:src|url|lazy-src)="([^"]+)"/i) ||
