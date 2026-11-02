@@ -40,7 +40,7 @@
  *     name from the render loop + var-agnostic tokenized-CDN fallback. Live-verified L1.
  *
  * @author @khun -- Extension Strategist
- * @version 4
+ * @version 5
  */
 
 var BASE_URL = "https://mangakatana.com";
@@ -95,40 +95,28 @@ function deduplicateByUrl(list) {
  * Field imageUrl (not cover) -- matches MProvider MangaItem contract.
  */
 function parseMangaList(html) {
-  var list = [];
-
-  // Extract series URLs -- these appear twice per item (cover + title link)
-  var linkPattern = /href="(https:\/\/mangakatana\.com\/manga\/[^"]+?)"/g;
-  var coverPattern = /src="(https:\/\/mangakatana\.com\/imgs\/[^"]+?)"/g;
-  var covers = [];
-  var m;
-
-  while ((m = coverPattern.exec(html)) !== null) {
-    covers.push(m[1]);
+  var list = [], byUrl = {}, titles = {};
+  var links = /<a\b[^>]*href=["'](https:\/\/mangakatana\.com\/manga\/[^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  var match;
+  while ((match = links.exec(html)) !== null) {
+    var url = match[1].replace(/\/$/, "");
+    // Only canonical series paths: /fc and decimal chapter links are not works.
+    if (!/^https:\/\/mangakatana\.com\/manga\/[^/?#]+\.\d+$/.test(url)) continue;
+    var text = decodeHtml(stripTags(match[2])).trim();
+    if (text) titles[url] = text;
+    var imageTag = match[2].match(/<img\b[^>]*>/i);
+    if (!imageTag || byUrl[url]) continue;
+    var image = imageTag[0].match(/\bdata-src=["']([^"']+)["']/i) ||
+      imageTag[0].match(/\bsrc=["']([^"']+)["']/i);
+    if (!image || !/^https:\/\/mangakatana\.com\/imgs\//.test(image[1])) continue;
+    var item = {title:"", url:url, imageUrl:image[1]};
+    byUrl[url] = item; list.push(item);
   }
-
-  var urls = [];
-  while ((m = linkPattern.exec(html)) !== null) {
-    var url = m[1];
-    // Exclude chapter links (contain /c followed by digits at end)
-    if (!/\/c\d+$/.test(url) && urls.indexOf(url) === -1) {
-      urls.push(url);
-    }
+  for (var i=0; i<list.length; i++) {
+    var slug = list[i].url.replace(BASE_URL+"/manga/", "");
+    var fallback = slug.replace(/\.\d+$/, "").replace(/-/g, " ");
+    list[i].title = titles[list[i].url] || fallback.charAt(0).toUpperCase()+fallback.slice(1);
   }
-
-  for (var i = 0; i < urls.length; i++) {
-    var slug = urls[i].replace(BASE_URL + "/manga/", "");
-    // Title from slug: strip trailing .ID and convert dashes to spaces
-    var titleRaw = slug.replace(/\.\d+$/, "").replace(/-/g, " ");
-    var title = titleRaw.charAt(0).toUpperCase() + titleRaw.slice(1);
-
-    list.push({
-      title: title,
-      url: urls[i],
-      imageUrl: covers[i] || ""
-    });
-  }
-
   return list;
 }
 
