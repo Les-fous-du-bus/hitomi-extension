@@ -297,7 +297,9 @@ class DefaultExtension extends MProvider {
       var result = [];
       for (var i = 0; i < chapters.length; i++) {
         var ch = chapters[i];
-        var chapNum = parseFloat(ch.chapter) || (i + 1);
+        var chapNum = parseFloat(ch.chapter);
+        // Zero is a real prologue number, not a missing chapter value.
+        if (!isFinite(chapNum)) chapNum = i + 1;
         var chapTitle = "Chapter " + chapNum;
         if (ch.title) chapTitle += " - " + ch.title;
 
