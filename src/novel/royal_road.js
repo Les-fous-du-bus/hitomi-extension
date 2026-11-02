@@ -32,7 +32,7 @@
  *   - Contenu chap   : div.chapter-inner, div.chapter-content
  *
  * @author @khun — Extension Strategist
- * @version 2.0.0
+ * @version 3.0.0
  */
 
 const BASE_URL = "https://www.royalroad.com";
@@ -165,10 +165,15 @@ class DefaultExtension extends LNProvider {
     const imgTagMatch = coverHtml.match(/<img[^>]+>/i);
     const cover = extractImgSrcFromHtml(imgTagMatch ? imgTagMatch[0] : coverHtml);
 
-    // Auteur
-    const authorMatch =
-      html.match(/property="author"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
-      html.match(/class="[^"]*author[^"]*"[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i);
+    // Only author-profile links inside the byline/author block are metadata.
+    // Generic "author" containers may start with the advertisement's Remove link.
+    const authorSection =
+      html.match(/<h[2-6]\b[^>]*>\s*(?:<[^>]+>\s*)*by\b([\s\S]*?)<\/h[2-6]>/i) ||
+      html.match(/<(?:span|div)\b[^>]*\bproperty=["']author["'][^>]*>([\s\S]*?)<\/(?:span|div)>/i) ||
+      html.match(/<(?:span|div)\b[^>]*\bclass=["'][^"']*\bauthor\b[^"']*["'][^>]*>([\s\S]*?)<\/(?:span|div)>/i);
+    const authorMatch = authorSection && authorSection[1].match(
+      /<a\b[^>]*\bhref=["'](?:(?:https?:)?\/\/(?:www\.)?royalroad\.com)?\/profile\/\d+\/?["'][^>]*>([\s\S]*?)<\/a>/i
+    );
     const author = authorMatch
       ? authorMatch[1].replace(/<[^>]+>/g, "").trim()
       : "";
