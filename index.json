@@ -75,8 +75,8 @@
             "iconUrl": "https://lnmtl.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v2 (2026-11-02) : Le message de traduction indisponible du site est refusé au lieu d’être enregistré comme chapitre. Une erreur de pagination signale un sommaire incomplet au lieu de masquer les chapitres manquants.",
-            "sha256": "684d0d33139416b2f01d1cec6a81c5a3698f3e7fed282ace06de091c1b909db8"
+            "note": "v2 (2026-11-02) : Sommaire chargé avec au plus quatre requêtes simultanées, dans l’ordre des volumes et pages. Totaux vérifiés et erreurs de pagination signalées sans sommaire tronqué. Les messages de traduction indisponible sont refusés comme contenu de chapitre.",
+            "sha256": "d4dfc656bb8b1040006ed64ed17f10f0a040693f3471937679ccf174a7e1e040"
         },
         {
             "id": "massnovel",
