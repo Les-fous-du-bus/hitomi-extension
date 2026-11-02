@@ -178,7 +178,8 @@ class DefaultExtension extends MProvider {
       if (seen[absolute]) return;
       seen[absolute] = true;
 
-      var titleEl = a.querySelector("h2.card-title") ||
+      var titleEl = a.querySelector("h3.as-carte-titre") ||
+                    a.querySelector("h2.card-title") ||
                     a.querySelector("h1") ||
                     a.querySelector("h2");
       var title = titleEl ? (titleEl.textContent || "").trim() : "";

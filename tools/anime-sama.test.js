@@ -280,3 +280,18 @@ test('un titre vide reste une erreur explicite', async () => {
     () => ext.getChapterList('https://anime-sama.to/catalogue/vide/'),
     /titreOeuvre vide/);
 });
+
+
+test('catalogue current card scopes titles apart from type badges without changing real titles', async () => {
+  const html = `<div class="as-carte as-carte-oeuvre">
+    <a href="https://anime-sama.to/catalogue/100-jours-avant-ta-mort">
+      <div class="as-carte-badges"><span>Scans</span></div>
+      <div class="as-carte-texte"><h3 class="as-carte-titre" title="100 Jours Avant Ta Mort">100 Jours Avant Ta Mort</h3></div>
+    </a></div>
+    <a href="/catalogue/scan-man/"><span>Anime</span><span>Scans</span>
+      <h3 class="as-carte-titre">Scan Man</h3></a>`;
+  const {ext} = chargerExtension(EXTENSION, {});
+  const result = ext._parseList(html);
+  assert.deepStrictEqual(normaliser(result.list.map(item => item.title)),
+    ['100 Jours Avant Ta Mort', 'Scan Man']);
+});
