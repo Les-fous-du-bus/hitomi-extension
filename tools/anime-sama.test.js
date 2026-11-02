@@ -26,6 +26,18 @@ const EXTENSION = path.join(__dirname, '..', 'src', 'manga', 'anime_sama.js');
 const PAGE_SCAN = (nom) =>
   `<html><body><h1 id="titreOeuvre" class="text-2xl uppercase font-bold ">${nom}</h1></body></html>`;
 
+test('le titre de fiche est celui de l œuvre, pas la rubrique Informations', async()=>{
+  const url='https://anime-sama.to/catalogue/100-jours-avant-ta-mort/';
+  for(const html of [
+    '<h1 id="titreOeuvre" class="oe-titre">100 Jours Avant Ta Mort</h1><h3 class="oe-bloc-titre">Informations</h3>',
+    '<h1>Catalogue</h1><h3 id="titreOeuvre">100 Jours Avant Ta Mort</h3><h3>Informations</h3>'
+  ]){
+    const {ext}=chargerExtension(EXTENSION,{[url]:html});
+    const detail=await ext.getMangaDetail(url);
+    assert.strictEqual(detail.title,'100 Jours Avant Ta Mort');
+  }
+});
+
 test('un chapitre reel est bien decoupe', async (t) => {
   const { ext } = chargerExtension(EXTENSION, {
     '/catalogue/100-jours-avant-ta-mort/scan/vf/': PAGE_SCAN('100 Jours Avant Ta Mort'),

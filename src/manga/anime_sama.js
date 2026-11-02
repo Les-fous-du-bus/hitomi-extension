@@ -191,8 +191,8 @@ class DefaultExtension extends MProvider {
       var html = await fetchv2(url, { headers: this._headers("/catalogue/" + slug + "/") });
       var doc = new DOMParser().parseFromString(typeof html === "string" ? html : "", "text/html");
 
-      // Titre : h3 (architecture connue), h1, fallback og:title.
-      var titleEl = doc.querySelector("h3") || doc.querySelector("h1");
+      // A generic h3 is now the Informations section, not the work title.
+      var titleEl = doc.querySelector("#titreOeuvre") || doc.querySelector("h1") || doc.querySelector("h3");
       var title = titleEl ? (titleEl.textContent || "").trim() : "";
       if (!title) {
         var ogTitle = doc.querySelector("meta[property='og:title']");
