@@ -9,7 +9,7 @@ const work = BASE+'/projects/test';
 test('Celestial catalogue uses card titles/covers and advertises real next page', async()=>{
   const html=`<link rel="next" href="/catalogue?page=2"><article class="card"><a href="/projects/test"><img src="/img/covers/test.webp"></a><a href="/projects/test/chapitre/12">Last chapter</a><h3 class="card__title"><a href="/projects/test">A &amp; B</a></h3></article>`;
   const {ext,appels}=chargerExtension(FILE,{'/catalogue':html});
-  assert.deepEqual(normaliser(await ext.getPopular(1)),{list:[{title:'A & B',url:work,imageUrl:BASE+'/img/covers/test.webp'}],hasNextPage:true});
+  assert.deepEqual(normaliser(await ext.getPopular(1)),{list:[{title:'A & B',url:work,imageUrl:BASE+'/img/covers/test.webp',genres:[],matureType:null}],hasNextPage:true});
   await ext.search('A & B',2,[]);
   assert.match(appels[1].url,/search=A%20%26%20B/);
   assert.match(appels[1].url,/page=2/);
@@ -36,4 +36,19 @@ test('Celestial refuses off-source work links and propagates network errors',asy
   const {ext}=chargerExtension(FILE,{'/catalogue':{error:'offline'}});
   await assert.rejects(ext.getPopular(1),/offline/);
   await assert.rejects(ext.getMangaDetail('https://evil.invalid/projects/test'),/source|adresse/i);
+});
+test('mixed catalogue maturity comes only from explicit card tags, not Action, title or synopsis',async()=>{
+  function card(slug,title,tags,description){return `<article class="card"><img src="/img/covers/${slug}.webp"><ul class="card__tags">${tags.map(x=>'<li>'+x+'</li>').join('')}</ul><p class="card__excerpt">${description||''}</p><h3 class="card__title"><a href="/projects/${slug}">${title}</a></h3></article>`;}
+  const html=card('action','Action Hero',['Action','Fantasy'])+card('ecchi','A story',['Romance','Ecchi'])+card('gore','A story',['Gore'])+card('sexual','A story',['Érotique'])+card('violence','A story',['Violence'])+card('unknown','Ecchi in the title',[],'Erotic synopsis');
+  const {ext}=chargerExtension(FILE,{'/catalogue':html});const list=normaliser((await ext.getPopular(1)).list);
+  assert.equal(ext.isMature,false);
+  assert.deepEqual(list.map(x=>x.matureType),[null,'ecchi','gore','sexual','violence',null]);
+  assert.deepEqual(list[0].genres,['Action','Fantasy']);assert.deepEqual(list[5].genres,[]);
+});
+test('detail preserves its own genres and does not impose a whole-source adult classification',async()=>{
+  for(const [tag,expected] of [['Action',null],['Ecchi','ecchi'],['Hentai','sexual'],['Gore','gore'],['Violence','violence']]){
+    const html=`<h1>Test</h1><ul class="pj__genres"><li><a href="/catalogue?genres=${tag}">${tag}</a></li></ul>`;
+    const {ext}=chargerExtension(FILE,{'/projects/test':html});const detail=normaliser(await ext.getMangaDetail(work));
+    assert.deepEqual(detail.genres,[tag]);assert.equal(detail.matureType,expected);
+  }
 });

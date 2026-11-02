@@ -27,6 +27,21 @@ function csRequireUrl(url,chapter){
   if(!value||!shape.test(value))throw new Error('Celestial Scan : adresse hors de la source ou invalide.');
   return value;
 }
+function csGenres(html,className){
+  var section=html.match(new RegExp('<ul\\b[^>]*class=["\'][^"\']*'+className+'[^"\']*["\'][^>]*>([\\s\\S]*?)<\\/ul>','i'));
+  var rows=(section?section[1]:'').match(/<li\b[^>]*>[\s\S]*?<\/li>/gi)||[],genres=[];
+  for(var i=0;i<rows.length;i++){var label=csText(rows[i]);if(label&&genres.indexOf(label)===-1)genres.push(label);}
+  return genres;
+}
+function csMatureType(genres){
+  // Only explicit tags count; Action/Horror, titles and descriptions are not ratings.
+  var labels=genres.map(function(g){return g.toLowerCase();});
+  for(var i=0;i<labels.length;i++)if(/^(?:hentai|[ée]rotique|erotic|erotica|smut|sexual content)$/.test(labels[i]))return 'sexual';
+  if(labels.indexOf('gore')!==-1)return 'gore';
+  if(labels.indexOf('ecchi')!==-1)return 'ecchi';
+  if(labels.indexOf('violence')!==-1)return 'violence';
+  return null;
+}
 function csCatalogue(html){
   var list=[],seen={},blocks=html.match(/<article\b[^>]*class=["'][^"']*\bcard\b[^"']*["'][^>]*>[\s\S]*?<\/article>/gi)||[];
   for(var i=0;i<blocks.length;i++){
@@ -35,7 +50,8 @@ function csCatalogue(html){
     if(!link)continue;
     var url=csUrl(link[1]),title=csText(link[2]),image=block.match(/<img\b[^>]*>/i);
     if(!url||!title||seen[url]||!/\/projects\/[^/?#]+\/?$/.test(url))continue;
-    seen[url]=true;list.push({title:title,url:url,imageUrl:csUrl(image?csAttr(image[0],'src'):'')});
+    var genres=csGenres(block,'card__tags');
+    seen[url]=true;list.push({title:title,url:url,imageUrl:csUrl(image?csAttr(image[0],'src'):''),genres:genres,matureType:csMatureType(genres)});
   }
   if(!list.length && /Just a moment|cf-browser-verification|challenge-platform/.test(html))throw new Error('Celestial Scan : vérification Cloudflare requise.');
   return {list:list,hasNextPage:/<link\b[^>]*rel=["']next["']/i.test(html)||/id=["']cat-loadmore["']/.test(html)};
@@ -62,8 +78,8 @@ class DefaultExtension extends MProvider {
   get baseUrl(){return CS_BASE;}
   get iconUrl(){return CS_BASE+'/picture/logo.png';}
   get supportsLatest(){return true;}
-  // Catalogue contains mature/ecchi/erotic tags; retain the app's content filter.
-  get isMature(){return true;}
+  // Mixed catalogue: preserve per-work tags instead of marking every work adult.
+  get isMature(){return false;}
   get hasCloudflare(){return false;}
   async getPopular(page){return csCatalogue(await fetchv2(CS_BASE+'/catalogue?sort=popular&page='+(page||1),{headers:CS_HEADERS}));}
   async getLatestUpdates(page){return csCatalogue(await fetchv2(CS_BASE+'/catalogue?sort=recent&page='+(page||1),{headers:CS_HEADERS}));}
@@ -76,10 +92,8 @@ class DefaultExtension extends MProvider {
     var img=cover&&cover[1].match(/<img\b[^>]*>/i);
     var synopsis=html.match(/<div\b[^>]*id=["']synopsis["'][^>]*>([\s\S]*?)<\/div>/i);
     var author=html.match(/<dt[^>]*>\s*Auteurs?\s*<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/i);
-    var genres=[],genreSection=html.match(/<ul\b[^>]*class=["'][^"']*pj__genres[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
-    var links=(genreSection?genreSection[1]:'').match(/<a\b[^>]*>[\s\S]*?<\/a>/gi)||[];
-    for(var i=0;i<links.length;i++){var g=csText(links[i]);if(g&&genres.indexOf(g)===-1)genres.push(g);}
-    return {title:csText(title[1]),url:url,imageUrl:csUrl(img?csAttr(img[0],'src'):''),description:csText(synopsis?synopsis[1]:''),authors:author?[csText(author[1])]:[],genres:genres,status:/status--completed/.test(html)?'completed':'ongoing',chapters:csChapters(html,url)};
+    var genres=csGenres(html,'pj__genres');
+    return {title:csText(title[1]),url:url,imageUrl:csUrl(img?csAttr(img[0],'src'):''),description:csText(synopsis?synopsis[1]:''),authors:author?[csText(author[1])]:[],genres:genres,matureType:csMatureType(genres),status:/status--completed/.test(html)?'completed':'ongoing',chapters:csChapters(html,url)};
   }
   async getChapterList(url){return (await this.getMangaDetail(url)).chapters;}
   async getPageList(input){
