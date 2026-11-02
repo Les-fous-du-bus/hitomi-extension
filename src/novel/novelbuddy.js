@@ -15,13 +15,11 @@
  *      voyagent dans un script __NEXT_DATA__. Aucun de ces trois reperes ne
  *      renvoie plus rien, d'ou le statut "dead" de l'extension.
  *
- * LIMITE CONNUE ET MESUREE : la fiche d'une oeuvre n'expose que ses 50 derniers
- * chapitres. Le site charge la suite depuis son application, par un chemin qui
- * n'est pas joignable en HTTP simple — les points d'entree evidents (parametres de
- * page sur la fiche, /chapters, api.novelbuddy.me) ont tous ete essayes le
- * 2026-09-04 et rendent 400 ou 404. Sur une serie longue on voit donc les 50
- * derniers chapitres, pas les milliers precedents. C'est un etat de fait du site,
- * pas un raccourci : le premier chapitre reste accessible par firstChapter.
+ * CORRECTION 2026-11-02 : la fiche SSR ne contient que les 50 derniers chapitres,
+ * mais le bundle actuel fournit une API publique /titles/{id}/chapters.
+ * Son sommaire complet est charge et controle avant d'etre expose (3956 entrees
+ * mesurees sur Reincarnation of the Strongest Sword God). Les anciennes URL
+ * de lecture sont conservees. Une reponse incomplete ou dupliquee est refusee.
  *
  * @author @khun — Extension Strategist
  * @version 2.0.0
