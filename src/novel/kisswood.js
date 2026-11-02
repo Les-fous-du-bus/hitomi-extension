@@ -284,7 +284,7 @@ class DefaultExtension extends MProvider {
         chapters.push({
           title: decodeHtml(chapTitle),
           url: chapUrl,
-          number: chapNum || i + 1,
+          number: numMatch ? chapNum : i + 1,
           dateUpload: Date.now(),
         });
       }
