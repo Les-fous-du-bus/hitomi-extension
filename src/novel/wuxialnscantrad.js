@@ -266,8 +266,10 @@ class DefaultExtension extends MProvider {
       var chapters = [];
       var seen = {};
 
-      // Chapter links in entry-content ul li a
-      var linkMatches = res.match(/<a[^>]*href="(https?:\/\/wuxialnscantrad\.wordpress\.com\/\d{4}\/[^"]*)"[^>]*>(.*?)<\/a>/gs);
+      // Comment widgets link to chapters of other novels on the same host.
+      var article=res.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+      if(!article)throw new Error('WuxiaLnScantrad : sommaire indisponible.');
+      var linkMatches = extractDivByClass(article[1], 'entry-content').match(/<a[^>]*href="(https?:\/\/wuxialnscantrad\.wordpress\.com\/\d{4}\/[^"]*)"[^>]*>(.*?)<\/a>/gs);
       if (!linkMatches) return [];
 
       for (var i = 0; i < linkMatches.length; i++) {

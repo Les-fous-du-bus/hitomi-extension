@@ -42,6 +42,17 @@ function decodeHtml(str) {
     .replace(/&raquo;/g, '"');
 }
 
+function kisswoodEntry(html) {
+  var open=/<div\b[^>]*class=["'][^"']*\bentry-content\b[^"']*["'][^>]*>/i.exec(html);
+  if(!open)throw new Error('KissWood : contenu de la page indisponible.');
+  var rest=html.substring(open.index+open[0].length),tags=/<\/?div\b[^>]*>/gi,depth=1,m;
+  while((m=tags.exec(rest))!==null){
+    depth+=m[0].substring(0,2)==='</'?-1:1;
+    if(depth===0)return rest.substring(0,m.index);
+  }
+  throw new Error('KissWood : contenu de la page incomplet.');
+}
+
 
 // Remplit les couvertures manquantes de la liste.
 //
@@ -236,7 +247,9 @@ class DefaultExtension extends MProvider {
       var seen = {};
 
       // Chapter links in entry-content: ul li a, p a, blockquote a
-      var linkMatches = res.match(/<a[^>]*href="(https?:\/\/kisswood\.eu\/[^"]*)"[^>]*>(.*?)<\/a>/gs);
+      // Recent comments in the sidebar also contain chapter titles of OTHER
+      // novels. Only links inside the actual TOC article belong to this book.
+      var linkMatches = kisswoodEntry(res).match(/<a[^>]*href="(https?:\/\/kisswood\.eu\/[^"]*)"[^>]*>(.*?)<\/a>/gs);
       if (!linkMatches) return [];
 
       for (var i = 0; i < linkMatches.length; i++) {
@@ -245,7 +258,7 @@ class DefaultExtension extends MProvider {
         var textMatch = m.match(/>(.*?)<\/a>/s);
         if (!hrefMatch || !textMatch) continue;
 
-        var chapUrl = hrefMatch[1].replace(/^http:\/\//, "https://");
+        var chapUrl = hrefMatch[1].replace(/^http:\/\//, "https://").replace(/#.*$/,'');
         var chapTitle = stripTags(textMatch[1]).replace(/\u00A0/g, " ").trim();
 
         if (!chapTitle) continue;
@@ -280,7 +293,7 @@ class DefaultExtension extends MProvider {
 
       return chapters;
     } catch (e) {
-      return [];
+      throw e;
     }
   }
 
@@ -290,21 +303,18 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, HEADERS);
 
       // Content is in entry-content, between <hr> tags
-      var entryMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*(?:<footer|<nav|<div[^>]*class="[^"]*(?:sharedaddy|post-navigation))/);
-      if (!entryMatch) {
-        entryMatch = res.match(/<div[^>]*class="[^"]*entry-content[^"]*"[^>]*>([\s\S]*?)<\/div>/);
-      }
-
-      if (entryMatch) {
-        var content = entryMatch[1];
+      {
+        var content = kisswoodEntry(res);
 
         // Split by <hr> tags and take content between first and last hr
         var hrParts = content.split(/<hr[^>]*\/?>/);
         if (hrParts.length >= 3) {
           // Take everything between first and last hr
           var chapterContent = hrParts.slice(1, hrParts.length - 1).join("<hr>");
+          if(decodeHtml(stripTags(chapterContent)).trim().length<200)throw new Error('KissWood : texte du chapitre indisponible.');
           return chapterContent;
         } else if (hrParts.length === 2) {
+          if(decodeHtml(stripTags(hrParts[1])).trim().length<200)throw new Error('KissWood : texte du chapitre indisponible.');
           return hrParts[1];
         }
 
@@ -315,12 +325,12 @@ class DefaultExtension extends MProvider {
         content = content.replace(/<[^>]*tipeee\.com\/kisswood[^>]*>[^<]*<\/a>/g, "");
         content = content.replace(/<[^>]*share=facebook[^>]*>[^<]*<\/a>/g, "");
 
+        if(decodeHtml(stripTags(content)).trim().length<200)throw new Error('KissWood : texte du chapitre indisponible.');
         return content;
       }
 
-      return "<p>Contenu non disponible</p>";
     } catch (e) {
-      return "<p>Erreur de chargement</p>";
+      throw e;
     }
   }
 

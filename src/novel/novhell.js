@@ -7,9 +7,9 @@
  * Mature : false
  *
  * Audit live 2026-04-19 (@khun) :
- *   - Site tres restreint (~7 romans publies). Homepage liste 5 figures
+ *   - Site tres restreint. Homepage liste 5 figures de romans.
  *   - Legacy "/roman/" inexistant
- *   - On complete maintenant via les liens <a href="https://novhell.org/<slug>/"> hors wp-json
+ *   - Les liens de statut et anciens alias ne sont pas de nouvelles œuvres.
  *   - Detail: meta og:title + meta description
  *
  * @author @khun — Extension Strategist
@@ -153,9 +153,11 @@ class DefaultExtension extends MProvider {
 
       var chapters = [];
 
-      // Novhell chapter links: main div article div div section div div div div div p a
-      // Simplified: find all links pointing to novhell.org chapter pages
-      var linkMatches = res.match(/<a[^>]*href="(https?:\/\/novhell\.org\/[^"]+)"[^>]*>(.*?)<\/a>/gs);
+      // Side widgets contain readable SRH chapters even on a TSW book page.
+      // A valid chapter URL alone is insufficient: it must belong to its article.
+      var article=res.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+      if(!article)throw new Error('Novhell : sommaire indisponible.');
+      var linkMatches = article[1].match(/<a[^>]*href="(https?:\/\/novhell\.org\/[^"]+)"[^>]*>(.*?)<\/a>/gs);
       if (!linkMatches) return [];
 
       var seen = {};
@@ -260,13 +262,6 @@ class DefaultExtension extends MProvider {
     var list = [];
     var seen = {};
 
-    // Reserved slugs that are NOT novels
-    var skipSlugs = {
-      "a-propos": 1, "feed": 1, "me-contacter": 1, "mentions-legales": 1,
-      "politique-de-confidentialite": 1, "wp-json": 1, "category": 1,
-      "tag": 1, "author": 1, "wp-admin": 1, "wp-login.php": 1,
-    };
-
     // Novhell homepage: article div div div figure elements
     var figureMatches = html.match(/<figure[^>]*>(.*?)<\/figure>/gs);
     if (figureMatches) {
@@ -304,25 +299,8 @@ class DefaultExtension extends MProvider {
       }
     }
 
-    // 2026-04-19: complement via anchors pointing to /<slug>/ pages
-    // Site is small (~7 novels) so we dedupe against the figure-based list
-    var anchorRegex = /<a[^>]*href="(https:\/\/novhell\.org\/([a-z0-9-]+)\/)"[^>]*>([\s\S]*?)<\/a>/gi;
-    var am;
-    while ((am = anchorRegex.exec(html)) !== null) {
-      var u = am[1];
-      var slug = am[2];
-      if (skipSlugs[slug]) continue;
-      if (seen[u]) continue;
-      var t = stripTags(am[3]).trim();
-      if (!t || t.length < 3) continue;
-      seen[u] = true;
-      list.push({
-        title: decodeHtml(t),
-        url: u,
-        imageUrl: "",
-        isMature: false,
-      });
-    }
+    // The generic-anchor fallback added a second Battlefield alias and a book
+    // literally named "En pause". The site's actual cover cards are authority.
 
     return { list: list, hasNextPage: false };
   }

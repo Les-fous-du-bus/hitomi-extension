@@ -310,9 +310,10 @@ class DefaultExtension extends MProvider {
 
       var chapters = [];
 
-      // Chapter links are in entry-content, pointing to xiaowaz.fr/articles/
-      // Try ul li a first, then p a
-      var linkMatches = res.match(/<a[^>]*href="(https?:\/\/xiaowaz\.fr\/articles\/[^"]+)"[^>]*>(.*?)<\/a>/gs);
+      // Recent posts outside the selected article belong to other novels.
+      var article=res.match(/<article\b[^>]*>([\s\S]*?)<\/article>/i);
+      if(!article)throw new Error('Xiaowaz : sommaire indisponible.');
+      var linkMatches = extractDivByClass(article[1], 'entry-content').match(/<a[^>]*href="(https?:\/\/xiaowaz\.fr\/articles\/[^"]+)"[^>]*>(.*?)<\/a>/gs);
       if (!linkMatches) return [];
 
       var seen = {};
