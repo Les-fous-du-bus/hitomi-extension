@@ -105,6 +105,29 @@ function parseList(html) {
   return { list: list, hasNextPage: hasNextPage };
 }
 
+// Keep Android bridge traffic bounded. Drain in-flight requests on error so
+// no fetch callback survives a rejected provider operation.
+async function lnmtlMapLimit(items, job) {
+  var results = new Array(items.length);
+  var next = 0;
+  var failure = null;
+  async function worker() {
+    while (!failure && next < items.length) {
+      var index = next++;
+      try {
+        results[index] = await job(items[index], index);
+      } catch (error) {
+        if (!failure) failure = error;
+      }
+    }
+  }
+  var workers = [];
+  for (var i = 0; i < Math.min(4, items.length); i++) workers.push(worker());
+  await Promise.all(workers);
+  if (failure) throw failure;
+  return results;
+}
+
 class DefaultExtension extends LNProvider {
   get id() {
     return "lnmtl";
@@ -247,36 +270,50 @@ class DefaultExtension extends LNProvider {
       }
     }
 
-    // Load chapters from all volumes via API
-    var chapters = [];
-    for (var v = 0; v < volumes.length; v++) {
-      var vol = volumes[v];
-      var volId = vol.id;
-      var volumeStart=chapters.length;
-
-      // First page
-      var chapterApiUrl = BASE_URL + "/chapter?volumeId=" + volId;
+    // Fetch first pages, then remaining pages with a shared limit of four.
+    // Response completion order must never change the site's volume/page order.
+    var volumePages = await lnmtlMapLimit(volumes, async function (vol) {
       var chapterText;
       try {
-        chapterText = await fetchv2(chapterApiUrl, { headers: HEADERS });
+        chapterText = await fetchv2(BASE_URL + "/chapter?volumeId=" + vol.id, { headers: HEADERS });
       } catch (e) {
         throw new Error('LNMTL : volume du sommaire inaccessible, réessaie plus tard.');
       }
-
       var chapterData;
       try {
         chapterData = JSON.parse(chapterText);
       } catch (e) {
         throw new Error('LNMTL : réponse du sommaire illisible.');
       }
-      if(!Array.isArray(chapterData.data))throw new Error('LNMTL : volume du sommaire incomplet.');
-      var volumeTotal=chapterData.total===undefined?null:Number(chapterData.total);
-      if(volumeTotal>0&&!chapterData.data.length)throw new Error('LNMTL : première page du sommaire vide malgré le total annoncé.');
-
-      // Process first page
-      if (chapterData.data) {
-        for (var c = 0; c < chapterData.data.length; c++) {
-          var ch = chapterData.data[c];
+      if (!Array.isArray(chapterData.data)) throw new Error('LNMTL : volume du sommaire incomplet.');
+      var total = chapterData.total === undefined ? null : Number(chapterData.total);
+      if (total > 0 && !chapterData.data.length) throw new Error('LNMTL : première page du sommaire vide malgré le total annoncé.');
+      return { pages: [chapterData.data], lastPage: chapterData.last_page || 1, total: total };
+    });
+    var pageJobs = [];
+    for (var v = 0; v < volumes.length; v++) {
+      for (var p = 2; p <= volumePages[v].lastPage; p++) {
+        pageJobs.push({ volume: v, page: p });
+      }
+    }
+    await lnmtlMapLimit(pageJobs, async function (job) {
+      var pageUrl = BASE_URL + "/chapter?page=" + job.page + "&volumeId=" + volumes[job.volume].id;
+      try {
+        var pageText = await fetchv2(pageUrl, { headers: HEADERS });
+        var pageData = JSON.parse(pageText);
+        if (!Array.isArray(pageData.data) || !pageData.data.length) throw new Error('LNMTL : page du sommaire vide.');
+        volumePages[job.volume].pages[job.page - 1] = pageData.data;
+      } catch (e) {
+        throw new Error('LNMTL : page du sommaire inaccessible ou incomplète.');
+      }
+    });
+    var chapters = [];
+    for (var v = 0; v < volumePages.length; v++) {
+      var volumeStart = chapters.length;
+      var loaded = volumePages[v];
+      for (var p = 0; p < loaded.pages.length; p++) {
+        for (var c = 0; c < loaded.pages[p].length; c++) {
+          var ch = loaded.pages[p][c];
           chapters.push({
             name: "#" + ch.number + " - " + (ch.title || ""),
             url: BASE_URL + "/chapter/" + ch.slug,
@@ -285,32 +322,7 @@ class DefaultExtension extends LNProvider {
           });
         }
       }
-
-      // Load remaining pages for this volume
-      var lastPage = chapterData.last_page || 1;
-      for (var p = 2; p <= lastPage; p++) {
-        var pageUrl =
-          BASE_URL + "/chapter?page=" + p + "&volumeId=" + volId;
-        try {
-          var pageText = await fetchv2(pageUrl, { headers: HEADERS });
-          var pageData = JSON.parse(pageText);
-          if(!Array.isArray(pageData.data)||!pageData.data.length)throw new Error('LNMTL : page du sommaire vide.');
-          if (pageData.data) {
-            for (var c2 = 0; c2 < pageData.data.length; c2++) {
-              var ch2 = pageData.data[c2];
-              chapters.push({
-                name: "#" + ch2.number + " - " + (ch2.title || ""),
-                url: BASE_URL + "/chapter/" + ch2.slug,
-                chapterNumber: ch2.number || chapters.length + 1,
-                releaseTime: ch2.created_at || "",
-              });
-            }
-          }
-        } catch (e) {
-          throw new Error('LNMTL : page du sommaire inaccessible ou incomplète.');
-        }
-      }
-      if(volumeTotal!==null&&isFinite(volumeTotal)&&volumeTotal>=0&&chapters.length-volumeStart!==volumeTotal)throw new Error('LNMTL : sommaire du volume incomplet par rapport au total annoncé.');
+      if (loaded.total !== null && isFinite(loaded.total) && loaded.total >= 0 && chapters.length - volumeStart !== loaded.total) throw new Error('LNMTL : sommaire du volume incomplet par rapport au total annoncé.');
     }
 
     return {
