@@ -21,12 +21,14 @@
 //      souvent une preface, une annonce ou une page "A propos", pas un chapitre.
 //      On echantillonne desormais debut, milieu et fin.
 //
-// Un quatrieme piege est signale plutot que corrige : Cloudflare rend 403 sur du
-// HTTP natif alors que l'app passe par son navigateur embarque. Ce cas rend
-// BLOCKED-CF, distinct de RED : l'extension n'est pas fautive.
+// Un blocage Cloudflare est distingue d'un resultat vide. Il ne permet pas
+// de conclure au fonctionnement sur Android : ce chemin doit etre teste aussi.
+// Le dialecte est determine par le dossier source, jamais par les methodes
+// heritees des ponts. GREEN exige toutes les etapes et tous les echantillons.
 const fs = require('fs');
 const vm = require('vm');
 const path = require('path');
+const {sourceKind,sourceVerdict}=require('./harness-contract.js');
 const { RUNTIME_BASE_JS } = require('./runtime-base.js');
 const { creerPont } = require('./bridge.js');
 
@@ -44,6 +46,7 @@ if (!file || !fs.existsSync(file)) {
   process.exit(2);
 }
 const src = fs.readFileSync(file, 'utf8');
+const kind=sourceKind(file,process.env.EXT_TEST_KIND);
 
 // Traces reseau du dernier appel, pour distinguer un blocage Cloudflare d'un
 // site reellement muet.
@@ -153,19 +156,18 @@ function sampleIndices(n) {
   const out = {
     id: path.basename(file, '.js'),
     baseUrl: (() => { try { return ext.baseUrl; } catch { return '?'; } })(),
-    kind: '?', stages: {}, chapters_probed: [], err: {},
+    kind, query, file, stages: {}, chapters_probed: [], err: {},
   };
   let firstUrl = null;
-  let usedNovel = false;
+  let usedNovel = kind === 'novel';
 
-  // LISTE — on tente le dialecte novel puis le dialecte manga.
-  const lr = await tryVariants([
+  // LISTE — utiliser le dialecte du dossier source.
+  const lr = await tryVariants((usedNovel ? [
     ['popularNovels', () => ext.popularNovels(1), r => listOf(r).length > 0],
     ['getPopular', () => ext.getPopular(1), r => listOf(r).length > 0],
-  ]);
+  ] : [['getPopular', () => ext.getPopular(1), r => listOf(r).length > 0]]));
   const list = listOf(lr.val);
-  usedNovel = lr.via === 'popularNovels';
-  out.kind = usedNovel ? 'novel' : (lr.via === 'getPopular' ? 'manga' : '?');
+
   out.stages.list = list.length;
   if (lr.err) out.err.list = lr.err;
   if (list.length) firstUrl = urlOf(list[0]);
@@ -197,10 +199,10 @@ function sampleIndices(n) {
   }
 
   // RECHERCHE
-  const sr = await tryVariants([
+  const sr = await tryVariants((usedNovel ? [
     ['searchNovels', () => ext.searchNovels(query, 1), r => listOf(r).length > 0],
     ['search', () => ext.search(query, 1, []), r => listOf(r).length > 0],
-  ]);
+  ] : [['search', () => ext.search(query, 1, []), r => listOf(r).length > 0]]));
   const slist = listOf(sr.val);
   out.stages.search = slist.length;
   if (sr.err) out.err.search = sr.err;
@@ -224,10 +226,10 @@ function sampleIndices(n) {
   if (candidates.length) {
     out.works_tried = [];
     for (const candidate of candidates) {
-      const dr = await tryVariants([
+      const dr = await tryVariants((usedNovel ? [
         ['parseNovelAndChapters', () => ext.parseNovelAndChapters(candidate), d => d && (d.title || d.name)],
         ['getMangaDetail', () => ext.getMangaDetail(candidate), d => d && (d.title || d.name)],
-      ]);
+      ] : [['getMangaDetail', () => ext.getMangaDetail(candidate), d => d && (d.title || d.name)]]));
       const detail = dr.val;
       const gotDetail = detail && (detail.title || detail.name) ? 1 : 0;
 
@@ -238,7 +240,7 @@ function sampleIndices(n) {
         if (cr.err && !out.err.chapters) out.err.chapters = cr.err;
       }
 
-      out.works_tried.push({ url: candidate.slice(-52), detail: gotDetail, chapters: found.length });
+      out.works_tried.push({ url: candidate, detail: gotDetail, chapters: found.length });
       out.stages.detail = gotDetail;
       if (dr.err) out.err.detail = dr.err; else delete out.err.detail;
 
@@ -274,13 +276,13 @@ function sampleIndices(n) {
       continue;
     }
     probed++;
-    const kr = await tryVariants([
+    const kr = await tryVariants((usedNovel ? [
       ['parseChapter', () => ext.parseChapter(u), r => contentOf(r).length > 0],
       ['getContent', () => ext.getContent(u), r => contentOf(r).length > 0],
       ['getPageList', () => ext.getPageList(u), r => Array.isArray(r) && r.length > 0],
       ['getHtmlContent', () => ext.getHtmlContent('', u), r => contentOf(r).length > 0],
-    ]);
-    const rec = { i: idx, name: String(c.title || c.name || '').slice(0, 48), via: kr.via };
+    ] : [['getPageList', () => ext.getPageList(u), r => Array.isArray(r) && r.length > 0]]));
+    const rec = { i: idx, url: u, name: String(c.title || c.name || '').slice(0, 48), via: kr.via };
     if (kr.via === 'getPageList') {
       rec.pages = (kr.val || []).length;
       pagesSeen += rec.pages;
@@ -318,20 +320,7 @@ function sampleIndices(n) {
   // Un echec sur le PREMIER element, lui, trahit une liste polluee (lien de menu,
   // preface, autre roman) — c'etait le cas de novhell avant correction. La
   // position est donc le discriminant, pas le simple compte.
-  const lastIdx = out.chapters_probed.length - 1;
-  const failures = out.chapters_probed.filter(c => (c.via === 'getPageList' ? !c.readable : (c.text || 0) < MIN_TEXT));
-  const onlyLastFailed = failures.length === 1 && out.chapters_probed.indexOf(failures[0]) === lastIdx;
-
-  const canBrowse = out.stages.list > 0 || out.stages.search > 0;
-  if (!canBrowse && net.cloudflare) out.verdict = 'BLOCKED-CF';
-  else if (!canBrowse) out.verdict = 'RED';
-  else if (probed === 0) out.verdict = 'NO-CHAPTERS';
-  else if (readable === probed) out.verdict = 'GREEN';
-  else if (out.kind === 'novel' && pagesSeen === 0 && readable > 0 && onlyLastFailed && probed >= 3) {
-    out.verdict = 'GREEN';
-    out.note = 'dernier chapitre non lisible : probablement en cours de publication cote site, a verifier si le cas se repete';
-  } else if (readable > 0) out.verdict = 'PARTIAL';
-  else out.verdict = net.cloudflare ? 'BLOCKED-CF' : 'EMPTY';
+  out.verdict=sourceVerdict({stages:out.stages,probed,readable,cloudflare:net.cloudflare,coverProbes:(out.cover_probes||[]).length});
 
   if (net.cloudflare) out.cloudflare = true;
   console.log(JSON.stringify(out));
