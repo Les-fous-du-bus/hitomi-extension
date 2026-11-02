@@ -157,16 +157,27 @@ class DefaultExtension extends LNProvider {
 
     var chapters = [];
     var raw = m.chapters || [];
+    var expected=Number(m.stats&&m.stats.chaptersCount||0);
+    // SSR contains only the latest 50 chapters plus a separate firstChapter.
+    // The site's own reader loads this public endpoint for the full list.
+    if(expected>raw.length){
+      if(!m.id)throw new Error('NovelBuddy : sommaire incomplet, identifiant absent.');
+      var all=JSON.parse(await fetchv2('https://api.novelbuddy.me/titles/'+encodeURIComponent(String(m.id))+'/chapters',{headers:HEADERS}));
+      if(all.success!==true||!all.data||!Array.isArray(all.data.chapters)||all.data.chapters.length<expected)throw new Error('NovelBuddy : sommaire complet indisponible ou incomplet.');
+      raw=all.data.chapters;
+    }
     // Le site liste du plus recent au plus ancien ; l'app attend l'ordre de
     // lecture, donc on retourne la liste.
+    var seen={};
     for (var i = raw.length - 1; i >= 0; i--) {
       var c = raw[i];
       if (!c || !c.url) continue;
+      var chapterUrl=absoluteUrl(c.url);if(seen[chapterUrl])continue;seen[chapterUrl]=true;
       chapters.push({
         name: c.name || ("Chapter " + (c.number || "")),
-        url: absoluteUrl(c.url),
+        url: chapterUrl,
         chapterNumber: typeof c.number === "number" ? c.number : 0,
-        releaseTime: c.updatedAt || "",
+        releaseTime: c.updatedAt || c.updated_at || "",
       });
     }
 
@@ -188,6 +199,8 @@ class DefaultExtension extends LNProvider {
         });
       }
     }
+
+    if(expected>chapters.length)throw new Error('NovelBuddy : sommaire incomplet après validation des chapitres.');
 
     return {
       title: m.name || "",
