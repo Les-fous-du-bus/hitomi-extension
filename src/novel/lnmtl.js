@@ -259,15 +259,16 @@ class DefaultExtension extends LNProvider {
       try {
         chapterText = await fetchv2(chapterApiUrl, { headers: HEADERS });
       } catch (e) {
-        continue;
+        throw new Error('LNMTL : volume du sommaire inaccessible, réessaie plus tard.');
       }
 
       var chapterData;
       try {
         chapterData = JSON.parse(chapterText);
       } catch (e) {
-        continue;
+        throw new Error('LNMTL : réponse du sommaire illisible.');
       }
+      if(!Array.isArray(chapterData.data))throw new Error('LNMTL : volume du sommaire incomplet.');
 
       // Process first page
       if (chapterData.data) {
@@ -290,6 +291,7 @@ class DefaultExtension extends LNProvider {
         try {
           var pageText = await fetchv2(pageUrl, { headers: HEADERS });
           var pageData = JSON.parse(pageText);
+          if(!Array.isArray(pageData.data)||!pageData.data.length)throw new Error('LNMTL : page du sommaire vide.');
           if (pageData.data) {
             for (var c2 = 0; c2 < pageData.data.length; c2++) {
               var ch2 = pageData.data[c2];
@@ -302,7 +304,7 @@ class DefaultExtension extends LNProvider {
             }
           }
         } catch (e) {
-          // Continue with next page
+          throw new Error('LNMTL : page du sommaire inaccessible ou incomplète.');
         }
       }
     }
