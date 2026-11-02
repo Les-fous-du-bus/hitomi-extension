@@ -38,6 +38,47 @@ test('le titre de fiche est celui de l œuvre, pas la rubrique Informations', as
   }
 });
 
+test('la fiche moderne distingue couverture, synopsis, auteur, statut et genres des éléments de navigation', async()=>{
+  const url='https://anime-sama.to/catalogue/100-jours-avant-ta-mort/';
+  const html=`<header><img src="/img/opti/logo.webp" alt="Anime-Sama"></header>
+    <meta property="og:image" content="https://cdn.test/landscape.jpg">
+    <div class="oe-affiche"><img src="https://cdn.test/cover.jpg" alt="100 Jours Avant Ta Mort"></div>
+    <h1 id="titreOeuvre">100 Jours Avant Ta Mort</h1>
+    <p id="titreAlter">Last Hundred Days Till She Dies, Kimi ga Shinu Made Ato Hyaku Nichi</p>
+    <dl class="oe-infos"><dt>Format</dt><dd>Manga</dd><dt>Auteur</dt><dd>Migihara &amp; Co</dd><dt>Statut</dt><dd>Terminé</dd></dl>
+    <h2>Synopsis</h2><div class="oe-synopsis"><p id="synopsisText">Taro a enfin pu avouer à Umi qu'il l'aime. Ensemble, ils affrontent le compte à rebours.</p></div>
+    <div class="oe-genres"><a href="/catalogue/?genre[]=Romance">Romance</a><a href="/catalogue/?genre[]=Drame">Drame</a></div>
+    <nav><a href="/catalogue/?genre=Action">Action</a></nav>`;
+  const {ext}=chargerExtension(EXTENSION,{[url]:html});
+  const detail=await ext.getMangaDetail(url);
+  assert.strictEqual(detail.imageUrl,'https://cdn.test/cover.jpg');
+  assert.match(detail.description,/^Taro a enfin/);
+  assert.ok(!detail.description.includes('Last Hundred Days'));
+  assert.deepStrictEqual(normaliser(detail.authors),['Migihara & Co']);
+  assert.strictEqual(detail.status,'completed');
+  assert.deepStrictEqual(normaliser(detail.genres),['Romance','Drame']);
+});
+
+test('les champs absents ne deviennent ni logo, ni titres alternatifs, ni statut en cours', async()=>{
+  const url='https://anime-sama.to/catalogue/fiche-incomplete/';
+  const {ext}=chargerExtension(EXTENSION,{[url]:'<img src="/img/opti/logo.webp"><h1 id="titreOeuvre">Fiche incomplète</h1><p id="titreAlter">Alternate title</p><nav><a href="/catalogue/?genre=Action">Action</a></nav>'});
+  const detail=await ext.getMangaDetail(url);
+  assert.strictEqual(detail.imageUrl,'');
+  assert.strictEqual(detail.description,'');
+  assert.deepStrictEqual(normaliser(detail.authors),[]);
+  assert.deepStrictEqual(normaliser(detail.genres),[]);
+  assert.strictEqual(detail.status,'unknown');
+});
+
+test('une couverture différée et un synopsis ancien restent attachés à leur champ explicite', async()=>{
+  const url='https://anime-sama.to/catalogue/ancien-format/';
+  const html='<img src="/img/opti/logo.webp"><h1 id="titreOeuvre">Ancien format</h1><p>Un alias</p><img id="coverOeuvre" src="data:image/gif;base64,AAAA" data-src="/covers/real.jpg"><h2>Synopsis</h2><div><p>Le vrai récit &amp; sa suite.</p></div>';
+  const {ext}=chargerExtension(EXTENSION,{[url]:html});
+  const detail=await ext.getMangaDetail(url);
+  assert.strictEqual(detail.imageUrl,'https://anime-sama.to/covers/real.jpg');
+  assert.strictEqual(detail.description,'Le vrai récit & sa suite.');
+});
+
 test('un chapitre reel est bien decoupe', async (t) => {
   const { ext } = chargerExtension(EXTENSION, {
     '/catalogue/100-jours-avant-ta-mort/scan/vf/': PAGE_SCAN('100 Jours Avant Ta Mort'),

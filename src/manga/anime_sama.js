@@ -85,12 +85,25 @@ class DefaultExtension extends MProvider {
 
   _extractImgSrc(img) {
     if (!img) return "";
-    var src = img.getAttribute("src") ||
-              img.getAttribute("data-src") ||
-              img.getAttribute("data-lazy-src") ||
-              "";
-    if (!src || src.startsWith("data:")) return "";
-    return this._absoluteUrl(src);
+    var attributes = ["data-src", "data-lazy-src", "src"];
+    for (var i = 0; i < attributes.length; i++) {
+      var src = img.getAttribute(attributes[i]) || "";
+      if (src && !src.startsWith("data:")) return this._absoluteUrl(src);
+    }
+    return "";
+  }
+
+  _metadataText(html) {
+    return String(html || "")
+      .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&(amp|quot|apos|nbsp|lt|gt|#\d+|#x[0-9a-f]+);/gi, function(entity, key) {
+        var named = {amp:"&", quot:'"', apos:"'", nbsp:" ", lt:"<", gt:">"};
+        if (key.charAt(0) !== "#") return named[key.toLowerCase()];
+        var value = key.charAt(1).toLowerCase() === "x" ? parseInt(key.slice(2), 16) : parseInt(key.slice(1), 10);
+        return value > 0 && value <= 0x10ffff ? String.fromCodePoint(value) : entity;
+      })
+      .replace(/\s+/g, " ").trim();
   }
 
   // ─────────────────────────────────────────────
@@ -199,55 +212,59 @@ class DefaultExtension extends MProvider {
         title = ogTitle ? (ogTitle.getAttribute("content") || "").trim() : "";
       }
 
-      // Cover : #coverOeuvre, puis premier img non-data:, puis og:image.
-      var imageUrl = "";
-      var coverEl = doc.querySelector("#coverOeuvre");
-      if (coverEl) imageUrl = this._extractImgSrc(coverEl);
-      if (!imageUrl) {
-        var imgs = doc.querySelectorAll("img");
-        for (var i = 0; i < imgs.length; i++) {
-          var candidate = this._extractImgSrc(imgs[i]);
-          if (candidate) { imageUrl = candidate; break; }
-        }
-      }
+      // The first image is the site logo, not the work's artwork.
+      var coverEl = doc.querySelector(".oe-affiche img") ||
+                    doc.querySelector("#coverOeuvre img") ||
+                    doc.querySelector("#coverOeuvre") ||
+                    doc.querySelector("#imgOeuvre");
+      var imageUrl = this._extractImgSrc(coverEl);
       if (!imageUrl) {
         var ogImage = doc.querySelector("meta[property='og:image']");
         imageUrl = ogImage ? this._absoluteUrl(ogImage.getAttribute("content") || "") : "";
       }
 
-      // Synopsis : premier <p> apres un <h2> contenant "synopsis".
-      var description = "";
-      var headings = doc.querySelectorAll("h2");
-      for (var j = 0; j < headings.length; j++) {
-        if ((headings[j].textContent || "").toLowerCase().includes("synopsis")) {
-          var sibling = headings[j].nextElementSibling;
-          while (sibling && (sibling.tagName || "").toLowerCase() !== "p") {
-            sibling = sibling.nextElementSibling;
-          }
-          if (sibling) description = (sibling.textContent || "").trim();
-          break;
+      // Alternate titles precede the synopsis and must not become its fallback.
+      var synopsisEl = doc.querySelector("#synopsisText") || doc.querySelector(".oe-synopsis p");
+      var description = synopsisEl ? this._metadataText(synopsisEl.innerHTML) : "";
+      if (!description) {
+        var heading = html.match(/<h([1-6])\b[^>]*>\s*Synopsis\s*<\/h\1>/i);
+        if (heading) {
+          var section = html.slice(heading.index + heading[0].length).split(/<h[1-6]\b/i)[0];
+          var paragraph = section.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i);
+          if (paragraph) description = this._metadataText(paragraph[1]);
         }
       }
-      if (!description) {
-        var p = doc.querySelector("p");
-        if (p) description = (p.textContent || "").trim();
-      }
 
-      // Genres
+      var info = {}, infoEl = doc.querySelector(".oe-infos");
+      if (infoEl) {
+        var pairPattern = /<dt\b[^>]*>([\s\S]*?)<\/dt>\s*<dd\b[^>]*>([\s\S]*?)<\/dd>/gi;
+        var pair;
+        while ((pair = pairPattern.exec(infoEl.innerHTML)) !== null) {
+          info[this._metadataText(pair[1]).toLowerCase()] = this._metadataText(pair[2]);
+        }
+      }
+      var author = info.auteur || info.auteurs || info["auteur(s)"] || "";
+      var rawStatus = (info.statut || "").toLowerCase();
+      var status = "unknown";
+      if (/termin[ée]|complet/.test(rawStatus)) status = "completed";
+      else if (/en cours/.test(rawStatus)) status = "ongoing";
+      else if (/pause|hiatus/.test(rawStatus)) status = "hiatus";
+      else if (/abandonn/.test(rawStatus)) status = "abandoned";
+
       var genres = [];
-      doc.querySelectorAll("a[href*='genre=']").forEach(function(a) {
-        var g = (a.textContent || "").trim();
-        if (g && genres.indexOf(g) === -1) genres.push(g);
-      });
+      doc.querySelectorAll(".oe-genres a").forEach(function(a) {
+        var genre = this._metadataText(a.innerHTML);
+        if (genre && genres.indexOf(genre) === -1) genres.push(genre);
+      }, this);
 
       return {
         title: title || slug.replace(/-/g, " "),
         url: url,
         imageUrl: imageUrl,
         description: description,
-        status: "ongoing",
+        status: status,
         genres: genres,
-        authors: [],
+        authors: author ? [author] : [],
         isMature: false,
       };
     } catch (_) {
