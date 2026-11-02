@@ -38,4 +38,7 @@ test('an advertised TOC page without chapters cannot silently truncate the book'
     const {ext}=chargerExtension(file,{'/novel/test?toc=2':'<html>Unavailable</html>','/novel/test':first+suffix});
     await assert.rejects(ext.parseNovelAndChapters(root+'/novel/test'),/sommaire vide/);
   }
+  const brokenFirst='<h1>Test</h1><a class="btn next" href="/novel/test?toc=2">Next</a>';
+  const {ext}=chargerExtension(file,{'/novel/test?toc=2':'<ul class="toc"><li><a href="/novel/test/ch2">Chapter 2</a></li></ul>','/novel/test':brokenFirst});
+  await assert.rejects(ext.parseNovelAndChapters(root+'/novel/test'),/première page/);
 });
