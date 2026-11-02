@@ -71,9 +71,9 @@ class DefaultExtension extends MProvider {
   // URL tested 2026-04-19: GET https://asurascans.com/comics?page=1 -> 200, 21 cards
   async getPopular(page) {
     try {
-      var url = BASE_URL + "/comics?order=rating&page=" + page;
+      var url = BASE_URL + "/browse?order=rating&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
-      return this._parseSeriesList(res);
+      return this._parseSeriesList(res, page);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -81,9 +81,9 @@ class DefaultExtension extends MProvider {
 
   async getLatestUpdates(page) {
     try {
-      var url = BASE_URL + "/comics?order=update&page=" + page;
+      var url = BASE_URL + "/browse?order=update&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
-      return this._parseSeriesList(res);
+      return this._parseSeriesList(res, page);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -91,9 +91,9 @@ class DefaultExtension extends MProvider {
 
   async search(query, page, filters) {
     try {
-      var url = BASE_URL + "/comics?s=" + encodeURIComponent(query) + "&page=" + page;
+      var url = BASE_URL + "/browse?q=" + encodeURIComponent(query) + "&page=" + page;
       var res = await fetchv2(url, { "Referer": BASE_URL });
-      return this._parseSeriesList(res);
+      return this._parseSeriesList(res, page);
     } catch (e) {
       return { list: [], hasNextPage: false };
     }
@@ -361,7 +361,7 @@ class DefaultExtension extends MProvider {
     ];
   }
 
-  _parseSeriesList(html) {
+  _parseSeriesList(html, page) {
     var list = [];
     var seen = {};
 
@@ -402,7 +402,8 @@ class DefaultExtension extends MProvider {
       });
     }
 
-    var hasNextPage = html.indexOf("Next") !== -1 && list.length > 0;
+    var nextPage = (Number(page) || 1) + 1;
+    var hasNextPage = list.length > 0 && new RegExp('href=[\"\'][^\"\']*[?&](?:amp;)?page=' + nextPage + '(?:[&#\"\'])', 'i').test(html);
     return { list: list, hasNextPage: hasNextPage };
   }
 }
