@@ -18,3 +18,8 @@ for(const [name,first,second]of [
   const replies={[u]:html,'/chapter?volumeId=5':first};if(second!==null)replies['/chapter?page=2&volumeId=5']=second;
   const{ext}=chargerExtension(file,replies);await assert.rejects(ext.parseNovelAndChapters(u),/sommaire/);
 });
+for(const data of [[],[{number:501,slug:'test-501',title:'A partial page'}]])test('LNMTL does not hide a later volume missing its advertised total ('+data.length+' rows)',async()=>{
+  const u='https://lnmtl.com/novel/test';const html='<img class="img-rounded" title="Test" src="https://lnmtl.com/cover.jpg"><script>lnmtl.volumes = [{"id":5,"number":5},{"id":6,"number":6}];</script>';
+  const replies={[u]:html,'/chapter?volumeId=5':JSON.stringify({data:[{number:401,slug:'test-401',title:'Valid'}],total:1,last_page:1}),'/chapter?volumeId=6':JSON.stringify({data,total:10,last_page:1})};
+  const{ext}=chargerExtension(file,replies);await assert.rejects(ext.parseNovelAndChapters(u),/sommaire/);
+});

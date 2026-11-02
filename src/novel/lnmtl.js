@@ -252,6 +252,7 @@ class DefaultExtension extends LNProvider {
     for (var v = 0; v < volumes.length; v++) {
       var vol = volumes[v];
       var volId = vol.id;
+      var volumeStart=chapters.length;
 
       // First page
       var chapterApiUrl = BASE_URL + "/chapter?volumeId=" + volId;
@@ -269,6 +270,8 @@ class DefaultExtension extends LNProvider {
         throw new Error('LNMTL : réponse du sommaire illisible.');
       }
       if(!Array.isArray(chapterData.data))throw new Error('LNMTL : volume du sommaire incomplet.');
+      var volumeTotal=chapterData.total===undefined?null:Number(chapterData.total);
+      if(volumeTotal>0&&!chapterData.data.length)throw new Error('LNMTL : première page du sommaire vide malgré le total annoncé.');
 
       // Process first page
       if (chapterData.data) {
@@ -307,6 +310,7 @@ class DefaultExtension extends LNProvider {
           throw new Error('LNMTL : page du sommaire inaccessible ou incomplète.');
         }
       }
+      if(volumeTotal!==null&&isFinite(volumeTotal)&&volumeTotal>=0&&chapters.length-volumeStart!==volumeTotal)throw new Error('LNMTL : sommaire du volume incomplet par rapport au total annoncé.');
     }
 
     return {
