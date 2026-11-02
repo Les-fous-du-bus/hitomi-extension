@@ -24,7 +24,8 @@ function mdAssignment(html, name) {
   throw new Error('Mangadraft : données '+name+' incomplètes.');
 }
 function mdAccessible(category) {
-  return category && category.published!==0 && category.is_private!==1 && category.delayed!==true &&
+  return category && category.published!==0 && category.published!==false && category.is_private!==1 && category.is_private!==true && category.delayed!==true &&
+    (category.ad_unlock!==true || category.unlocked===true || category.access===true) &&
     (category.is_free===true || category.unlocked===true || category.access===true);
 }
 function mdCategories(categories) {

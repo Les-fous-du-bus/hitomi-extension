@@ -34,3 +34,8 @@ test('a ROOT container is expanded into real child chapters rather than an empty
  const {ext}=chargerExtension(FILE,{'/manga/test':reader(categories),'/reader/test':reader(categories)});
  const r=await ext.getMangaDetail(base+'/manga/test');assert.equal(r.chapters.length,1);assert.equal(r.chapters[0].url,base+'/reader/test/c.21');
 });
+test('boolean unpublished/private and ad-locked categories remain excluded',async()=>{
+ const categories={TOME:[],ROOT:[category(1,1,{published:false}),category(2,2,{is_private:true}),category(3,3,{ad_unlock:true}),category(4,4)],CHAPTER:{},SPECIAL:[]};
+ const {ext}=chargerExtension(FILE,{'/manga/test':reader(categories),'/reader/test':reader(categories)});
+ const r=await ext.getMangaDetail(base+'/manga/test');assert.deepEqual(normaliser(r.chapters.map(x=>x.url)),[base+'/reader/test/c.4']);
+});
