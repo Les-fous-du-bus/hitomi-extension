@@ -23,14 +23,15 @@
             "name": "KissWood",
             "lang": "fr",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/kisswood.js",
             "iconUrl": "https://kisswood.eu/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "99cd7f6bea76d5318b657998a8e53b950b604bd20f2efb5ab3cc9ff9d516d8ef"
+            "sha256": "4d15d68560bf4a0bbc66263c110f413778088f1ef73ca789d3525910937fcfaf",
+            "note": "v2 (2026-11-02) : Sommaire limité à l’article de l’œuvre ; les liens des commentaires et des autres romans sont exclus. Le chapitre 0 conserve son numéro et son ordre."
         },
         {
             "id": "lightnovelpub",
@@ -67,15 +68,15 @@
             "name": "LNMTL",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/novel/lnmtl.js",
             "iconUrl": "https://lnmtl.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "CF present (server: cloudflare, HTTP 200) but no challenge triggered in testing. Monitor.",
-            "sha256": "0baca721f4b37a00bf8d267935132bab697ff89254dc1c7bac9b5f50ff546157"
+            "note": "v2 (2026-11-02) : Le message de traduction indisponible du site est refusé au lieu d’être enregistré comme chapitre. Une erreur de pagination signale un sommaire incomplet au lieu de masquer les chapitres manquants.",
+            "sha256": "684d0d33139416b2f01d1cec6a81c5a3698f3e7fed282ace06de091c1b909db8"
         },
         {
             "id": "massnovel",
@@ -112,15 +113,15 @@
             "name": "NovelBuddy",
             "lang": "en",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": false,
             "jsUrl": "src/novel/novelbuddy.js",
             "iconUrl": "https://novelbuddy.me/static/sites/novelbuddy-me/icons/favicon-32x32.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "2b55dfd9f30b0f54818b1d0e58711ae9064fc58738fabe20fcc43d9052aac134",
-            "note": "v2 (2026-09-04) : reecriture complete. Le domaine .com n'a plus de DNS et redirige vers novelbuddy.me, ET le site est devenu une application Next.js : les blocs .book-detailed-item, div.chapter__content et /api/manga/{id}/chapters ont tous disparu. On lit desormais le JSON embarque (__NEXT_DATA__). LIMITE MESUREE : la fiche n'expose que les 50 derniers chapitres ; les points d'entree de pagination essayes le 2026-09-04 rendent 400 ou 404. Le chapitre 1 est repeche via firstChapter. Mesure : 3/3 chapitres lisibles."
+            "sha256": "56de16b7aa732cb79841822cba5a8f09d15756de5aee58aa7edae7d19f7b8b54",
+            "note": "v3 (2026-11-02) : Sommaire complet récupéré depuis l’API publique du site, contrôlé et dédupliqué ; les anciens liens de lecture sont conservés. Mesure : 3956 chapitres au lieu de 51."
         },
         {
             "id": "noveldeglace",
@@ -186,15 +187,15 @@
             "name": "Novhell",
             "lang": "fr",
             "space": "light_novel",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/novhell.js",
             "iconUrl": "https://novhell.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v3 (2026-09-04) : le filtre annonce en commentaire (only chapter-like links) n'etait pas applique, donc la liste ramassait les liens du menu vers les autres romans du site (Emperor of the Cosmos, Star Rank Hunter), qui rendent une page de presentation. Filtre pose + normalisation des adresses http en https. Mesure : 398 chapitres reels au lieu de 411 pollues, 3/3 lisibles.",
-            "sha256": "fadc8e1540a5e60394bd41caa7139235c98424d22e93b2a6cfebd4a74f17281c"
+            "note": "v4 (2026-11-02) : Catalogue limité aux vraies fiches et sommaire limité au contenu de l’œuvre ; les romans des menus latéraux ne deviennent plus des chapitres.",
+            "sha256": "dec18783a96e775c2fe3b2c57c6fe8b11ecd8134520533d3570da2264d451a16"
         },
         {
             "id": "readnovelfull",
@@ -290,45 +291,45 @@
             "name": "WuxiaLnScantrad",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/wuxialnscantrad.js",
             "iconUrl": "https://wuxialnscantrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "24b9f7de35002f248c4bb49384a3c1258da53bbaae0f0009b135b583216060d8",
-            "note": "v2 (2026-09-04) : getContent fermait le conteneur sur le premier </div>, qui appartenait au widget de notation en tete de contenu. L'extension rendait 76 caracteres de decor. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 107 chapitres, 3/3 lisibles."
+            "sha256": "fb5cde75efaabacf414b4c3b0898e09440b63d8fc2d52c449a712c021988b8c9",
+            "note": "v3 (2026-11-02) : Sommaire limité au contenu principal de l’œuvre ; les commentaires récents d’autres romans sont exclus."
         },
         {
             "id": "xiaowaz",
             "name": "Xiaowaz",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/xiaowaz.js",
             "iconUrl": "https://xiaowaz.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "b1bdfe78b758b928a5499878fdbe6f85f265ff160934fad62e1d3b5b385ce368",
-            "note": "v2 (2026-09-04) : le decoupage du texte bornait entre wp-post-navigation et l'un de abh_box / ko-fi / sharedaddy. Les trois marqueurs de fin ont disparu du site, la regex ne fermait plus son bloc et tous les chapitres rendaient le message d'indisponibilite. Remplace par une extraction de entry-content par comptage d'imbrication, insensible aux encarts optionnels. Mesure : 190 chapitres, 3/3 lisibles."
+            "sha256": "2ccfa43744eae9882d10700c84b5364430a8daf52558bd645ce0d2c1d3730015",
+            "note": "v3 (2026-11-02) : Sommaire limité au contenu principal de l’œuvre ; les commentaires récents d’autres romans sont exclus."
         },
         {
             "id": "anime_sama",
             "name": "AnimeSama",
             "lang": "fr",
             "space": "manga",
-            "version": 6,
+            "version": 7,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/anime_sama.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v6 (2026-09-24) : « Billy Bat » echouait avec « le site ne connait pas cote scans ». Le site lit le nom de l'oeuvre par innerHTML BRUT et sa page porte « Billy Bat » suivi d'un espace ; son interface de chapitres attend cette cle a l'identique. L'extension appliquait .trim() — et le socle de l'app retire deja les espaces de textContent. On lit innerHTML, comme le site. « 07 Ghost », lui, reste reellement absent de l'arriere-plan de scans du site. v5 (2026-09-16) : le catalogue ne disparait plus en silence quand l acces direct echoue. fetchv2 reste le chemin par defaut ; une erreur, ou une premiere page d accueil sans aucune fiche - signature d un interstitiel JavaScript repondu en 200 - bascule sur fetchRendered, qui execute la page dans le navigateur et porte la vraie empreinte TLS. Les deux chemins en echec rendent une erreur qui les nomme tous les deux, au lieu d une liste vide. Mesure : 48 oeuvres, 49 chapitres, 3/3 lisibles, 3/3 couvertures servies.",
-            "sha256": "c905d96f119558d82d511d11603365a8cbbebc820effc22ad369806f1824c8cd"
+            "note": "v7 (2026-11-02) : Le titre est lu sur l’en-tête de l’œuvre avant les titres des sections ; « Informations » ne remplace plus le nom du manga.",
+            "sha256": "82c3788b70793289f427b30e6aa5f782b5d3e6c280151b4c224fc731051d71eb"
         },
         {
             "id": "astral_manga",
@@ -349,15 +350,15 @@
             "name": "Asura Scans",
             "lang": "en",
             "space": "manga",
-            "version": 7,
+            "version": 8,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/asurascans.js",
             "iconUrl": "https://asurascans.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v7 (2026-10-25) : extraction des pages Astro limitee a props.pages, parametres URL conserves, repli HTML decode sans fusion de plusieurs adresses. Verification HTTP : chapitre 1, 38 pages aux index uniques.",
-            "sha256": "0874a1316ce175de8e2ce7d8ca584aa552b9d4833f2bbab6a5438e8387afe411"
+            "note": "v8 (2026-11-02) : Catalogue, nouveautés et recherche utilisent la page Browse actuelle ; la recherche ne renvoie plus l’accueil sans filtrer la requête.",
+            "sha256": "066fdfed5b88ec9ce8428852563d521f42a780518456f67cd51cf04c53b46966"
         },
         {
             "id": "bato",
@@ -379,15 +380,15 @@
             "name": "Flame Comics",
             "lang": "en",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/flamecomics.js",
             "iconUrl": "https://flamecomics.xyz/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v2 (round 4 fix 2026-05-10): _extractAllSeries switched from regex with [^\\[\\]] character class to JSON.parse on __NEXT_DATA__ script tag. Previous regex broke on nested arrays (tags:[]). Fix verified: 153 series parsed via pageProps.series. Effie hardening: 2MB cap on JSON.parse + series_id /^\\d+$/ validation against CDN path traversal.",
-            "sha256": "4dd922266325599ae39aad30231b9d1f9f39d220e9aa4d7856c2700712c24545"
+            "note": "v3 (2026-11-02) : Le prologue numéroté 0 conserve son numéro ; il n’est plus remplacé par la taille du sommaire.",
+            "sha256": "82189e5c43ba3c4523ccf24a2f113990cc101a71a072d37589eb87ebaad19448"
         },
         {
             "id": "lelmanga",
@@ -497,15 +498,15 @@
             "name": "MangaKatana",
             "lang": "en",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/mangakatana.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=mangakatana.com&sz=64",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v3: MProvider class wrap + ReDoS hardening (F1: author/status patterns bounded [^<]{0,500}/[^>]{0,200}) + scheme validation on ytaw image URLs (F4: ^https?://.+). v1-v2 history: ported from Mangayomi, sendRequest->fetchv2 fix.",
-            "sha256": "83fff93c0c852bf9f435d7d58081828710dc95b8172f2eb48e339ba991ea1af7"
+            "note": "v5 (2026-11-02) : Les couvertures sont associées à leur propre œuvre et les liens de chapitre sont exclus du catalogue.",
+            "sha256": "f2a7c119b7a912c68a2c53a2fb22b2e231bd26916666754d9a33a319592ab654"
         },
         {
             "id": "mangapark1",
@@ -706,15 +707,15 @@
             "name": "Webtoons",
             "lang": "multi",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/webtoons.js",
             "iconUrl": "https://upload.wikimedia.org/wikipedia/commons/0/09/Naver_Line_Webtoon_logo.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v3 (round 4 fix 2026-05-10): dropped alt='[^]*' requirement from primary parse pattern. Live DOM has alt='' on all series imgs which broke v2 regex. Fix verified: 143 series parsed.",
-            "sha256": "ead573ceb5dbe6b4ea15096c1a060174b454b178b37b4de9fa200f573475ba1e"
+            "note": "v5 (2026-11-02) : Pagination complète du sommaire, recherche dans la langue choisie et extraction des images corrigées. Vérification Android : 48 chapitres contre 9 avant correction sur School Bus Graveyard, 30 images téléchargées et décodées.",
+            "sha256": "59e8d5a82dbfeedf630cad26b61b13a4e98026c1e71e2cd4ae6c98fdc548d543"
         },
         {
             "id": "weebcentral",
@@ -730,6 +731,81 @@
             "obsolescenceRisk": "medium",
             "note": "v6 fix 2026-08-10 (Yan bug report 'extension morte'): le site est passe aux liens RELATIFS. /hot-updates et /series/<ULID>/full-chapter-list servent href='/series/...' et href='/chapters/...' au lieu de href='https://weebcentral.com/...'. Migration PARTIELLE: /search/data rend encore de l'absolu. Toutes les regex d'href etaient ancrees sur la forme absolue -> 0 match sur listing ET liste de chapitres, sans exception levee (le site repond 200). Fix: prefixe d'hote optionnel via hrefPattern(), normalisation en ABSOLU via absoluteUrl() (le relatif orphelinerait les telechargements et la progression deja indexes par URL absolue). Runtime verifie: v5 list=0/chapters=0 -> v6 list=60/chapters=194/pages=84.",
             "sha256": "7cabb7ac878d7166bde2e45e6d435b824fd9924459594c4771810f031185a24e"
+        },
+        {
+            "id": "celestial_scan",
+            "name": "Celestial Scan",
+            "lang": "fr",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/celestial_scan.js",
+            "iconUrl": "https://www.celestial-scan.com/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1 (2026-11-02) : Catalogue mixte : classification mature uniquement d’après les catégories explicites de chaque œuvre.",
+            "sha256": "662032b942045e6648ffac1c56713f48eea09c71be1487fea1d0ecf5641c52e9"
+        },
+        {
+            "id": "mangadraft",
+            "name": "Mangadraft",
+            "lang": "fr",
+            "space": "manga",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/manga/mangadraft.js",
+            "iconUrl": "https://www.mangadraft.com/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1 (2026-11-02) : Catalogue principalement français. Chapitres publics et accessibles uniquement ; aucun déverrouillage ni achat.",
+            "sha256": "1ff50cabada62d681477a9012c199b47af0d0fa1849888182fb554a584849f69"
+        },
+        {
+            "id": "wandering_inn",
+            "name": "The Wandering Inn",
+            "lang": "en",
+            "space": "light_novel",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/novel/wandering_inn.js",
+            "iconUrl": "https://wanderinginn.com/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1 (2026-11-02) : Une œuvre : sommaire officiel dans l’ordre de lecture web. Les chapitres protégés restent verrouillés.",
+            "sha256": "5c31a180dfff3d684be856e722cf0aa7c6e49d09ddccf9127b67ccd3bcbdfc50"
+        },
+        {
+            "id": "wuxiaworld",
+            "name": "Wuxiaworld",
+            "lang": "en",
+            "space": "light_novel",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/novel/wuxiaworld.js",
+            "iconUrl": "https://lite.wuxiaworld.com/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1 (2026-11-02) : Interface officielle légère. Chapitres gratuits accessibles ; accès payant ou extraits refusés.",
+            "sha256": "096ec7a4439b8086e8ecc0cdb6cafdfb00631421ad82468aece56ead6f979a52"
+        },
+        {
+            "id": "webnovel",
+            "name": "Webnovel",
+            "lang": "en",
+            "space": "light_novel",
+            "version": 1,
+            "mature": false,
+            "cloudflare": false,
+            "jsUrl": "src/novel/webnovel.js",
+            "iconUrl": "https://m.webnovel.com/favicon.ico",
+            "status": "active",
+            "obsolescenceRisk": "medium",
+            "note": "v1 (2026-11-02) : Interface mobile officielle testée sur Android. Recherche limitée à sa première page ; seuls les chapitres accessibles sont lus.",
+            "sha256": "da4a0b48772eaece7aa1f0c653e38e7738e83cff96923d349f4c2be638719c47"
         }
     ]
 }
