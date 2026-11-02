@@ -341,11 +341,14 @@ class DefaultExtension extends LNProvider {
     }
 
     if (sentences.length === 0) {
-      return "<p>Content not available</p>";
+      throw new Error('LNMTL : traduction du chapitre indisponible.');
     }
 
     // Clean up typography
     var content = sentences.join("\n");
+    // The upstream site publishes this maintenance placeholder as translated
+    // sentences. It is not a chapter and must never become an offline copy.
+    if(/This chapter content is hitting in the hand, when you see this paragraph/i.test(stripHtml(content)))throw new Error('LNMTL : traduction du chapitre indisponible, réessaie plus tard.');
     content = content.replace(/\u201E/g, '"'); // replace lower double quotation
 
     return content;
