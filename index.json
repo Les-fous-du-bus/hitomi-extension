@@ -322,15 +322,15 @@
             "name": "AnimeSama",
             "lang": "fr",
             "space": "manga",
-            "version": 8,
+            "version": 9,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/anime_sama.js",
             "iconUrl": "https://www.google.com/s2/favicons?domain=anime-sama.to&sz=64",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v8 (2026-11-02) : couverture, synopsis, auteur, genres et statut extraits des sections de l’œuvre ; logo et titres alternatifs exclus. Champs absents laissés vides ou inconnus. Métadonnées et couverture décodée validées sur Android pour 100 Jours Avant Ta Mort.",
-            "sha256": "96ce56aee6d93dea2b4917da3e141f007af8a9eb22747968e66ae7410293d833"
+            "note": "v9 (2026-11-02) : titres du catalogue lus dans leur champ dédié, sans badges Anime/Scans/Webtoon. Recherche du titre complet 100 Jours Avant Ta Mort validée sur Android. Conserve les corrections v8 de couverture, synopsis, auteur, genres et statut.",
+            "sha256": "3539298a7932403afd3b065dc199d7d8d6e26a6570f4626319cfc845b19c6f39"
         },
         {
             "id": "astral_manga",
