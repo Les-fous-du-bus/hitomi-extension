@@ -8,7 +8,7 @@
             "name": "Chireads",
             "lang": "fr",
             "space": "light_novel",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/chireads.js",
@@ -16,7 +16,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "v4 (2026-09-04) : le repli de getChapterList parcourait la page entiere sans filtrer, donc la liste ramassait le menu du site (accueil, Traductions, Original, A Propos de Nous) comme des chapitres ; le premier element pointait sur la page d'accueil. Filtre sur la forme reelle /<rubrique>/<slug-serie>/<slug-chapitre>/. La date se lit desormais depuis /AAAA/MM/JJ/ (l'ancien motif AAAA-MM-JJ ne trouvait jamais rien). Mesure : 733 chapitres reels, 3/3 lisibles.",
-            "sha256": "44e8418e531939780797e604286788b04eecb4c56d3f9c22fe96ddff3a338fb0"
+            "sha256": "4c8f252776a73fd4d19b165c6bdf5969f7212c40798ee269953aae6a2f0f4aba"
         },
         {
             "id": "kisswood",
@@ -322,7 +322,7 @@
             "name": "AnimeSama",
             "lang": "fr",
             "space": "manga",
-            "version": 9,
+            "version": 10,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/anime_sama.js",
@@ -330,7 +330,7 @@
             "status": "active",
             "obsolescenceRisk": "high",
             "note": "v9 (2026-11-02) : titres du catalogue lus dans leur champ dédié, sans badges Anime/Scans/Webtoon. Recherche du titre complet 100 Jours Avant Ta Mort validée sur Android. Conserve les corrections v8 de couverture, synopsis, auteur, genres et statut.",
-            "sha256": "3539298a7932403afd3b065dc199d7d8d6e26a6570f4626319cfc845b19c6f39"
+            "sha256": "0f31ad5e63a1a003e3826d7ff762b36c0e405a7b64819323f35ac5c6093facd5"
         },
         {
             "id": "astral_manga",
@@ -396,14 +396,14 @@
             "name": "Lelmanga",
             "lang": "fr",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/lelmanga.js",
             "iconUrl": "https://www.lelmanga.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "e86049731da091385ed9b9109c3af37e24ee8872ba71aa2cdb6b3dbab91a9d19"
+            "sha256": "4cef841bfeeb494c7618604aa09fb3855c4a46ccc2b61c45b828ae56c8bce231"
         },
         {
             "id": "manga_scantrad",
@@ -574,7 +574,7 @@
             "name": "MangaTown",
             "lang": "en",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangatown.js",
@@ -582,7 +582,7 @@
             "status": "active",
             "obsolescenceRisk": "low",
             "note": "fix 2026-08-18 (v1.1.0): getPageList ne rendait qu'UNE image par chapitre. Le compte de pages etait cherche dans un <select> avec le filtre options<100, mais la page contient deux <select> de 156 options (selecteurs de CHAPITRES). Filtre toujours faux -> pageCount=1. Remplace par total_pages + derivation du suffixe numerique : 1 seul appel HTTP par chapitre au lieu de N. Verifie en direct sur c001/c100/c152 (21/6/5 pages, toutes servies en 200). Un chapitre annonce mais non publie leve une erreur explicite au lieu de rendre [].",
-            "sha256": "18497e7cbad9a1900bbae554d121725af0d31261af93263bc0abcae57d8aac04"
+            "sha256": "d96255ac06d8ac42470c934dfbacc4b1637b927323b469e85977d5d3a4ec6abb"
         },
         {
             "id": "manhwaz",

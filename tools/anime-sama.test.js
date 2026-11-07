@@ -88,6 +88,10 @@ test('un chapitre reel est bien decoupe', async (t) => {
   const chapitres = await ext.getChapterList(
     'https://anime-sama.to/catalogue/100-jours-avant-ta-mort/');
 
+  await t.test('aucune date de publication inventée', () => {
+    assert.ok(chapitres.every(chapitre => chapitre.dateUpload == null));
+  });
+
   await t.test('tous les chapitres remontent', () => {
     assert.strictEqual(chapitres.length, 3);
   });

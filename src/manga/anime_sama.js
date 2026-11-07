@@ -363,7 +363,6 @@ class DefaultExtension extends MProvider {
         title: "Chapitre " + key,
         url: scanUrl + "#ch=" + encodeURIComponent(key) + "&o=" + encOeuvre + "&n=" + pageCount,
         number: numFloat,
-        dateUpload: Date.now(),
         scanlator: "AnimeSama",
       });
     }

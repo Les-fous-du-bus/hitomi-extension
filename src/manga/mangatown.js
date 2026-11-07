@@ -290,7 +290,9 @@ class DefaultExtension extends MProvider {
       var pageUrl = firstUrl.replace(
         /(\d+)(\.[a-zA-Z]+)$/,
         function (_m, digits, ext) {
-          var n = String(i);
+          // Certaines séries commencent à 158, et non à 001.
+          // Préserver la première URL et incrémenter à partir de son suffixe.
+          var n = String(parseInt(digits, 10) + i - 1);
           while (n.length < digits.length) n = "0" + n;
           return n + ext;
         }

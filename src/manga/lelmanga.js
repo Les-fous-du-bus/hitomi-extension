@@ -30,7 +30,13 @@ function decodeHtml(str) {
     .replace(/&hellip;/g, "...")
     .replace(/&#8211;/g, "-")
     .replace(/&#8217;/g, "'")
-    .replace(/&#8230;/g, "...");
+    .replace(/&#8230;/g, "...")
+    .replace(/&#(x[0-9a-f]+|[0-9]+);/gi, function(entity, value) {
+      var code = value.charAt(0).toLowerCase() === "x"
+        ? parseInt(value.slice(1), 16) : parseInt(value, 10);
+      if (code < 1 || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) return entity;
+      return String.fromCodePoint(code);
+    });
 }
 
 class DefaultExtension extends MProvider {

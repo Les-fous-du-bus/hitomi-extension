@@ -36,7 +36,11 @@ function decodeHtml(str) {
     .replace(/&#x27;/g, "'")
     .replace(/&rsquo;/g, "'")
     .replace(/&lsquo;/g, "'")
-    .replace(/&hellip;/g, "...");
+    .replace(/&hellip;/g, "...")
+    .replace(/&#(x[0-9a-f]+|[0-9]+);/gi, function (entity, code) {
+      var n = code.charAt(0).toLowerCase() === "x" ? parseInt(code.substring(1), 16) : parseInt(code, 10);
+      return n >= 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff) ? String.fromCodePoint(n) : entity;
+    });
 }
 
 class DefaultExtension extends MProvider {
@@ -126,7 +130,8 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(fullUrl, { "Accept-Encoding": "deflate" });
 
       // Title — can be h3.inform-title or div.inform-product-txt
-      var titleMatch = res.match(/<h3 class="inform-title[^"]*"[^>]*>(.*?)<\/h3>/s) ||
+      var titleMatch = res.match(/<h1[^>]*class="[^"]*refresh-detail-title[^"]*"[^>]*>(.*?)<\/h1>/s) ||
+                        res.match(/<h3 class="inform-title[^"]*"[^>]*>(.*?)<\/h3>/s) ||
                         res.match(/<(?:div|h1) class="inform-product-txt"[^>]*>(.*?)<\/(?:div|h1)>/s) ||
                         res.match(/<div class="inform-title"[^>]*>(.*?)<\/div>/s);
       var title = titleMatch ? stripTags(titleMatch[1]).trim() : "Unknown";
@@ -136,17 +141,21 @@ class DefaultExtension extends MProvider {
       }
 
       // Cover
-      var coverMatch = res.match(/<div class="inform-product[^"]*"[^>]*>[^]*?<img[^>]*src="([^"]+)"/s) ||
+      var coverMatch = res.match(/<figure[^>]*class="[^"]*refresh-detail-cover[^"]*"[^>]*>[^]*?<img[^>]*src="([^"]+)"/s) ||
+                        res.match(/<div class="inform-product[^"]*"[^>]*>[^]*?<img[^>]*src="([^"]+)"/s) ||
                         res.match(/<div class="inform-product-img"[^>]*>[^]*?<img[^>]*src="([^"]+)"/s);
       var imageUrl = coverMatch ? coverMatch[1] : "";
 
       // Description
-      var descMatch = res.match(/<div class="inform-inform-txt"[^>]*>(.*?)<\/div>/s) ||
+      var descMatch = res.match(/<div[^>]*class="[^"]*refresh-detail-summary-content[^"]*"[^>]*>(.*?)<\/div>/s) ||
+                      res.match(/<div class="inform-inform-txt"[^>]*>(.*?)<\/div>/s) ||
                       res.match(/<div class="inform-intr-txt"[^>]*>(.*?)<\/div>/s);
       var description = descMatch ? stripTags(descMatch[1]).trim() : "";
 
       // Author and Status from h6 info block or info columns
       var authors = [];
+      var modernAuthor = res.match(/<dt>\s*Auteur\s*<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/s);
+      if (modernAuthor) authors.push(decodeHtml(stripTags(modernAuthor[1]).trim()));
       var status = "unknown";
       var infoMatch = res.match(/<h6[^>]*>(.*?)<\/h6>/s) ||
                       res.match(/<div class="inform-(?:product-txt|inform-data)"[^>]*>[^]*?<div class="inform-intr-col"[^>]*>(.*?)<\/div>/s);
@@ -161,7 +170,7 @@ class DefaultExtension extends MProvider {
           if (nextField === -1) nextField = infoText.indexOf("Statut", authorIdx + 8);
           if (nextField === -1) nextField = authorIdx + 100;
           var authorName = infoText.substring(authorIdx + 9, nextField).trim();
-          if (authorName) authors.push(authorName);
+          if (authorName && authors.indexOf(authorName) === -1) authors.push(authorName);
         }
         // Extract status
         var statutIdx = infoText.indexOf("Statut de Parution");
@@ -211,7 +220,9 @@ class DefaultExtension extends MProvider {
       var chapters = [];
 
       // Match chapter links: .chapitre-table a or .inform-annexe-list a
-      var chapterSection = res.match(/<(?:div|table) class="chapitre-table"[^>]*>(.*?)<\/(?:div|table)>/s);
+      var modernLists = res.match(/<(ul|ol)[^>]*class="[^"]*refresh-detail-chapter-list[^"]*"[^>]*>[\s\S]*?<\/\1>/g);
+      var chapterSection = modernLists && modernLists.length ? [null, modernLists.join("\n")] : null;
+      if (!chapterSection) chapterSection = res.match(/<(?:div|table) class="chapitre-table"[^>]*>(.*?)<\/(?:div|table)>/s);
       if (!chapterSection) {
         chapterSection = res.match(/<div class="inform-annexe-list"[^>]*>(.*?)(<div class="inform-annexe-list"|$)/s);
       }
@@ -240,7 +251,7 @@ class DefaultExtension extends MProvider {
         if (!hrefMatch || !textMatch) continue;
 
         var chapUrl = hrefMatch[1];
-        var chapTitle = stripTags(textMatch[1]).trim();
+        var chapTitle = decodeHtml(stripTags(textMatch[1]).trim());
 
         if (!chapUrl || chapUrl.indexOf(BASE_URL) === -1) continue;
         if (!seriesSlug) continue;
@@ -266,6 +277,8 @@ class DefaultExtension extends MProvider {
         var chapNum = i + 1;
         var numMatch = chapTitle.match(/(\d+(?:\.\d+)?)/);
         if (numMatch) chapNum = parseFloat(numMatch[1]);
+        // Le numero redemarre par tome ; garder l ordre du sommaire et l URL intacte.
+        if (modernLists && modernLists.length) chapNum = chapters.length + 1;
 
         chapters.push({
           title: chapTitle || "Chapitre " + chapNum,
