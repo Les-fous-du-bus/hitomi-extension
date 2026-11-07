@@ -128,14 +128,14 @@
             "name": "NovelDeGlace",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/noveldeglace.js",
             "iconUrl": "https://noveldeglace.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "70842313b64d6f0b339496d2573658e303e872abcd53a0061c137aa3d4560a21",
+            "sha256": "2fab296f196532acb30c5ae9ceab555858da7361a230f5bd850946833c914fe4",
             "note": "v2 (2026-09-04) : deux defauts corriges. getContent ancrait sur class=\"chapter-content\" en correspondance exacte, or le theme sert desormais class=\"entry-content-chapitre chapter-inner chapter-content\" : tous les chapitres rendaient le message d'indisponibilite. Et getChapterList bornait la table des matieres sur </div></div></div>, ce qui s'arretait au premier tome (33 chapitres sur 907). Extraction par comptage d'imbrication + bornage sur le data-title suivant. Mesure : 907 chapitres, 3/3 lisibles."
         },
         {

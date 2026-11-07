@@ -345,7 +345,7 @@ class DefaultExtension extends MProvider {
         var imageUrl = imgMatch ? imgMatch[1] : "";
 
         // Link — depends on latest vs popular
-        var linkMatch;
+        var linkMatch = null;
         if (isLatest) {
           linkMatch = article.match(/<span class="Roman"[^>]*>[^]*?<a[^>]*href="([^"]+)"/s);
         }
