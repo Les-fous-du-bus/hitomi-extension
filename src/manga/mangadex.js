@@ -22,6 +22,20 @@ const COVER_BASE = "https://uploads.mangadex.org/covers";
 const LANG = "fr";
 const PAGE_SIZE = 20;
 
+// Identifie explicitement le client de l'API. Avec l'agent WebView Android,
+// MangaDex peut renvoyer sa page de verification HTML au lieu du JSON.
+const API_HEADERS = { 'User-Agent': 'Hitomi/2.0.13 (+https://github.com/Les-fous-du-bus/Hitomi)' };
+
+// Une page de protection ou d'erreur HTTP n'est pas une réponse de l'API.
+// Ne pas exposer une SyntaxError JavaScript incompréhensible à l'utilisateur.
+function parseApiResponse(body) {
+  try {
+    return JSON.parse(body);
+  } catch (_) {
+    throw new Error("MangaDex : la réponse de l'API est illisible ou bloquée. Réessaie plus tard ou vérifie l'accès à la source.");
+  }
+}
+
 // Mapping statut MangaDex → Hitomi
 const STATUS_MAP = {
   ongoing: "ongoing",
@@ -118,8 +132,8 @@ class DefaultExtension extends MProvider {
       `&order[followedCount]=desc` +
       `&contentRating[]=safe&contentRating[]=suggestive&contentRating[]=erotica`;
 
-    const res = await fetchv2(url, {});
-    const json = JSON.parse(res);
+    const res = await fetchv2(url, { headers: API_HEADERS });
+    const json = parseApiResponse(res);
 
     if (json.result !== "ok") throw new Error("MangaDex API error");
 
@@ -139,8 +153,8 @@ class DefaultExtension extends MProvider {
       `&order[updatedAt]=desc` +
       `&contentRating[]=safe&contentRating[]=suggestive`;
 
-    const res = await fetchv2(url, {});
-    const json = JSON.parse(res);
+    const res = await fetchv2(url, { headers: API_HEADERS });
+    const json = parseApiResponse(res);
 
     if (json.result !== "ok") throw new Error("MangaDex API error");
 
@@ -181,8 +195,8 @@ class DefaultExtension extends MProvider {
       url += `&availableTranslatedLanguage[]=${LANG}`;
     }
 
-    const res = await fetchv2(url, {});
-    const json = JSON.parse(res);
+    const res = await fetchv2(url, { headers: API_HEADERS });
+    const json = parseApiResponse(res);
 
     if (json.result !== "ok") throw new Error("MangaDex API error");
 
@@ -203,8 +217,8 @@ class DefaultExtension extends MProvider {
       `${BASE_API}/manga/${mangaId}` +
       `?includes[]=cover_art&includes[]=author&includes[]=artist`;
 
-    const res = await fetchv2(detailUrl, {});
-    const json = JSON.parse(res);
+    const res = await fetchv2(detailUrl, { headers: API_HEADERS });
+    const json = parseApiResponse(res);
 
     if (json.result !== "ok") throw new Error("MangaDex detail error");
 
@@ -284,8 +298,8 @@ class DefaultExtension extends MProvider {
         `&order[chapter]=desc&order[volume]=desc` +
         `&includes[]=scanlation_group`;
 
-      const res = await fetchv2(chapUrl, {});
-      const json = JSON.parse(res);
+      const res = await fetchv2(chapUrl, { headers: API_HEADERS });
+      const json = parseApiResponse(res);
 
       if (json.result !== "ok") break;
 
@@ -343,9 +357,9 @@ class DefaultExtension extends MProvider {
 
     const serverRes = await fetchv2(
       `${BASE_API}/at-home/server/${chapterId}`,
-      {}
+      { headers: API_HEADERS }
     );
-    const serverJson = JSON.parse(serverRes);
+    const serverJson = parseApiResponse(serverRes);
 
     if (serverJson.result !== "ok") throw new Error("MangaDex at-home error");
 
@@ -356,7 +370,7 @@ class DefaultExtension extends MProvider {
     return pages.map((fileName, index) => ({
       index,
       imageUrl: `${baseUrl}/data/${hash}/${fileName}`,
-      headers: {},
+      headers: API_HEADERS,
     }));
   }
 

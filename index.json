@@ -439,15 +439,15 @@
             "name": "MangaDex",
             "lang": "multi",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangadex.js",
             "iconUrl": "https://mangadex.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "runtime-audit 2026-05-10: RUNTIME-OK. API v5 stable, search + chapters verified.",
-            "sha256": "23938967edf6a24b928b92791c02e914672356b55273c540ee3352957f6abd35"
+            "note": "v3: identify Hitomi for API and image requests; expose HTML challenges as clear errors.",
+            "sha256": "d4322e3d31fd2c550924b10cf6e27a89b8b66d69c86401f794313911f32dc535"
         },
         {
             "id": "mangafire",
