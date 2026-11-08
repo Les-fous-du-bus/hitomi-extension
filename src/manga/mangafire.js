@@ -59,7 +59,7 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, {});
       return this._parseMangaList(res);
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
@@ -69,7 +69,7 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, {});
       return this._parseMangaList(res);
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
@@ -91,7 +91,7 @@ class DefaultExtension extends MProvider {
       }
       return { list: filtered, hasNextPage: false };
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
@@ -310,6 +310,11 @@ class DefaultExtension extends MProvider {
   }
 
   _parseMangaList(html) {
+    // fetchv2 retourne aussi le HTML des reponses 403 : un interstitiel
+    // n'est pas un catalogue vide et doit etre explique a l'utilisateur.
+    if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)/i.test(html || '')) {
+      throw new Error("MangaFire : acces bloque par la verification du site ; ouvre la source dans le navigateur et reessaie.");
+    }
     var list = [];
 
     // Parse manga units from filter page

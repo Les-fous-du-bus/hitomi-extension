@@ -83,6 +83,16 @@ function detectMature(doc) {
   return false;
 }
 
+// Ce domaine redirige parfois vers une annonce explicite de fermeture.
+// Ne pas presenter cette page externe comme un catalogue ou chapitre vide.
+async function fetchBato(url) {
+  const html = await fetchv2(url, { headers: HEADERS });
+  if (/<title>\s*this website has been closed\s*<\/title>/i.test(html || '')) {
+    throw new Error("Bato.to : le domaine affiche une annonce de fermeture ; choisis une autre source.");
+  }
+  return html;
+}
+
 class DefaultExtension extends MProvider {
   get name() {
     return "Bato.to";
@@ -129,7 +139,7 @@ class DefaultExtension extends MProvider {
     const lang = await this._getLangPref();
     const langParam = lang ? `langs=${lang}&` : "";
     const url = `${BASE_URL}/browse?${langParam}sort=views_w&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     return this._parseBrowse(html);
   }
 
@@ -137,7 +147,7 @@ class DefaultExtension extends MProvider {
     const lang = await this._getLangPref();
     const langParam = lang ? `langs=${lang}&` : "";
     const url = `${BASE_URL}/browse?${langParam}sort=update&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     return this._parseBrowse(html);
   }
 
@@ -156,7 +166,7 @@ class DefaultExtension extends MProvider {
     const url =
       `${BASE_URL}/search?word=${encodeURIComponent(query || "")}` +
       `&langs=${lang}&page=${page}`;
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     return this._parseBrowse(html);
   }
 
@@ -221,7 +231,7 @@ class DefaultExtension extends MProvider {
   // ─────────────────────────────────────────────
 
   async getMangaDetail(url) {
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     const doc = new DOMParser().parseFromString(html, "text/html");
 
     // Titre
@@ -295,7 +305,7 @@ class DefaultExtension extends MProvider {
   }
 
   async getChapterList(url) {
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     const doc = new DOMParser().parseFromString(html, "text/html");
     const chapters = [];
 
@@ -347,7 +357,7 @@ class DefaultExtension extends MProvider {
   // ─────────────────────────────────────────────
 
   async getPageList(url) {
-    const html = await fetchv2(url, { headers: HEADERS });
+    const html = await fetchBato(url);
     const pages = [];
 
     // Pattern 1 : JSON embarqué dans un composant Astro (bato.to 2024+)

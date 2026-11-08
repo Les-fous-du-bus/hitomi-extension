@@ -337,14 +337,14 @@
             "name": "AstralManga",
             "lang": "fr",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/astral_manga.js",
             "iconUrl": "https://astral-manga.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "sha256": "254168385adf885133e386f7c4722ff2b2c6b2233dfafee3e47c1f7a914d40cd"
+            "sha256": "5deab45c8f747a48233b7a59686832c63faf4aea856a9bd2c68514ccc19dc5e5"
         },
         {
             "id": "asurascans",
@@ -366,15 +366,15 @@
             "name": "Bato.to",
             "lang": "multi",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/bato.js",
             "iconUrl": "https://bato.to/favicon.ico",
             "status": "dead",
             "obsolescenceRisk": "medium",
-            "note": "v1: ported from Mangayomi bato source, runtime tested 2026-05-10. NETWORK-BLOCKED in test environment (bato.to TCP timeout from macOS dev machine -- CF TCP-level block). Extension architecture validated against DOM snapshot. Requires in-app test on Android device. Exists in assets/extensions/manga/bato.js.",
-            "sha256": "c458d3424217dd5ab2ca5d84fcc5e00bd73947c2b14fe7139e347a505c8ff7af"
+            "note": "2026-11-08 : domaine redirigé vers une annonce de fermeture ; message explicite vérifié sur Android. Accès non rétabli. Historique : v1: ported from Mangayomi bato source, runtime tested 2026-05-10. NETWORK-BLOCKED in test environment (bato.to TCP timeout from macOS dev machine -- CF TCP-level block). Extension architecture validated against DOM snapshot. Requires in-app test on Android device. Exists in assets/extensions/manga/bato.js.",
+            "sha256": "8eb4cfa6170bef1fe8b6122c5b76ab0aadb32af343264b108cbb5279b83f0545"
         },
         {
             "id": "flamecomics",
@@ -410,14 +410,14 @@
             "name": "MangaScantrad",
             "lang": "fr",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/manga_scantrad.js",
             "iconUrl": "https://manga-scantrad.io/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "sha256": "3110e30f96ab06aba4689c14825731315d2c60033df39468344194ad9fbf44a0"
+            "sha256": "a638ff6c3eb71031bac31377225b296796eed16e9e5388d80d56b754d38ade3e"
         },
         {
             "id": "mangabuddy",
@@ -454,15 +454,15 @@
             "name": "MangaFire",
             "lang": "multi",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangafire.js",
             "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
-            "sha256": "932a9ec0657d9980f8d3ba449ad03dd5625a2b3d6d79ec8f50485616bb13328e"
+            "note": "2026-11-08 : vérification Cloudflare observée ; message explicite vérifié sur Android. Accès non rétabli. Historique : runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
+            "sha256": "adb0f6842c9e710e5bb6a0bcb760f1a471d51bcf45e52988580dfd7717f1bbf9"
         },
         {
             "id": "mangahere",
