@@ -80,15 +80,24 @@ function decodeHtml(str) {
  * Structure: div.row > div.col-xs-3 img.cover + div.col-xs-7 h3.truyen-title > a
  */
 function parseList(html) {
+    if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)|^\s*error code:\s*(?:1015|1020)/i.test(html || "")) {
+      throw new Error("NovelFull : acces bloque par Cloudflare ; ouvre la source pour verifier.");
+    }
+
   var list = [];
   var seen = {};
 
-  var titleRegex =
-    /<h3\s+class="truyen-title"[^>]*>\s*<a\s+href=["']([^"']+)["'][^>]*title=["']([^"']+)["'][^>]*>/gi;
+  // Les badges peuvent précéder le lien. Limiter la recherche au même h3
+  // pour ne jamais associer un titre à la carte suivante.
+  var titleRegex = /<h3\b[^>]*class=["'][^"']*\btruyen-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/gi;
   var m;
   while ((m = titleRegex.exec(html)) !== null) {
-    var url = absoluteUrl(m[1]);
-    var title = decodeHtml(m[2]);
+    var link = m[1].match(/<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+    if (!link) continue;
+    var href = link[1].match(/\bhref\s*=\s*["']([^"']+)["']/i);
+    var label = link[1].match(/\btitle\s*=\s*["']([^"']+)["']/i);
+    var url = href ? absoluteUrl(href[1]) : "";
+    var title = decodeHtml(label ? label[1] : stripHtml(link[2]));
     if (!title || !url || seen[url]) continue;
     seen[url] = true;
 
@@ -262,8 +271,9 @@ class DefaultExtension extends LNProvider {
     );
     if (lastPageMatch) {
       var totalPages = parseInt(lastPageMatch[2]);
-      // Load up to 50 pages (safety limit)
-      var maxPages = Math.min(totalPages, 50);
+      // A limit must never be mistaken for the complete chapter list.
+      if (totalPages > 50) throw new Error("NovelFull : sommaire de plus de 50 pages indisponible en entier.");
+      var maxPages = totalPages;
       for (var p = 2; p <= maxPages; p++) {
         try {
           // Build paginated URL
@@ -271,6 +281,7 @@ class DefaultExtension extends LNProvider {
           var pageUrl = baseDetailUrl + "?page=" + p + "&per-page=50";
           var pageHtml = await fetchv2(pageUrl, { headers: HEADERS });
           var pageChapters = extractChapters(pageHtml);
+          if (!pageChapters.length) throw new Error("NovelFull : page du sommaire vide ou indisponible.");
           for (var c = 0; c < pageChapters.length; c++) {
             var isDupe = false;
             for (var d = 0; d < chapters.length; d++) {
@@ -282,7 +293,7 @@ class DefaultExtension extends LNProvider {
             if (!isDupe) chapters.push(pageChapters[c]);
           }
         } catch (e) {
-          break;
+          throw e;
         }
       }
     }
@@ -315,11 +326,11 @@ class DefaultExtension extends LNProvider {
     var startMarker = 'id="chapter-content"';
     var startIdx = html.indexOf(startMarker);
     if (startIdx === -1) {
-      return "<p>Content not available</p>";
+      throw new Error("Contenu du chapitre indisponible sur la source.");
     }
 
     var gtIdx = html.indexOf(">", startIdx);
-    if (gtIdx === -1) return "<p>Content not available</p>";
+    if (gtIdx === -1) throw new Error("Contenu du chapitre indisponible sur la source.");
 
     var depth = 1;
     var pos = gtIdx + 1;
@@ -354,6 +365,6 @@ class DefaultExtension extends LNProvider {
       }
     }
 
-    return "<p>Content not available</p>";
+    throw new Error("Contenu du chapitre indisponible sur la source.");
   }
 }

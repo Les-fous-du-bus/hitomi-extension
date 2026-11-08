@@ -158,15 +158,15 @@
             "name": "NovelFull",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/novel/novelfull.js",
             "iconUrl": "https://novelfull.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "novelfull.com CF 403 + novelfull.me CF 526 (SSL error). cloudflare: true required. Monitor domain stability.",
-            "sha256": "115422aef3330a1ff95874ad0c094517668a4899e78ea724ded683df855636f5"
+            "note": "2026-11-08 : catalogue et lecture valides sur quatre romans Android echantillonnes ; sommaires au-dela de 50 pages temporairement indisponibles pour eviter une liste tronquee. novelfull.com CF 403 + novelfull.me CF 526 (SSL error). cloudflare: true required. Monitor domain stability.",
+            "sha256": "9e034be595ab08bf0a16e10e1db45115db9484199f86268e14ec93dc2c35866c"
         },
         {
             "id": "novelupdates",
