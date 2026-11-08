@@ -42,6 +42,16 @@
 
 var BASE_URL = "https://manhwaz.com";
 
+// La source peut être inaccessible même lorsque la bibliothèque locale existe.
+async function manhwazFetch(url, options) {
+  try {
+    return await fetchv2(url, options);
+  } catch (e) {
+    var cause = String(e && e.message ? e.message : e);
+    throw new Error("ManhwaZ : source inaccessible. Vérifie la connexion ou réessaie plus tard. Détail : " + cause);
+  }
+}
+
 /**
  * Parse manga catalog cards.
  * Cards use href="https://manhwaz.com/webtoon/{slug}" pattern.
@@ -229,25 +239,25 @@ class DefaultExtension extends MProvider {
   async getPopular(page) {
     // /popular returns 404; home page sorts by view count = closest to popular
     var url = BASE_URL + '/?page=' + page;
-    var html = await fetchv2(url, {});
+    var html = await manhwazFetch(url, {});
     return parseCatalogPage(html);
   }
 
   async getLatestUpdates(page) {
     // Home page shows recently updated content
     var url = BASE_URL + '/?page=' + page;
-    var html = await fetchv2(url, {});
+    var html = await manhwazFetch(url, {});
     return parseCatalogPage(html);
   }
 
   async search(query, page, filters) {
     var url = BASE_URL + '/search?s=' + encodeURIComponent(query) + '&page=' + page;
-    var html = await fetchv2(url, {});
+    var html = await manhwazFetch(url, {});
     return parseCatalogPage(html);
   }
 
   async getMangaDetail(mangaUrl) {
-    var html = await fetchv2(mangaUrl, {});
+    var html = await manhwazFetch(mangaUrl, {});
     return parseMangaDetail(html, mangaUrl);
   }
 
@@ -257,7 +267,7 @@ class DefaultExtension extends MProvider {
   }
 
   async getPageList(chapterUrl) {
-    var html = await fetchv2(chapterUrl, {});
+    var html = await manhwazFetch(chapterUrl, {});
 
     // Images from CDN: https://cdn.manhwaz.com/manga/{id}/{chapter}/{hash}.jpg
     // They appear as src or data-src in img tags within the reader

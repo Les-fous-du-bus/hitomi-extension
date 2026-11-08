@@ -98,7 +98,7 @@
             "name": "NovelBin",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/novel/novelbin.js",
@@ -106,7 +106,7 @@
             "status": "dead",
             "obsolescenceRisk": "medium",
             "note": "Mesure 2026-09-04 : novelbin.com n'a plus AUCUN enregistrement DNS. novelbin.net repond mais sert une redirection JavaScript a jeton, et une fois le defi franchi la page ne contient zero caractere de texte visible et aucun lien d'oeuvre — rien ne prouve qu'il s'agisse du meme service. novelbin.org, novelbin.io et novelbin.me sont sans DNS. Laisse en dead faute de domaine de remplacement etabli.",
-            "sha256": "885076f85c9b947048c45a0a55fdba764e622d95e26e50b6666de3b65cab6367"
+            "sha256": "b8c946d1759aa438b0c007e2b27f7e91491dd6984dfaaba0673da1b1364e046c"
         },
         {
             "id": "novelbuddy",
@@ -589,7 +589,7 @@
             "name": "ManhwaZ",
             "lang": "en",
             "space": "manga",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/manhwaz.js",
@@ -597,7 +597,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "HTML scraping SSR. /popular returns 404 - home page used as catalog. Chapter images from cdn.manhwaz.com. Strict slug filter on chapter list to prevent related-manga link pollution. mature=true (adult manhwa indexed).",
-            "sha256": "cd97eac1a28fe38c8232bd60995c7902c276e8eae6aadfecb54f3e210e805a17"
+            "sha256": "83fadb6d26904c6c56d5a5f0da3c70fa65af945b7558ffb19b21d76e802785b5"
         },
         {
             "id": "pantheon_scan",

@@ -25,6 +25,16 @@
 
 var BASE_URL = "https://novelbin.com";
 
+// La source peut être inaccessible même lorsque la bibliothèque locale existe.
+async function novelbinFetch(url, options) {
+  try {
+    return await fetchv2(url, options);
+  } catch (e) {
+    var cause = String(e && e.message ? e.message : e);
+    throw new Error("NovelBin : source inaccessible. Vérifie la connexion ou réessaie plus tard. Détail : " + cause);
+  }
+}
+
 var HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0",
@@ -138,7 +148,7 @@ class DefaultExtension extends LNProvider {
 
   async popularNovels(page) {
     var url = BASE_URL + "/sort/top-hot-novel?page=" + page;
-    var html = await fetchv2(url, { headers: HEADERS });
+    var html = await novelbinFetch(url, { headers: HEADERS });
     return parseList(html);
   }
 
@@ -149,7 +159,7 @@ class DefaultExtension extends LNProvider {
       encodeURIComponent(searchTerm || "") +
       "&page=" +
       page;
-    var html = await fetchv2(url, { headers: HEADERS });
+    var html = await novelbinFetch(url, { headers: HEADERS });
     return parseList(html);
   }
 
@@ -158,7 +168,7 @@ class DefaultExtension extends LNProvider {
   // -----------------------------------------------
 
   async parseNovelAndChapters(novelUrl) {
-    var html = await fetchv2(novelUrl, { headers: HEADERS });
+    var html = await novelbinFetch(novelUrl, { headers: HEADERS });
 
     // Title from h3.title[itemprop="name"]
     var titleMatch =
@@ -275,18 +285,18 @@ class DefaultExtension extends LNProvider {
   // -----------------------------------------------
 
   async parseChapter(chapterUrl) {
-    var html = await fetchv2(chapterUrl, { headers: HEADERS });
+    var html = await novelbinFetch(chapterUrl, { headers: HEADERS });
 
     // Content from div#chr-content
     var startMarker = 'id="chr-content"';
     var startIdx = html.indexOf(startMarker);
     if (startIdx === -1) {
-      return "<p>Content not available</p>";
+      throw new Error("Contenu du chapitre indisponible sur la source.");
     }
 
     // Find the opening > of this div
     var gtIdx = html.indexOf(">", startIdx);
-    if (gtIdx === -1) return "<p>Content not available</p>";
+    if (gtIdx === -1) throw new Error("Contenu du chapitre indisponible sur la source.");
 
     // Count div depth to find matching close
     var depth = 1;
@@ -318,6 +328,6 @@ class DefaultExtension extends LNProvider {
       }
     }
 
-    return "<p>Content not available</p>";
+    throw new Error("Contenu du chapitre indisponible sur la source.");
   }
 }
