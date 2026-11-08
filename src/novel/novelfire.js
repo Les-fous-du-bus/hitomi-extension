@@ -62,7 +62,10 @@ function attendre(ms) {
 // levera pas dans ce budget.
 async function lirePage(url) {
   var html = await fetchv2(url, { headers: HEADERS });
-  if (!estLimiteDeDebit(html)) return html;
+  if (!estLimiteDeDebit(html)) {
+    verifierChallenge(html);
+    return html;
+  }
   await attendre(ATTENTE_SOUS_LIMITE_MS);
   html = await fetchv2(url, { headers: HEADERS });
   if (estLimiteDeDebit(html)) {
@@ -71,7 +74,18 @@ async function lirePage(url) {
         "la limite dure encore apres 11 s. Reessaie dans une minute."
     );
   }
+  verifierChallenge(html);
   return html;
+}
+
+// Deux chapitres Android ont recu un document HTTP chargeant un challenge,
+// pas un chapitre. Le script CF seul peut exister dans une page normale :
+// exiger aussi le titre de chargement observe pour eviter un faux positif.
+function verifierChallenge(html) {
+  if (/<title>\s*Loading\.\.\.\s*<\/title>/i.test(html || "") &&
+      /\/cdn-cgi\/challenge-platform\//i.test(html || "")) {
+    throw new Error("NovelFire : le site demande une verification Cloudflare avant de charger cette page.");
+  }
 }
 
 function absoluteUrl(href) {
@@ -387,7 +401,13 @@ class DefaultExtension extends LNProvider {
           if (n > derniere) derniere = n;
         }
         if (derniere > derniereAnnoncee) derniereAnnoncee = derniere;
-        hasMore = pageNum < derniere && pageNum < 100; // garde-fou
+        // Ne pas faire passer le garde-fou pour la fin reelle d'une oeuvre.
+        if (pageNum >= 100 && pageNum < derniere) {
+          throw new Error(
+            "NovelFire : la liste depasse 100 pages ; aucun sommaire incomplet n'a ete enregistre."
+          );
+        }
+        hasMore = pageNum < derniere;
         pageNum++;
       }
     }

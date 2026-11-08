@@ -336,3 +336,16 @@ test('un chapitre qui cite le nombre 1015 n est pas pris pour une limite de debi
   assert.match(html, /Chapter 1015/);
   assert.deepStrictEqual(minuterie.attentes, [], 'aucune attente pour une page normale');
 });
+
+test('une oeuvre dont le sommaire depasse cent pages ne rend pas une liste tronquee', async () => {
+  const reponses = { '/book/my-house-of-horrors': FICHE_OEUVRE };
+  for (let page = 1; page <= 100; page++) {
+    reponses[`/book/my-house-of-horrors/chapters?page=${page}`] =
+      pageChapitres(page, page, 101);
+  }
+  const { ext } = chargerExtension(EXTENSION, reponses);
+  await assert.rejects(
+    ext.parseNovelAndChapters('https://novelfire.net/book/my-house-of-horrors'),
+    /liste depasse 100 pages/
+  );
+});
