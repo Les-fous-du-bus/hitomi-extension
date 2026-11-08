@@ -38,7 +38,7 @@
             "name": "LightNovelPub",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/novel/lightnovelpub.js",
@@ -46,7 +46,7 @@
             "status": "active",
             "obsolescenceRisk": "medium",
             "note": "Cloudflare en mode managed confirme sur tous les points d'entree (403 + cf-ray, revalide le 2026-09-04). Le harnais rend BLOCKED-CF depuis du HTTP natif : c'est attendu, ce n'est pas une panne d'extension. Le navigateur embarque de l'app resout le defi, d'ou cloudflare: true. Statut repasse de dead a active : l'extension n'a jamais ete fautive.",
-            "sha256": "218609f20566cccb43d28082ff27d8dcf45ec5e8601f9bcd72a6b6ab2f0d0f2f"
+            "sha256": "36893e3dfff20bd2439394f9c186a9a7b22cd9c8841b74039ae9b875df59e53f"
         },
         {
             "id": "lightnovelvf",
@@ -173,14 +173,14 @@
             "name": "Novel Updates",
             "lang": "en",
             "space": "light_novel",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/novel/novelupdates.js",
             "iconUrl": "https://www.novelupdates.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "sha256": "ac4269663d04aa92ef9c0986fae1b1d47c50c252f4a59f6fd4d405b6c8701d2d"
+            "sha256": "ee7f4441bb3c0650bdf2abf71a286ccc2f0eb538a90728961002448e72974027"
         },
         {
             "id": "novhell",
@@ -484,15 +484,15 @@
             "name": "MangaKakalot",
             "lang": "en",
             "space": "manga",
-            "version": 1,
+            "version": 2,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangakakalot.js",
             "iconUrl": "https://www.mangakakalot.gg/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "runtime-audit 2026-05-10: RUNTIME-FAIL. Extension URL /manga-list/type-topview/ctg-all/state-all/page-1 returns CF 403 + JS challenge. Homepage 200 but 0 manga refs. Domain www.mangakakalot.gg reachable but all catalog endpoints CF-blocked from server. In-app WebView bypass needed for any content.",
-            "sha256": "eebea09361a3ee96bae0091a9e6a6a68809be4f71cbffaf86cb43f133447f8bc"
+            "note": "2026-11-08 : ancienne adresse de catalogue inaccessible et recherche bloquée ; erreurs signalées, accès non rétabli. Historique : runtime-audit 2026-05-10: RUNTIME-FAIL. Extension URL /manga-list/type-topview/ctg-all/state-all/page-1 returns CF 403 + JS challenge. Homepage 200 but 0 manga refs. Domain www.mangakakalot.gg reachable but all catalog endpoints CF-blocked from server. In-app WebView bypass needed for any content.",
+            "sha256": "a195e823ac757ad5a67a23a1b901bc27aacd3605ef89d2895ea2f80be8c5a31a"
         },
         {
             "id": "mangakatana",
@@ -649,14 +649,15 @@
             "name": "SushiScan",
             "lang": "fr",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/sushi_scan.js",
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "6b9ce2a68efe46bead6616a4b6608242fea6b6e7a2b860bc808424387332d96c"
+            "sha256": "833d54974e701bb609e28eea957207fa276f582fdf0da920c58cefd9a72ef7c3",
+            "note": "2026-11-08 : sélection limitée de secours si le catalogue manque ; erreurs de fiches et pages visibles. Essai Android partiel : liste obtenue mais serveur 504 sur plusieurs œuvres, lecture complète non validée. Historique : "
         },
         {
             "id": "tcbscans",

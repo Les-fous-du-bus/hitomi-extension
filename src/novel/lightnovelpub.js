@@ -121,6 +121,10 @@ function extractImgSrc(imgTag) {
  *     > .item-body > h5.novel-title > a  (OR a[title] directly)
  */
 function parseNovelList(html) {
+    if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)|^\s*error code:\s*(?:1015|1020)/i.test(html || "")) {
+      throw new Error("LightNovelPub : acces bloque par Cloudflare ; ouvre la source pour verifier.");
+    }
+
   var list = [];
 
   // Try multiple card container patterns
@@ -351,12 +355,8 @@ class DefaultExtension extends LNProvider {
    */
   async popularNovels(page) {
     var url = BASE_URL + "/browse?orderBy=popular&status=All&genre=none&page=" + page;
-    var html;
-    try {
-      html = await fetchv2(url, { headers: HEADERS });
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    // Une erreur reseau ou un blocage est un echec, pas un catalogue vide.
+    var html = await fetchv2(url, { headers: HEADERS });
     return parseNovelList(html);
   }
 
@@ -365,12 +365,8 @@ class DefaultExtension extends LNProvider {
    */
   async latestNovels(page) {
     var url = BASE_URL + "/browse?orderBy=new&status=All&genre=none&page=" + page;
-    var html;
-    try {
-      html = await fetchv2(url, { headers: HEADERS });
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    // Une erreur reseau ou un blocage est un echec, pas un catalogue vide.
+    var html = await fetchv2(url, { headers: HEADERS });
     return parseNovelList(html);
   }
 
@@ -381,12 +377,8 @@ class DefaultExtension extends LNProvider {
   async searchNovels(searchTerm, page) {
     if (!searchTerm || searchTerm.trim() === "") return this.popularNovels(page);
     var url = BASE_URL + "/search?keywords=" + encodeURIComponent(searchTerm.trim()) + "&page=" + page;
-    var html;
-    try {
-      html = await fetchv2(url, { headers: HEADERS });
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    // Une erreur reseau ou un blocage est un echec, pas un catalogue vide.
+    var html = await fetchv2(url, { headers: HEADERS });
     return parseNovelList(html);
   }
 
@@ -400,12 +392,7 @@ class DefaultExtension extends LNProvider {
    * Chapters sorted oldest-first per Hitomi convention.
    */
   async parseNovelAndChapters(novelUrl) {
-    var html;
-    try {
-      html = await fetchv2(novelUrl, { headers: HEADERS });
-    } catch (e) {
-      return { title: "", url: novelUrl, cover: "", chapters: [] };
-    }
+    var html = await fetchv2(novelUrl, { headers: HEADERS });
 
     var detail = parseDetail(html, novelUrl);
 
@@ -420,12 +407,8 @@ class DefaultExtension extends LNProvider {
 
     while (hasMore && pageNum <= 200) {
       var chapListUrl = BASE_URL + "/novel/" + slug + "/chapters?page=" + pageNum;
-      var chapHtml;
-      try {
-        chapHtml = await fetchv2(chapListUrl, { headers: HEADERS });
-      } catch (e) {
-        break;
-      }
+      // Ne jamais presenter une liste interrompue comme complete.
+      var chapHtml = await fetchv2(chapListUrl, { headers: HEADERS });
 
       var result = parseChapterList(chapHtml);
 
@@ -454,12 +437,7 @@ class DefaultExtension extends LNProvider {
   // -----------------------------------------------
 
   async parseChapter(chapterUrl) {
-    var html;
-    try {
-      html = await fetchv2(chapterUrl, { headers: HEADERS });
-    } catch (e) {
-      return "<p>Content not available.</p>";
-    }
+    var html = await fetchv2(chapterUrl, { headers: HEADERS });
     return cleanChapterContent(html);
   }
 }

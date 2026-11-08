@@ -48,7 +48,8 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, {});
       return this._parseSearchResults(res);
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      // Preserve network and browser challenge failures for the app.
+      throw e;
     }
   }
 
@@ -58,7 +59,8 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, {});
       return this._parseSearchResults(res);
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      // Preserve network and browser challenge failures for the app.
+      throw e;
     }
   }
 
@@ -68,7 +70,8 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, {});
       return this._parseSearchResults(res);
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      // Preserve network and browser challenge failures for the app.
+      throw e;
     }
   }
 
@@ -158,7 +161,7 @@ class DefaultExtension extends MProvider {
         isMature: isMature,
       };
     } catch (e) {
-      return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
+      throw e;
     }
   }
 
@@ -246,7 +249,7 @@ class DefaultExtension extends MProvider {
       chapters.reverse();
       return chapters;
     } catch (e) {
-      return [];
+      throw e;
     }
   }
 
@@ -291,9 +294,9 @@ class DefaultExtension extends MProvider {
         }
       }
 
-      return "<p>Content could not be loaded. The chapter may be on an unsupported external site.</p>";
+      throw new Error("Novel Updates : contenu indisponible sur le site de traduction.");
     } catch (e) {
-      return "<p>Error loading chapter content</p>";
+      throw e;
     }
   }
 
@@ -324,6 +327,10 @@ class DefaultExtension extends MProvider {
   }
 
   _parseSearchResults(html) {
+    if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)|^\s*error code:\s*(?:1015|1020)/i.test(html || "")) {
+      throw new Error("Novel Updates : acces bloque par Cloudflare ; ouvre la source pour verifier.");
+    }
+
     var list = [];
 
     // Parse div.search_main_box_nu elements

@@ -67,10 +67,18 @@ class DefaultExtension extends MProvider {
     try {
       var url = BASE_URL + "/catalogue/?page=" + page + "&order=popular";
       var res = await fetchv2(url, { "User-Agent": UA });
-      return this._parseMangaReaderList(res);
+      var parsed = this._parseMangaReaderList(res);
+      if (parsed.list.length || page > 1) return parsed;
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      if (page > 1) throw e;
     }
+    // La page d'accueil possède un choix de titres quand /catalogue est indisponible.
+    // Elle n'est pas le catalogue complet : ne pas annoncer une pagination fictive.
+    var home = await fetchv2(BASE_URL + "/", { "User-Agent": UA });
+    var fallback = this._parseMangaReaderList(home);
+    if (!fallback.list.length) throw new Error("SushiScan : catalogue indisponible.");
+    fallback.hasNextPage = false;
+    return fallback;
   }
 
   async getLatestUpdates(page) {
@@ -160,7 +168,9 @@ class DefaultExtension extends MProvider {
         isMature: isMature,
       };
     } catch (e) {
-      return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
+      // Laisser l’application expliquer la panne et proposer une fiche hors ligne.
+      // Une fiche factice « Error » peut masquer un 504 comme une œuvre réelle.
+      throw e;
     }
   }
 
@@ -191,6 +201,10 @@ class DefaultExtension extends MProvider {
         if (!linkMatch) continue;
 
         var chapUrl = linkMatch[1];
+        // Le site inclut parfois un gabarit client non instancié parmi les li.
+        // Un fragment ou une interpolation ne désigne pas un vrai chapitre.
+        if (/^(?:#|javascript:)/i.test(chapUrl) || /\{\{|\}\}/.test(chapUrl)) continue;
+        chapUrl = this._absUrl(chapUrl);
         var chapTitle = "";
         var titleMatch = ch.match(/<span class="chapternum">(.*?)<\/span>/s);
         if (titleMatch) chapTitle = stripTags(titleMatch[1]).trim();
@@ -221,57 +235,57 @@ class DefaultExtension extends MProvider {
       chapters.reverse();
       return chapters;
     } catch (e) {
-      return [];
+      // Une erreur réseau ne signifie pas que l’œuvre n’a aucun chapitre.
+      throw e;
     }
   }
 
   async getPageList(url) {
-    try {
-      var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, { "User-Agent": UA });
+    var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
+    var res = await fetchv2(fullUrl, { "User-Agent": UA });
 
-      var pages = [];
+    var pages = [];
 
-      // Method 1: JSON "images" array (preferred, most reliable)
-      var imagesMatch = res.match(/"images"\s*:\s*(\[.*?\])/);
-      if (imagesMatch) {
-        try {
-          var images = JSON.parse(imagesMatch[1].replace(/\\\//g, "/"));
-          for (var i = 0; i < images.length; i++) {
+    // Method 1: JSON "images" array (preferred, most reliable)
+    var imagesMatch = res.match(/"images"\s*:\s*(\[.*?\])/);
+    if (imagesMatch) {
+      try {
+        var images = JSON.parse(imagesMatch[1].replace(/\\\//g, "/"));
+        for (var i = 0; i < images.length; i++) {
+          pages.push({
+            index: i,
+            imageUrl: images[i],
+            headers: { "Referer": BASE_URL },
+          });
+        }
+        if (pages.length) return pages;
+      } catch (e) {
+        // Fall through to method 2
+      }
+    }
+
+    // Method 2: #readerarea img tags
+    var readerArea = res.match(/<div id="readerarea"[^>]*>(.*?)<\/div>\s*(?:<\/div>|<div)/s);
+    if (readerArea) {
+      var imgMatches = readerArea[1].match(/<img[^>]*(?:data-src|src)\s*=\s*"(https?[^"]+)"/gs);
+      if (imgMatches) {
+        for (var i = 0; i < imgMatches.length; i++) {
+          var srcMatch = imgMatches[i].match(/(?:data-src|src)\s*=\s*"(https?[^"]+)"/);
+          if (srcMatch) {
             pages.push({
               index: i,
-              imageUrl: images[i],
+              imageUrl: srcMatch[1].trim(),
               headers: { "Referer": BASE_URL },
             });
           }
-          return pages;
-        } catch (e) {
-          // Fall through to method 2
         }
       }
-
-      // Method 2: #readerarea img tags
-      var readerArea = res.match(/<div id="readerarea"[^>]*>(.*?)<\/div>\s*(?:<\/div>|<div)/s);
-      if (readerArea) {
-        var imgMatches = readerArea[1].match(/<img[^>]*(?:data-src|src)\s*=\s*"(https?[^"]+)"/gs);
-        if (imgMatches) {
-          for (var i = 0; i < imgMatches.length; i++) {
-            var srcMatch = imgMatches[i].match(/(?:data-src|src)\s*=\s*"(https?[^"]+)"/);
-            if (srcMatch) {
-              pages.push({
-                index: i,
-                imageUrl: srcMatch[1].trim(),
-                headers: { "Referer": BASE_URL },
-              });
-            }
-          }
-        }
-      }
-
-      return pages;
-    } catch (e) {
-      return [];
     }
+
+    if (!pages.length) {
+      throw new Error("SushiScan : aucune page de lecture disponible pour ce chapitre.");
+    }
+    return pages;
   }
 
   getFilterList() {
@@ -280,6 +294,7 @@ class DefaultExtension extends MProvider {
 
   _parseMangaReaderList(html) {
     var list = [];
+    var seen = {};
     // Scope to the listing container, then split on .bsx card boundaries.
     // The old fixed </a></div></div> terminator was brittle to closing-div
     // drift; a boundary split survives it and keeps each card self-contained.
@@ -295,12 +310,14 @@ class DefaultExtension extends MProvider {
       var linkMatch = item.match(/<a[^>]*href="([^"]+)"[^>]*?title="([^"]*)"/);
       if (!linkMatch) continue;
       var mangaUrl = this._absUrl(linkMatch[1]);
+      if (seen[mangaUrl]) continue;
       var title = decodeHtml(linkMatch[2]).trim();
       if (!title) {
         var ttMatch = item.match(/<div class="tt"[^>]*>([^]*?)<\/div>/);
         if (ttMatch) title = decodeHtml(stripTags(ttMatch[1])).trim();
       }
       if (!title) continue;
+      seen[mangaUrl] = true;
 
       // Cover via the fallback chain (data-lazy-src||data-src||srcset||src),
       // skipping data: placeholders, normalized to an absolute URL.

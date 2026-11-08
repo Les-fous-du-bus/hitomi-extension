@@ -57,6 +57,16 @@ function parseKakalotDate(dateStr) {
   }
 }
 
+function checkCatalogueResponse(html) {
+  if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)/i.test(html || "")) {
+    throw new Error("MangaKakalot : acces bloque par la verification du site ; ouvre la source dans le navigateur et reessaie.");
+  }
+  if (/<title>\s*(?:error\s*)?404\s*<\/title>/i.test(html || "")) {
+    throw new Error("MangaKakalot : cette adresse de catalogue ne fonctionne plus ; la source a change de site.");
+  }
+  return html;
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "MangaKakalot"; }
   get lang() { return "en"; }
@@ -72,9 +82,9 @@ class DefaultExtension extends MProvider {
     try {
       var url = BASE_URL + "/manga-list/type-topview/ctg-all/state-all/page-" + page;
       var res = await fetchv2(url, this._getHeaders());
-      return this._parseMangaList(res);
+      return this._parseMangaList(checkCatalogueResponse(res));
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
@@ -82,9 +92,9 @@ class DefaultExtension extends MProvider {
     try {
       var url = BASE_URL + "/manga-list/type-latest/ctg-all/state-all/page-" + page;
       var res = await fetchv2(url, this._getHeaders());
-      return this._parseMangaList(res);
+      return this._parseMangaList(checkCatalogueResponse(res));
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
@@ -95,9 +105,9 @@ class DefaultExtension extends MProvider {
       var url = BASE_URL + "/search/story/" + encodeURIComponent(q);
       if (page > 1) url += "?page=" + page;
       var res = await fetchv2(url, this._getHeaders());
-      return this._parseSearchResults(res);
+      return this._parseSearchResults(checkCatalogueResponse(res));
     } catch (e) {
-      return { list: [], hasNextPage: false };
+      throw e;
     }
   }
 
