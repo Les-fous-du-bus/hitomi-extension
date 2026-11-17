@@ -649,15 +649,15 @@
             "name": "SushiScan",
             "lang": "fr",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/sushi_scan.js",
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "833d54974e701bb609e28eea957207fa276f582fdf0da920c58cefd9a72ef7c3",
-            "note": "2026-11-08 : sélection limitée de secours si le catalogue manque ; erreurs de fiches et pages visibles. Essai Android partiel : liste obtenue mais serveur 504 sur plusieurs œuvres, lecture complète non validée. Historique : "
+            "sha256": "85fe8083dfe4b177a2aa190784a7773ba893bdc2c25c87b8d079ccd857231d54",
+            "note": "2026-11-17 : erreurs HTML 502/503/504 et challenges Cloudflare signalés avant parsing ; recherche et nouveautés ne masquent plus une panne comme liste vide. Sélection d’accueil limitée conservée. Essai Mac 3 œuvres : serveur 504 sur plusieurs fiches et chapitres ; lecture non validée. Ne répare pas le serveur de la source."
         },
         {
             "id": "tcbscans",

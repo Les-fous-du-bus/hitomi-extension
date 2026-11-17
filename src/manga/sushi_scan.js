@@ -7,7 +7,7 @@
  * Mature : false
  *
  * @author @khun — Extension Strategist
- * @version 1.0.2
+ * @version 1.0.3
  *
  * 2026-07-14 fix (v1.0.2):
  *  - BASE_URL sushiscan.net -> sushiscan.fr: .net is Cloudflare-walled (403
@@ -66,7 +66,7 @@ class DefaultExtension extends MProvider {
   async getPopular(page) {
     try {
       var url = BASE_URL + "/catalogue/?page=" + page + "&order=popular";
-      var res = await fetchv2(url, { "User-Agent": UA });
+      var res = await this._fetchHtml(url, { "User-Agent": UA });
       var parsed = this._parseMangaReaderList(res);
       if (parsed.list.length || page > 1) return parsed;
     } catch (e) {
@@ -74,7 +74,7 @@ class DefaultExtension extends MProvider {
     }
     // La page d'accueil possède un choix de titres quand /catalogue est indisponible.
     // Elle n'est pas le catalogue complet : ne pas annoncer une pagination fictive.
-    var home = await fetchv2(BASE_URL + "/", { "User-Agent": UA });
+    var home = await this._fetchHtml(BASE_URL + "/", { "User-Agent": UA });
     var fallback = this._parseMangaReaderList(home);
     if (!fallback.list.length) throw new Error("SushiScan : catalogue indisponible.");
     fallback.hasNextPage = false;
@@ -82,29 +82,21 @@ class DefaultExtension extends MProvider {
   }
 
   async getLatestUpdates(page) {
-    try {
-      var url = BASE_URL + "/catalogue/?page=" + page + "&order=update";
-      var res = await fetchv2(url, { "User-Agent": UA });
-      return this._parseMangaReaderList(res);
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    var url = BASE_URL + "/catalogue/?page=" + page + "&order=update";
+    var res = await this._fetchHtml(url, { "User-Agent": UA });
+    return this._parseMangaReaderList(res);
   }
 
   async search(query, page, filters) {
-    try {
-      var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query);
-      var res = await fetchv2(url, { "User-Agent": UA });
-      return this._parseMangaReaderList(res);
-    } catch (e) {
-      return { list: [], hasNextPage: false };
-    }
+    var url = BASE_URL + "/page/" + page + "/?s=" + encodeURIComponent(query);
+    var res = await this._fetchHtml(url, { "User-Agent": UA });
+    return this._parseMangaReaderList(res);
   }
 
   async getMangaDetail(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, { "User-Agent": UA });
+      var res = await this._fetchHtml(fullUrl, { "User-Agent": UA });
 
       // Title — entry-title or h1
       var titleMatch = res.match(/<h1[^>]*class="entry-title"[^>]*itemprop="name"[^>]*>(.*?)<\/h1>/s) ||
@@ -177,7 +169,7 @@ class DefaultExtension extends MProvider {
   async getChapterList(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await fetchv2(fullUrl, { "User-Agent": UA });
+      var res = await this._fetchHtml(fullUrl, { "User-Agent": UA });
 
       var chapters = [];
       // MangaReader: #chapterlist li with .chbox .eph-num a
@@ -242,7 +234,7 @@ class DefaultExtension extends MProvider {
 
   async getPageList(url) {
     var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-    var res = await fetchv2(fullUrl, { "User-Agent": UA });
+    var res = await this._fetchHtml(fullUrl, { "User-Agent": UA });
 
     var pages = [];
 
@@ -286,6 +278,25 @@ class DefaultExtension extends MProvider {
       throw new Error("SushiScan : aucune page de lecture disponible pour ce chapitre.");
     }
     return pages;
+  }
+
+  async _fetchHtml(url, headers) {
+    // fetchv2 peut rendre un corps HTML d’erreur sans exposer le statut HTTP.
+    var html = await fetchv2(url, headers);
+    var head = html.slice(0, 16000);
+    if (/<[^>]*\sid\s*=\s*["\'](?:cf-browser-verification|challenge-form)["\']|<title[^>]*>\s*(?:Just a moment|Attention Required)/i.test(head)) {
+      throw new Error("SushiScan : validation Cloudflare requise sur la source.");
+    }
+    var headings = head.match(/<(?:title|h1)\b[^>]*>[^]*?<\/(?:title|h1)>/gi) || [];
+    for (var i = 0; i < headings.length; i++) {
+      var heading = stripTags(headings[i]).trim();
+      var code = heading.match(/^(?:error\s*)?(502|503|504)\b/i);
+      if (!code && /^(?:Bad Gateway|Service Unavailable|Gateway Time-?out)\b/i.test(heading)) {
+        code = ["", /Bad Gateway/i.test(heading) ? "502" : /Service Unavailable/i.test(heading) ? "503" : "504"];
+      }
+      if (code) throw new Error("SushiScan : source indisponible (page d’erreur " + code[1] + "). Réessaie plus tard.");
+    }
+    return html;
   }
 
   getFilterList() {

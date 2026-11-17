@@ -73,3 +73,63 @@ test("une carte sans titre ne masque pas une carte suivante pour la même œuvre
   assert.equal(result.list.length, 1);
   assert.equal(result.list[0].title, "Titre réel");
 });
+
+
+// Le vrai bridge rend aussi les corps HTML d’erreur sans champ `error`.
+for (const status of [200, 502, 503, 504]) {
+  test(`une fiche HTML Gateway échoue même sans erreur bridge (status ${status})`, async () => {
+    const body = '<html><head><title>504 Gateway Time-out</title></head><body><h1>504 Gateway Time-out</h1></body></html>';
+    const {ext}=chargerExtension(source, {'/catalogue/test/':{status,body}});
+    await assert.rejects(ext.getMangaDetail('https://sushiscan.fr/catalogue/test/'), /SushiScan.*504/);
+    await assert.rejects(ext.getChapterList('https://sushiscan.fr/catalogue/test/'), /SushiScan.*504/);
+  });
+}
+for (const [code, label] of [[502,'Bad Gateway'],[503,'Service Unavailable'],[504,'Gateway Time-out']]) {
+  test(`un chapitre HTML ${code} ne devient pas une erreur de parseur`, async () => {
+    const {ext}=chargerExtension(source, {'/test-chapitre-1/':`<html><title>${code} ${label}</title><h1>${code} ${label}</h1></html>`});
+    await assert.rejects(ext.getPageList('https://sushiscan.fr/test-chapitre-1/'), new RegExp('SushiScan.*'+code));
+  });
+}
+test('recherche et nouveautés propagent les erreurs HTML du serveur', async () => {
+  const body='<html><title>503 Service Unavailable</title></html>';
+  const {ext}=chargerExtension(source, {'sushiscan.fr/':body});
+  await assert.rejects(ext.search('Kingdom',1,[]), /SushiScan.*503/);
+  await assert.rejects(ext.getLatestUpdates(1), /SushiScan.*503/);
+});
+test('un challenge Cloudflare reste distinct d’une fiche ou d’un sommaire vide', async () => {
+  const body='<html><title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/h/g/orchestrate/chl_page/v1"></script></html>';
+  const {ext}=chargerExtension(source, {'sushiscan.fr/':body});
+  await assert.rejects(ext.getMangaDetail('https://sushiscan.fr/catalogue/test/'), /SushiScan.*Cloudflare/);
+  await assert.rejects(ext.getChapterList('https://sushiscan.fr/catalogue/test/'), /SushiScan.*Cloudflare/);
+  await assert.rejects(ext.getPageList('https://sushiscan.fr/test-chapitre-1/'), /SushiScan.*Cloudflare/);
+});
+test('un catalogue HTML504 conserve le recours unique à l’accueil, sans pagination fictive', async () => {
+  const card='<div class="bsx"><a href="/catalogue/test/" title="Test"><img src="/test.jpg"></a></div>';
+  const {ext,appels}=chargerExtension(source, {'/catalogue/?page=1':{status:504,body:'<h1>504 Gateway Time-out</h1>'},'sushiscan.fr/':card});
+  const result=await ext.getPopular(1);
+  assert.equal(result.list.length,1);assert.equal(result.hasNextPage,false);assert.equal(appels.length,2);
+});
+test('un catalogue page2 en panne ne revient pas aux mêmes titres d’accueil', async () => {
+  const {ext,appels}=chargerExtension(source, {'/catalogue/?page=2':'<h1>502 Bad Gateway</h1>'});
+  await assert.rejects(ext.getPopular(2), /SushiScan.*502/);assert.equal(appels.length,1);
+});
+test('la mention Bad Gateway dans un synopsis ne bloque pas une vraie fiche', async () => {
+  const html='<html><title>Kingdom - SushiScan</title><h1 class="entry-title">Kingdom</h1><div class="entry-content" itemprop="description">Une histoire surnommée Bad Gateway par ses lecteurs.</div></html>';
+  const {ext}=chargerExtension(source, {'/catalogue/test/':html});
+  const detail=await ext.getMangaDetail('https://sushiscan.fr/catalogue/test/');assert.equal(detail.title,'Kingdom');
+});
+
+
+test('un script Cloudflare sur une fiche normale ne devient pas un challenge', async () => {
+  const html='<html><title>Kingdom - SushiScan</title><script src="/cdn-cgi/challenge-platform/scripts/jsd/main.js"></script><h1 class="entry-title">Kingdom</h1><li data-num="1"><a href="/kingdom-chapitre-1/"><span class="chapternum">Chapitre 1</span></a></li><script>{"images":["https://cdn.example.test/a.jpg"]}</script></html>';
+  const {ext}=chargerExtension(source, {'sushiscan.fr/':html});
+  assert.equal((await ext.getMangaDetail('https://sushiscan.fr/catalogue/kingdom/')).title,'Kingdom');
+  assert.equal((await ext.getChapterList('https://sushiscan.fr/catalogue/kingdom/')).length,1);
+  assert.equal((await ext.getPageList('https://sushiscan.fr/kingdom-chapitre-1/')).length,1);
+});
+for (const id of ['cf-browser-verification','challenge-form']) {
+  test(`un formulaire de challenge ${id} reste une validation requise sans titre standard`, async () => {
+    const {ext}=chargerExtension(source, {'sushiscan.fr/':`<html><title>SushiScan</title><form id="${id}"></form></html>`});
+    await assert.rejects(ext.getMangaDetail('https://sushiscan.fr/catalogue/kingdom/'), /SushiScan.*Cloudflare/);
+  });
+}
