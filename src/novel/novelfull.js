@@ -28,6 +28,69 @@
 
 var BASE_URL = "https://novelfull.com";
 
+var GENRE_OPTIONS = [
+  {
+    "displayName": "Tous",
+    "value": ""
+  },
+  {
+    "displayName": "Horror",
+    "value": "Horror"
+  },
+  {
+    "displayName": "Action",
+    "value": "Action"
+  },
+  {
+    "displayName": "Adventure",
+    "value": "Adventure"
+  },
+  {
+    "displayName": "Fantasy",
+    "value": "Fantasy"
+  },
+  {
+    "displayName": "Romance",
+    "value": "Romance"
+  },
+  {
+    "displayName": "Drama",
+    "value": "Drama"
+  },
+  {
+    "displayName": "Comedy",
+    "value": "Comedy"
+  },
+  {
+    "displayName": "Mystery",
+    "value": "Mystery"
+  },
+  {
+    "displayName": "Psychological",
+    "value": "Psychological"
+  },
+  {
+    "displayName": "Sci-fi",
+    "value": "Sci-fi"
+  },
+  {
+    "displayName": "Supernatural",
+    "value": "Supernatural"
+  },
+  {
+    "displayName": "Slice of Life",
+    "value": "Slice of Life"
+  },
+  {
+    "displayName": "Historical",
+    "value": "Historical"
+  },
+  {
+    "displayName": "Martial Arts",
+    "value": "Martial Arts"
+  }
+];
+
 var HEADERS = {
   "User-Agent":
     "Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0",
@@ -87,17 +150,16 @@ function parseList(html) {
   var list = [];
   var seen = {};
 
-  // Les badges peuvent précéder le lien. Limiter la recherche au même h3
-  // pour ne jamais associer un titre à la carte suivante.
   var titleRegex = /<h3\b[^>]*class=["'][^"']*\btruyen-title\b[^"']*["'][^>]*>([\s\S]*?)<\/h3>/gi;
   var m;
   while ((m = titleRegex.exec(html)) !== null) {
-    var link = m[1].match(/<a\b([^>]*)>([\s\S]*?)<\/a>/i);
-    if (!link) continue;
-    var href = link[1].match(/\bhref\s*=\s*["']([^"']+)["']/i);
-    var label = link[1].match(/\btitle\s*=\s*["']([^"']+)["']/i);
-    var url = href ? absoluteUrl(href[1]) : "";
-    var title = decodeHtml(label ? label[1] : stripHtml(link[2]));
+    var anchor = m[1].match(/<a\b([^>]*)>([\s\S]*?)<\/a>/i);
+    if (!anchor) continue;
+    var href = anchor[1].match(/\bhref=["']([^"']+)["']/i);
+    if (!href) continue;
+    var titleAttr = anchor[1].match(/\btitle=["']([^"']+)["']/i);
+    var url = absoluteUrl(href[1]);
+    var title = decodeHtml(titleAttr ? titleAttr[1] : stripHtml(anchor[2]));
     if (!title || !url || seen[url]) continue;
     seen[url] = true;
 
@@ -118,9 +180,15 @@ function parseList(html) {
     list.push({ title: title, url: url, cover: cover });
   }
 
-  var hasNextPage =
-    /rel=["']next["']/i.test(html) ||
-    /class="[^"]*pagination[^"]*"[\s\S]*?class="[^"]*next[^"]*"/i.test(html);
+  var hasNextPage = /<a\b[^>]*\brel=["']next["']/i.test(html);
+  var pagination = html.match(/<ul\b[^>]*class=["'][^"']*\bpagination\b[^"']*["'][^>]*>([\s\S]*?)<\/ul>/i);
+  if (pagination) {
+    var nextItem = /<li\b([^>]*)>([\s\S]*?)<\/li>/gi;
+    var nextMatch;
+    while ((nextMatch = nextItem.exec(pagination[1])) !== null) {
+      if (/\bnext\b/i.test(nextMatch[1]) && !/\bdisabled\b/i.test(nextMatch[1]) && /<a\b[^>]*href=["'][^"'#]+/i.test(nextMatch[2])) hasNextPage = true;
+    }
+  }
 
   return { list: list, hasNextPage: hasNextPage };
 }
@@ -194,7 +262,26 @@ class DefaultExtension extends LNProvider {
     return parseList(html);
   }
 
-  async searchNovels(searchTerm, page) {
+  getFilterList() {
+    return [{ type: "SelectFilter", name: "Genre", default: 0, values: GENRE_OPTIONS }];
+  }
+
+  async searchNovels(searchTerm, page, filters) {
+    var genreFilter = (filters || []).find(function (f) { return f.type === "SelectFilter" && f.name === "Genre"; });
+    var selected = genreFilter && genreFilter.values && genreFilter.values[genreFilter.state || 0];
+    var genre = genreFilter && (genreFilter.value || (selected && selected.value));
+    if (genre) {
+      if (!GENRE_OPTIONS.some(function (v) { return v.value === genre; })) throw new Error("NovelFull : genre invalide.");
+      if ((searchTerm || "").trim()) throw new Error("NovelFull : recherche par titre et genre simultanés non disponible.");
+      var genreUrl = BASE_URL + "/genre/" + encodeURIComponent(genre).replace(/%20/g, "+");
+      if (page > 1) genreUrl += "?page=" + page;
+      var genreHtml = await fetchv2(genreUrl, { headers: HEADERS });
+      var result = parseList(genreHtml);
+      // Le chemin officiel confirme ce genre uniquement ; les autres tags,
+      // dont la nature sexuelle, ne sont pas fournis dans ces cartes.
+      result.list.forEach(function (item) { item.genres = [genre]; item.matureType = "unknown"; });
+      return result;
+    }
     var url =
       BASE_URL +
       "/search?keyword=" +

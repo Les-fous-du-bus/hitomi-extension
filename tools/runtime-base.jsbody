@@ -325,6 +325,7 @@
               url: item.url,
               cover: item.imageUrl || '',
               isMature: item.isMature || false,
+              matureType: item.matureType || null,
               genres: Array.isArray(item.genres) ? item.genres : [],
             });
           }
@@ -332,8 +333,8 @@
         return { list: list, hasNextPage: result ? result.hasNextPage : false };
       }
 
-      async searchNovels(searchTerm, page) {
-        var result = await this.search(searchTerm, page, []);
+      async searchNovels(searchTerm, page, filters) {
+        var result = await this.search(searchTerm, page, filters || []);
         var list = [];
         if (result && result.list) {
           for (var i = 0; i < result.list.length; i++) {
@@ -343,6 +344,7 @@
               url: item.url,
               cover: item.imageUrl || '',
               isMature: item.isMature || false,
+              matureType: item.matureType || null,
               genres: Array.isArray(item.genres) ? item.genres : [],
             });
           }
@@ -374,6 +376,7 @@
           status: detail.status || '',
           genres: detail.genres || [],
           isMature: detail.isMature || false,
+          matureType: detail.matureType || null,
           chapters: lnChapters,
         };
       }
@@ -423,6 +426,7 @@
               url: item.url,
               imageUrl: item.cover || '',
               isMature: item.isMature || false,
+              matureType: item.matureType || null,
               genres: Array.isArray(item.genres) ? item.genres : [],
             });
           }
@@ -433,7 +437,7 @@
       async getLatestUpdates(page) { return this.getPopular(page); }
 
       async search(query, page, filters) {
-        var result = await this.searchNovels(query, page);
+        var result = await this.searchNovels(query, page, filters || []);
         var list = [];
         if (result && result.list) {
           for (var i = 0; i < result.list.length; i++) {
@@ -443,6 +447,7 @@
               url: item.url,
               imageUrl: item.cover || '',
               isMature: item.isMature || false,
+              matureType: item.matureType || null,
               genres: Array.isArray(item.genres) ? item.genres : [],
             });
           }

@@ -158,15 +158,15 @@
             "name": "NovelFull",
             "lang": "en",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/novel/novelfull.js",
             "iconUrl": "https://novelfull.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "2026-11-08 : catalogue et lecture valides sur quatre romans Android echantillonnes ; sommaires au-dela de 50 pages temporairement indisponibles pour eviter une liste tronquee. novelfull.com CF 403 + novelfull.me CF 526 (SSL error). cloudflare: true required. Monitor domain stability.",
-            "sha256": "9e034be595ab08bf0a16e10e1db45115db9484199f86268e14ec93dc2c35866c"
+            "note": "2026-11-16 : filtre de genre officiel et pagination, dont Horror ; cartes avec icone et fin de pagination corrigees. Genre + titre simultanes non pris en charge ; classification sexuelle inconnue dans les cartes de genre. Limite de 50 pages de sommaire conservee.",
+            "sha256": "1ae1d95dab91cfa04599fbf5768f7bf68987060d9a05b6cd9cae96acc9f5e536"
         },
         {
             "id": "novelupdates",
@@ -439,15 +439,15 @@
             "name": "MangaDex",
             "lang": "multi",
             "space": "manga",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/manga/mangadex.js",
             "iconUrl": "https://mangadex.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "low",
-            "note": "v3: identify Hitomi for API and image requests; expose HTML challenges as clear errors.",
-            "sha256": "d4322e3d31fd2c550924b10cf6e27a89b8b66d69c86401f794313911f32dc535"
+            "note": "v4 : genres dont Horreur, langue et pagination combinables ; genres et classement précis conservés dans les cartes.",
+            "sha256": "65555d405836afe50d48215004ddf553879670d164b1f57d1ae8377b070c9866"
         },
         {
             "id": "mangafire",

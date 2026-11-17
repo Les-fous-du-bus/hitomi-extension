@@ -98,6 +98,11 @@ function parseMangaItem(item) {
     title,
     url: `${BASE_API}/manga/${item.id}`,
     imageUrl: buildCoverUrl(item.id, coverFileName),
+    genres: (attrs.tags || []).map(t => {
+      const names = (t.attributes && t.attributes.name) || {};
+      return names.en || names.fr || Object.values(names)[0] || '';
+    }).filter(Boolean),
+    matureType: isMature ? 'sexual' : attrs.contentRating === 'suggestive' ? 'ecchi' : null,
     isMature,
   };
 }
@@ -181,6 +186,10 @@ class DefaultExtension extends MProvider {
         if (filter.type === "SelectFilter" && filter.name === "Langue") {
           const langVal = filter.values && filter.values[filter.state || 0];
           url += `&availableTranslatedLanguage[]=${langVal ? langVal.value : LANG}`;
+        } else if (filter.type === "SelectFilter" && filter.name === "Genre") {
+          const selected = filter.values && filter.values[filter.state || 0];
+          const tag = filter.value || (selected && selected.value);
+          if (tag) url += `&includedTags[]=${encodeURIComponent(tag)}`;
         } else if (filter.type === "SelectFilter" && filter.name === "Statut") {
           const statusVal = filter.values && filter.values[filter.state || 0];
           if (statusVal && statusVal.value) url += `&status[]=${statusVal.value}`;
@@ -380,6 +389,61 @@ class DefaultExtension extends MProvider {
 
   getFilterList() {
     return [
+      {
+        "type": "SelectFilter",
+        "name": "Genre",
+        "values": [
+          {
+            "displayName": "Tous",
+            "value": ""
+          },
+          {
+            "displayName": "Science-fiction",
+            "value": "256c8bd9-4904-4360-bf4f-508a76d67183"
+          },
+          {
+            "displayName": "Action",
+            "value": "391b0423-d847-456f-aff0-8b0cfc03066b"
+          },
+          {
+            "displayName": "Psychologique",
+            "value": "3b60b75c-a2d7-4860-ab56-05f391bb889c"
+          },
+          {
+            "displayName": "Romance",
+            "value": "423e2eae-a7a2-4a8b-ac03-a8351462d71d"
+          },
+          {
+            "displayName": "Comédie",
+            "value": "4d32cc48-9f00-4cca-9b5a-a839f0764984"
+          },
+          {
+            "displayName": "Aventure",
+            "value": "87cc87cd-a395-47af-b27a-93258283bbc6"
+          },
+          {
+            "displayName": "Drame",
+            "value": "b9af3a63-f058-46de-a9a0-e0c13906197a"
+          },
+          {
+            "displayName": "Horreur",
+            "value": "cdad7e68-1419-41dd-bdce-27753074a640"
+          },
+          {
+            "displayName": "Fantasy",
+            "value": "cdc58593-87dd-415e-bbc0-2ec27bf404cc"
+          },
+          {
+            "displayName": "Tranche de vie",
+            "value": "e5301a23-ebd9-49dd-a0cb-2add944c7fe9"
+          },
+          {
+            "displayName": "Mystère",
+            "value": "ee968100-4191-4968-93d3-f82d72be7e46"
+          }
+        ],
+        "default": 0
+      },
       {
         type: "SelectFilter",
         name: "Langue",
