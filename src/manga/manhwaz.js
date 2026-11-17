@@ -37,19 +37,27 @@
  *     getPageList unchanged (live-verified 44/44). Live-verified L2.
  *
  * @author @khun -- Extension Strategist
- * @version 2
+ * @version 4
  */
 
 var BASE_URL = "https://manhwaz.com";
 
 // La source peut être inaccessible même lorsque la bibliothèque locale existe.
 async function manhwazFetch(url, options) {
+  var html;
   try {
-    return await fetchv2(url, options);
+    html = await fetchv2(url, options);
   } catch (e) {
     var cause = String(e && e.message ? e.message : e);
     throw new Error("ManhwaZ : source inaccessible. Vérifie la connexion ou réessaie plus tard. Détail : " + cause);
   }
+  // A registrar parking page may be served as HTTP200; neither marker alone is enough.
+  if (/namecheap\.com/i.test(html) && /Domain registration has\s+expired/i.test(html)) {
+    throw new Error("ManhwaZ : le domaine de la source a expiré. Les chapitres déjà téléchargés restent accessibles.");
+  }
+  var errorPage = html.match(/<(?:title|h1)\b[^>]*>\s*(404|502|503|504)\b/i);
+  if (errorPage) throw new Error("ManhwaZ : source indisponible (page d’erreur " + errorPage[1] + "). Réessaie plus tard.");
+  return html;
 }
 
 /**

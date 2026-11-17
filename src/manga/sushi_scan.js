@@ -3,11 +3,11 @@
  * Source : https://sushiscan.fr
  * Methode : HTML scraping (regex) — MangaReader WordPress theme
  * Langue : fr
- * Cloudflare : NON
- * Mature : false
+ * Cloudflare : selon protection du site
+ * Mature : catalogue mixte ; classement par œuvre
  *
  * @author @khun — Extension Strategist
- * @version 1.0.3
+ * @version 1.0.4
  *
  * 2026-07-14 fix (v1.0.2):
  *  - BASE_URL sushiscan.net -> sushiscan.fr: .net is Cloudflare-walled (403
@@ -25,7 +25,21 @@
  *    accurate and Hitomi can persist the flag.
  */
 
-var MATURE_GENRES_RE = /\b(adulte|adult|smut|pornhwa|pornwha|hentai|erotique|ero|mature|ecchi|yaoi|yuri|18\+)\b/i;
+// Only explicit content tags establish a sexual category. Age ratings and
+// uncensored editions do not say why a work is restricted.
+function matureTypeFromGenres(genres) {
+  if (!genres.length) return "unknown";
+  var type = null;
+  for (var i = 0; i < genres.length; i++) {
+    var tag = genres[i].toLowerCase().replace(/[éèêë]/g, "e").replace(/[àâä]/g, "a").replace(/[ôö]/g, "o").replace(/[îï]/g, "i").replace(/[ùûü]/g, "u");
+    if (/\b(?:sexual\s+content|contenu\s+sexuel|smut|pornhwa|pornwha|hentai|erotique|erotica|erotic|pornographic|pornographie)\b/.test(tag)) return "sexual";
+    if (/\bgore\b/.test(tag)) type = "gore";
+    else if (/\bviolence\b/.test(tag) && type !== "gore") type = "violence";
+    else if (/\b(?:ecchi|suggestive)\b/.test(tag) && type !== "gore" && type !== "violence") type = "ecchi";
+    else if (!type && /\b(?:adult|adulte|mature|nsfw|uncensored|non[ -]censure)\b|(?:18|21)\s*\+|r[ -]?18/.test(tag)) type = "unknown";
+  }
+  return type;
+}
 
 // BASE_URL points at sushiscan.fr (the mirror named in this header). The old
 // sushiscan.net value was hard-walled by Cloudflare ("Just a moment...", 403)
@@ -144,10 +158,7 @@ class DefaultExtension extends MProvider {
         else if (/cancel|abandon|dropped/i.test(st)) status = "abandoned";
       }
 
-      var isMature = false;
-      for (var gi = 0; gi < genres.length; gi++) {
-        if (MATURE_GENRES_RE.test(genres[gi])) { isMature = true; break; }
-      }
+      var matureType = matureTypeFromGenres(genres);
 
       return {
         title: decodeHtml(title),
@@ -157,7 +168,8 @@ class DefaultExtension extends MProvider {
         status: status,
         genres: genres,
         authors: authors,
-        isMature: isMature,
+        isMature: matureType !== null,
+        matureType: matureType,
       };
     } catch (e) {
       // Laisser l’application expliquer la panne et proposer une fiche hors ligne.
@@ -334,13 +346,13 @@ class DefaultExtension extends MProvider {
       // skipping data: placeholders, normalized to an absolute URL.
       var imageUrl = this._extractImg(item);
 
-      // Listing markup carries no genre chip per tile. Title-only heuristic —
-      // low recall, zero false positives. Real flag comes from getMangaDetail.
+      // Without genre metadata a title cannot establish a sexual category.
       list.push({
         title: title,
         url: mangaUrl,
         imageUrl: imageUrl,
-        isMature: MATURE_GENRES_RE.test(title),
+        isMature: true,
+        matureType: "unknown",
       });
     }
 

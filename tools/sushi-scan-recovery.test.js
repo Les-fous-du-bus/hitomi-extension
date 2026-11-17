@@ -133,3 +133,30 @@ for (const id of ['cf-browser-verification','challenge-form']) {
     await assert.rejects(ext.getMangaDetail('https://sushiscan.fr/catalogue/kingdom/'), /SushiScan.*Cloudflare/);
   });
 }
+
+
+for (const [genres, expected] of [
+  [['Action'],null],[['Horreur'],null],[['Yaoi'],null],[['Yuri'],null],
+  [['18+'],'unknown'],[['R18'],'unknown'],[['Mature'],'unknown'],[['Adulte'],'unknown'],[['Non censuré'],'unknown'],
+  [['Sexual Content'],'sexual'],[['Contenu sexuel'],'sexual'],[['Érotique'],'sexual'],[['Pornhwa'],'sexual'],[['Smut'],'sexual'],[['Hentai'],'sexual'],
+  [['Gore'],'gore'],[['Violence'],'violence'],[['Ecchi'],'ecchi'],
+  [['Asexual Content'],null],[[], 'unknown'],[['Mature','Gore'],'gore'],[['18+','Violence'],'violence'],
+  [['Yaoi','Smut'],'sexual'],[['Gore','Érotique'],'sexual'],[['Érotique','Gore'],'sexual']
+]) {
+  test(`la classification précise ne confond pas âge, sexualité et violence: ${genres}`, async () => {
+    const html='<h1 class="entry-title">Test</h1><div class="seriestugenre">'+genres.map(g=>'<a>'+g+'</a>').join('')+'</div>';
+    const {ext}=chargerExtension(source, {'/catalogue/test/':html});
+    const detail=await ext.getMangaDetail('https://sushiscan.fr/catalogue/test/');
+    assert.equal(detail.matureType,expected);assert.equal(detail.isMature,expected!==null);
+  });
+}
+test('les cartes sans métadonnées ne déduisent rien du titre', async () => {
+  const card='<div class="bsx"><a href="/catalogue/test/" title="Mature Horror"><img src="/test.jpg"></a></div>';
+  const {ext}=chargerExtension(source, {'/catalogue/?page=1':card});
+  const result=await ext.getPopular(1);assert.equal(result.list[0].matureType,'unknown');assert.equal(result.list[0].isMature,true);
+});
+test('le fallback503 garde la classification inconnue et aucune pagination fictive', async () => {
+  const card='<div class="bsx"><a href="/catalogue/test/" title="Test"><img src="/test.jpg"></a></div>';
+  const {ext,appels}=chargerExtension(source, {'/catalogue/?page=1':{status:503,body:'<h1>503 Service Unavailable</h1>'},'sushiscan.fr/':card});
+  const result=await ext.getPopular(1);assert.equal(result.list[0].matureType,'unknown');assert.equal(result.hasNextPage,false);assert.equal(appels.length,2);
+});

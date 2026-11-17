@@ -7,7 +7,7 @@
  * Mature : partiel (categories Adulte, Yaoi, Yuri)
  *
  * @author @khun — Extension Strategist
- * @version 1.0.1
+ * @version 1.0.2
  *
  * LIVE AUDIT 2026-04-19 (@khun)
  * - Probed /roman/ (mobile UA): 71 <article> cards.
@@ -26,6 +26,7 @@ function stripTags(str) {
 function decodeHtml(str) {
   if (!str) return "";
   return str
+    .replace(/&nbsp;|&#160;|&#x0*a0;/gi, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
@@ -51,7 +52,7 @@ function decodeHtml(str) {
 // message d'indisponibilite sur tous les chapitres.
 function extractDivByClass(html, className) {
   if (!html || !className) return "";
-  var open = new RegExp('<div[^>]*class="[^"]*\\b' + className + '\\b[^"]*"[^>]*>', 'i');
+  var open = new RegExp('<div[^>]*class="(?:[^"]*\\s)?' + className + '(?:\\s[^"]*)?"[^>]*>', 'i');
   var m = open.exec(html);
   if (!m) return "";
   var start = m.index + m[0].length;
@@ -169,22 +170,15 @@ class DefaultExtension extends MProvider {
         if (authorText) authors.push(authorText);
       }
 
-      // Genres — .categorie and .genre
+      // Metadata blocks now use compound classes; only labels, not tooltip prose, are genres.
       var genres = [];
-      var catMatch = res.match(/<[^>]*class="categorie"[^>]*>(.*?)<\/[^>]*>/s);
-      if (catMatch) {
-        var catText = stripTags(catMatch[1]).replace(/Cat.*?:\s*/i, "").trim();
-        if (catText && catText !== "Autre") genres.push(catText);
-      }
-      var genreMatch = res.match(/<[^>]*class="genre"[^>]*>(.*?)<\/[^>]*>/s);
-      if (genreMatch) {
-        var genreText = stripTags(genreMatch[1]).replace(/Genre\s*:\s*/i, "").trim();
-        if (genreText) {
-          var parts = genreText.split(",");
-          for (var i = 0; i < parts.length; i++) {
-            var g = parts[i].trim();
-            if (g) genres.push(g);
-          }
+      for (var blockName of ["categorie", "genre"]) {
+        var block = extractDivByClass(res, blockName);
+        var links = block.match(/<a\b[^>]*>[^]*?<\/a>/gi) || [];
+        if (!links.length) links = stripTags(block).trim().replace(/^(?:Cat.*?|Genre)\s*:\s*/i, "").split(",");
+        for (var link of links) {
+          var label = decodeHtml(stripTags(link)).trim();
+          if (label && label !== "Autre" && genres.indexOf(label) === -1) genres.push(label);
         }
       }
 
