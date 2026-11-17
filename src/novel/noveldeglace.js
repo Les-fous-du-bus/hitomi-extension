@@ -86,14 +86,6 @@ function sliceByDataTitle(html, title) {
 
 var MATURE_CATEGORIES = ["adulte", "yaoi", "yuri", "roman pour adulte", "adult"];
 
-// Accent folding for Latin catalogue search; QuickJS normalize is optional.
-function normalizeLatinSearch(text) {
-  return text.toLowerCase().replace(/[\u0300-\u036f]/g, "")
-    .replace(/[àáâãäå]/g, "a").replace(/ç/g, "c").replace(/[èéêë]/g, "e")
-    .replace(/[ìíîï]/g, "i").replace(/ñ/g, "n").replace(/[òóôõö]/g, "o")
-    .replace(/[ùúûü]/g, "u").replace(/[ýÿ]/g, "y");
-}
-
 class DefaultExtension extends MProvider {
   get name() { return "NovelDeGlace"; }
   get lang() { return "fr"; }
@@ -130,10 +122,12 @@ class DefaultExtension extends MProvider {
       var res = await fetchv2(url, { "Accept-Encoding": "deflate" });
       var all = this._parseNovelArticles(res, false);
 
-      var normalizedQuery = normalizeLatinSearch(query);
+      var normalizedQuery = query.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       var filtered = [];
       for (var i = 0; i < all.list.length; i++) {
-        var normalizedTitle = normalizeLatinSearch(all.list[i].title);
+        var normalizedTitle = all.list[i].title.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         if (normalizedTitle.indexOf(normalizedQuery) !== -1) {
           filtered.push(all.list[i]);
         }

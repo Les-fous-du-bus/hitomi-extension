@@ -133,14 +133,6 @@ async function enrichCovers(ext, list) {
   return list;
 }
 
-// Accent folding for Latin catalogue search; QuickJS normalize is optional.
-function normalizeLatinSearch(text) {
-  return text.toLowerCase().replace(/[\u0300-\u036f]/g, "")
-    .replace(/[àáâãäå]/g, "a").replace(/ç/g, "c").replace(/[èéêë]/g, "e")
-    .replace(/[ìíîï]/g, "i").replace(/ñ/g, "n").replace(/[òóôõö]/g, "o")
-    .replace(/[ùúûü]/g, "u").replace(/[ýÿ]/g, "y");
-}
-
 class DefaultExtension extends MProvider {
   get name() { return "WarriorLegendTrad"; }
   get lang() { return "fr"; }
@@ -177,10 +169,12 @@ class DefaultExtension extends MProvider {
       var page2 = await this.getPopular(2);
       var allNovels = page1.list.concat(page2.list);
 
-      var normalizedQuery = normalizeLatinSearch(query);
+      var normalizedQuery = query.toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       var filtered = [];
       for (var i = 0; i < allNovels.length; i++) {
-        var normalizedTitle = normalizeLatinSearch(allNovels[i].title);
+        var normalizedTitle = allNovels[i].title.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         if (normalizedTitle.indexOf(normalizedQuery) !== -1) {
           filtered.push(allNovels[i]);
         }
