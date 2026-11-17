@@ -160,3 +160,28 @@ test('le fallback503 garde la classification inconnue et aucune pagination ficti
   const {ext,appels}=chargerExtension(source, {'/catalogue/?page=1':{status:503,body:'<h1>503 Service Unavailable</h1>'},'sushiscan.fr/':card});
   const result=await ext.getPopular(1);assert.equal(result.list[0].matureType,'unknown');assert.equal(result.hasNextPage,false);assert.equal(appels.length,2);
 });
+
+
+for (const [raw, decoded, expected] of [
+  ['Érotique','Érotique','sexual'],
+  ['E\u0301rotique','E\u0301rotique','sexual'],
+  ['&Eacute;rotique','Érotique','sexual'],
+  ['&#201;rotique','Érotique','sexual'],
+  ['&#xC9;rotique','Érotique','sexual'],
+  ['contenu&nbsp;sexuel','contenu sexuel','sexual'],
+  ['Asexual Content','Asexual Content',null],
+]) {
+  test(`les genres sont décodés avant classement et les accents composés/décomposés concordent: ${raw}`, async () => {
+    const html='<h1 class="entry-title">Test</h1><div class="seriestugenre"><a>'+raw+'</a></div>';
+    const {ext}=chargerExtension(source, {'/catalogue/test/':html});
+    const detail=await ext.getMangaDetail('https://sushiscan.fr/catalogue/test/');
+    assert.equal(detail.genres[0],decoded);assert.equal(detail.matureType,expected);assert.equal(detail.isMature,expected!==null);
+    assert.equal(detail.url,'https://sushiscan.fr/catalogue/test/');
+  });
+}
+test('les entités numériques invalides ne lèvent pas et ne deviennent pas sexuelles', async () => {
+  const html='<h1 class="entry-title">Test</h1><div class="seriestugenre"><a>&#1114112; &#xD800;</a></div>';
+  const {ext}=chargerExtension(source, {'/catalogue/test/':html});
+  const detail=await ext.getMangaDetail('https://sushiscan.fr/catalogue/test/');
+  assert.equal(detail.genres[0],'&#1114112; &#xD800;');assert.equal(detail.matureType,null);
+});

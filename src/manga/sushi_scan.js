@@ -31,7 +31,7 @@ function matureTypeFromGenres(genres) {
   if (!genres.length) return "unknown";
   var type = null;
   for (var i = 0; i < genres.length; i++) {
-    var tag = genres[i].toLowerCase().replace(/[éèêë]/g, "e").replace(/[àâä]/g, "a").replace(/[ôö]/g, "o").replace(/[îï]/g, "i").replace(/[ùûü]/g, "u");
+    var tag = genres[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
     if (/\b(?:sexual\s+content|contenu\s+sexuel|smut|pornhwa|pornwha|hentai|erotique|erotica|erotic|pornographic|pornographie)\b/.test(tag)) return "sexual";
     if (/\bgore\b/.test(tag)) type = "gore";
     else if (/\bviolence\b/.test(tag) && type !== "gore") type = "violence";
@@ -58,6 +58,13 @@ function decodeHtml(str) {
   if (!str) return "";
   return str
     .replace(/&amp;/g, "&")
+    .replace(/&Eacute;/g, "É")
+    .replace(/&eacute;/g, "é")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&#(x[0-9a-f]{1,6}|[0-9]{1,7});/gi, function(entity, number) {
+      var value = number.charAt(0).toLowerCase() === "x" ? parseInt(number.slice(1), 16) : parseInt(number, 10);
+      return value > 0 && value <= 0x10ffff && !(value >= 0xd800 && value <= 0xdfff) ? String.fromCodePoint(value) : entity;
+    })
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
@@ -133,7 +140,7 @@ class DefaultExtension extends MProvider {
         var genreLinks = genreBlock[1].match(/<a[^>]*>(.*?)<\/a>/gs);
         if (genreLinks) {
           for (var i = 0; i < genreLinks.length; i++) {
-            var g = stripTags(genreLinks[i]).trim();
+            var g = decodeHtml(stripTags(genreLinks[i])).trim();
             if (g) genres.push(g);
           }
         }
