@@ -185,3 +185,27 @@ test('les entités numériques invalides ne lèvent pas et ne deviennent pas sex
   const detail=await ext.getMangaDetail('https://sushiscan.fr/catalogue/test/');
   assert.equal(detail.genres[0],'&#1114112; &#xD800;');assert.equal(detail.matureType,null);
 });
+
+
+test('le moteur sans String.normalize classe toujours les genres décodés NFC et NFD', async () => {
+  const fs=require('node:fs'),vm=require('node:vm');
+  const {RUNTIME_BASE_JS}=require('./runtime-base.js');
+  let genre='';
+  const sandbox={console,setTimeout,clearTimeout,URL,URLSearchParams,Buffer,
+    sendMessage:async ()=>({status:200,headers:{},body:'<h1 class="entry-title">Test</h1><div class="seriestugenre"><a>'+genre+'</a></div>'})};
+  vm.createContext(sandbox);
+  // Keep intrinsic String local to this VM: never mutate Node's shared prototype.
+  vm.runInContext('String.prototype.normalize = undefined',sandbox);
+  assert.equal(vm.runInContext('typeof "".normalize',sandbox),'undefined');
+  assert.equal(vm.runInContext('typeof String.fromCodePoint',sandbox),'function');
+  vm.runInContext(RUNTIME_BASE_JS,sandbox);
+  vm.runInContext(fs.readFileSync(source,'utf8')+';globalThis.extension=new DefaultExtension()',sandbox);
+  for (const raw of ['Érotique','E\u0301rotique','&Eacute;rotique','&#201;rotique','&#xC9;rotique','contenu&nbsp;sexuel']) {
+    genre=raw;
+    const detail=await sandbox.extension.getMangaDetail('https://sushiscan.fr/catalogue/test/');
+    assert.equal(detail.matureType,'sexual',raw);
+    assert.equal(detail.url,'https://sushiscan.fr/catalogue/test/');
+  }
+  genre='Asexual Content';
+  assert.equal((await sandbox.extension.getMangaDetail('https://sushiscan.fr/catalogue/test/')).matureType,null);
+});

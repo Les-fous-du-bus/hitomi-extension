@@ -31,7 +31,10 @@ function matureTypeFromGenres(genres) {
   if (!genres.length) return "unknown";
   var type = null;
   for (var i = 0; i < genres.length; i++) {
-    var tag = genres[i].normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    // QuickJS exposes normalize only in optional full-Unicode builds.
+    var tag = genres[i].toLowerCase().replace(/[\u0300-\u036f]/g, "")
+      .replace(/[éèêë]/g, "e").replace(/[àâä]/g, "a").replace(/[ôö]/g, "o")
+      .replace(/[îï]/g, "i").replace(/[ùûü]/g, "u");
     if (/\b(?:sexual\s+content|contenu\s+sexuel|smut|pornhwa|pornwha|hentai|erotique|erotica|erotic|pornographic|pornographie)\b/.test(tag)) return "sexual";
     if (/\bgore\b/.test(tag)) type = "gore";
     else if (/\bviolence\b/.test(tag) && type !== "gore") type = "violence";

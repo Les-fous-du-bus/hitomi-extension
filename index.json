@@ -656,7 +656,7 @@
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "d9572fb2cdec643442a3f5af7d0200361a510b5d6e8209d4ff8ca6e8d3c94724",
+            "sha256": "b2c070965431956628c92f72593e5e1fc3a6bb211f32a1d1043accdf0b629454",
             "note": "2026-11-17 : classement sexuel fondé sur genres précis, avec entités HTML et accents normalisés ; âge/mature sans catégorie précise restent inconnus, horreur/yaoi/yuri ne deviennent pas sexuels. Cartes sans métadonnées classées inconnues. Diagnostic 502/503/504 et Cloudflare conservé ; serveur SushiScan toujours en panne sur plusieurs chapitres, lecture non validée."
         },
         {
