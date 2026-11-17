@@ -98,15 +98,15 @@
             "name": "NovelBin",
             "lang": "en",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/novel/novelbin.js",
             "iconUrl": "https://novelbin.com/favicon.ico",
             "status": "dead",
             "obsolescenceRisk": "medium",
-            "note": "Mesure 2026-09-04 : novelbin.com n'a plus AUCUN enregistrement DNS. novelbin.net repond mais sert une redirection JavaScript a jeton, et une fois le defi franchi la page ne contient zero caractere de texte visible et aucun lien d'oeuvre — rien ne prouve qu'il s'agisse du meme service. novelbin.org, novelbin.io et novelbin.me sont sans DNS. Laisse en dead faute de domaine de remplacement etabli.",
-            "sha256": "b8c946d1759aa438b0c007e2b27f7e91491dd6984dfaaba0673da1b1364e046c"
+            "note": "Contrôle 2026-11-17 : catalogue et recherche novelbin.com répondent HTTP 503 sans défi Cloudflare explicite depuis le banc Mac. La v3 signale l'erreur HTTP au lieu d'un catalogue vide ; elle refuse aussi les pages non reconnues. Source toujours indisponible, fonctionnement Android non confirmé. Aucun domaine de remplacement validé.",
+            "sha256": "a33c5f4998a7c43aa46d552b4b96c63ce08f5d0a8d1e426ddd88bd74d8be2d79"
         },
         {
             "id": "novelbuddy",

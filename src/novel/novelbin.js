@@ -3,7 +3,7 @@
  * Source : https://novelbin.com
  * Type : Scraping HTML
  * Langue : EN
- * Cloudflare : NON
+ * Cloudflare : détection des défis explicites (sans résolution automatique)
  * Mature : OUI (genres Adult, Mature)
  * ContentType : LIGHT_NOVEL / WEB NOVEL
  *
@@ -20,19 +20,36 @@
  *   - Contenu    : /b/{slug}/chapter-N (div#chr-content.chr-c)
  *
  * @author @khun -- Extension Strategist
- * @version 1.0.0
+ * @version 3
  */
 
 var BASE_URL = "https://novelbin.com";
 
-// La source peut être inaccessible même lorsque la bibliothèque locale existe.
+// Preserve HTTP status: fetchv2's text helper intentionally drops it.
 async function novelbinFetch(url, options) {
+  var response;
   try {
-    return await fetchv2(url, options);
+    response = await sendMessage('fetchv2', JSON.stringify([url, options || {}]));
+    if (response.error) throw new Error(response.error);
   } catch (e) {
     var cause = String(e && e.message ? e.message : e);
     throw new Error("NovelBin : source inaccessible. Vérifie la connexion ou réessaie plus tard. Détail : " + cause);
   }
+  var html = String(response.body || "");
+  // Edge headers and background challenge-platform scripts do not prove a challenge.
+  var titleMatch = html.match(/<title[^>]*>([^<]*)<\/title>/i);
+  var pageTitle = titleMatch ? titleMatch[1].trim() : "";
+  var challengeTitle = /^Just a moment[.!\u2026\s]*$/i.test(pageTitle) ||
+    /^Attention Required[!\s]*\|\s*Cloudflare$/i.test(pageTitle);
+  var challenge = challengeTitle || /\b_cf_chl_opt\b|id=["']cf-browser-verification["']/i.test(html);
+  if (challenge) {
+    throw new Error("NovelBin : vérification Cloudflare requise sur la source.");
+  }
+  if (response.status >= 400) {
+    throw new Error("NovelBin : source inaccessible (HTTP " + response.status + "). Réessaie plus tard.");
+  }
+  if (!html.trim()) throw new Error("NovelBin : réponse vide de la source.");
+  return html;
 }
 
 var HEADERS = {
@@ -117,6 +134,16 @@ function parseList(html) {
     list.push({ title: title, url: url, cover: cover });
   }
 
+  if (!list.length) {
+    var visibleText = stripHtml(html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<[^>]+>/g, " "));
+    if (!/\b(?:no (?:results|novels|matches)(?: were)? found|nothing found|no results)\b/i.test(visibleText)) {
+      throw new Error("NovelBin : catalogue indisponible ou format de page non reconnu.");
+    }
+  }
+
   // Pagination: check for rel="next" or pagination links
   var hasNextPage =
     /rel=["']next["']/i.test(html) ||
@@ -175,7 +202,8 @@ class DefaultExtension extends LNProvider {
       html.match(/<h3[^>]*class="title"[^>]*itemprop="name"[^>]*>([\s\S]*?)<\/h3>/i) ||
       html.match(/<h3[^>]*itemprop="name"[^>]*class="title"[^>]*>([\s\S]*?)<\/h3>/i) ||
       html.match(/<h3[^>]*class="title"[^>]*>([\s\S]*?)<\/h3>/i);
-    var title = titleMatch ? decodeHtml(stripHtml(titleMatch[1])) : "Untitled";
+    var title = titleMatch ? decodeHtml(stripHtml(titleMatch[1])) : "";
+    if (!title) throw new Error("NovelBin : fiche indisponible ou format de page non reconnu.");
 
     // Cover from meta[itemprop="image"] or .book img
     var coverMatch = html.match(/<meta[^>]*itemprop="image"[^>]*content=["']([^"']+)["']/i);
