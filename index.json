@@ -454,15 +454,15 @@
             "name": "MangaFire",
             "lang": "multi",
             "space": "manga",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": true,
             "jsUrl": "src/manga/mangafire.js",
             "iconUrl": "https://mangafire.to/assets/sites/mangafire/favicon.png",
-            "status": "active",
+            "status": "deprecated",
             "obsolescenceRisk": "medium",
-            "note": "2026-11-08 : vérification Cloudflare observée ; message explicite vérifié sur Android. Accès non rétabli. Historique : runtime-audit 2026-05-10: HTTP 200 + CF-RAY present, page content loads (>4KB). RUNTIME-PARTIAL — CF managed challenge present, page loads from desktop UA but in-app WebView bypass required for full access.",
-            "sha256": "adb0f6842c9e710e5bb6a0bcb760f1a471d51bcf45e52988580dfd7717f1bbf9"
+            "note": "Contrôle 2026-11-17 : le site sert un nouveau shell JavaScript sans catalogue HTML exploitable. La v5 distingue ce format non pris en charge d'un vrai défi Cloudflare ; un script Cloudflare seul n'est plus un blocage. Lecture non rétablie ; adaptation du nouveau site encore nécessaire. Contrôle Mac, pas de lecture Android confirmée.",
+            "sha256": "6fe21d391c8d30f8cb6b4ca4d273ddd768b36f0350ef78f337a0376d5a6c127e"
         },
         {
             "id": "mangahere",

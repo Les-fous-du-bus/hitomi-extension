@@ -46,6 +46,27 @@ function stripTags(str) {
   return str.replace(/<[^>]*>/g, "");
 }
 
+// Un script Cloudflare peut être présent sur une page normale : ce n'est pas
+// un défi. Le nouveau site renvoie aussi une coquille SPA sans œuvres SSR.
+function ensureMangaFirePageSupported(html) {
+  var text = html || "";
+  // Les titres complets standard sont spécifiques ; un titre préfixé comme
+  // "Just a moment - MangaFire" et un script Cloudflare normal ne suffisent pas.
+  var challengeTitle = /<title\b[^>]*>\s*(?:just a moment(?:\.{1,3}|…)?|attention required!?(?:\s*\|\s*cloudflare))\s*<\/title\s*>/i.test(text);
+  if (challengeTitle) {
+    throw new Error("MangaFire : acces bloque par la verification du site ; ouvre la source dans le navigateur et reessaie.");
+  }
+  var appRoot = /<div\b[^>]*\sid\s*=\s*["']app-root["'][^>]*>/i.test(text);
+  var appBundle = /<script\b[^>]*\bsrc=["'][^"']*\/assets\/main-[^"']+\.js(?:\?[^"']*)?["']/i.test(text);
+  if (appRoot && appBundle) {
+    throw new Error("MangaFire : le site a change ; ce format de page n'est pas encore pris en charge par l'extension.");
+  }
+}
+
+function isMangaFirePageError(error) {
+  return /MangaFire : (?:acces bloque par la verification du site|le site a change)/.test(String(error && error.message || error));
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "MangaFire"; }
   get lang() { return "multi"; }
@@ -99,6 +120,7 @@ class DefaultExtension extends MProvider {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var res = await fetchv2(fullUrl, {});
+      ensureMangaFirePageSupported(res);
 
       // Title
       var titleMatch = res.match(/<div class="info">[^]*?<h1[^>]*>(.*?)<\/h1>/s);
@@ -150,6 +172,7 @@ class DefaultExtension extends MProvider {
         isMature: false,
       };
     } catch (e) {
+      if (isMangaFirePageError(e)) throw e;
       return { title: "Error", url: url, imageUrl: "", description: "", status: "unknown", genres: [], authors: [], isMature: false };
     }
   }
@@ -167,6 +190,7 @@ class DefaultExtension extends MProvider {
       // Fetch chapter list via AJAX endpoint
       var chapUrl = BASE_URL + "/ajax/manga/" + mangaId + "/chapter/" + LANG;
       var chapRes = await fetchv2(chapUrl, {});
+      ensureMangaFirePageSupported(chapRes);
 
       var chapData;
       try {
@@ -228,6 +252,7 @@ class DefaultExtension extends MProvider {
 
       return chapters;
     } catch (e) {
+      if (isMangaFirePageError(e)) throw e;
       return [];
     }
   }
@@ -241,6 +266,7 @@ class DefaultExtension extends MProvider {
       //   Returns: {"result":{"images":[[url,width,height],...]},...}
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
       var html = await fetchv2(fullUrl, {});
+      ensureMangaFirePageSupported(html);
 
       // Extract internal chapter ID from reading container: data-id="12345"
       var idMatch = html.match(/class="reading-detail[^"]*"[^>]*data-id="(\d+)"/);
@@ -257,6 +283,7 @@ class DefaultExtension extends MProvider {
       var chapterId = idMatch[1];
       var ajaxUrl = BASE_URL + "/ajax/read/" + chapterId;
       var ajaxRes = await fetchv2(ajaxUrl, { "X-Requested-With": "XMLHttpRequest", "Referer": fullUrl });
+      ensureMangaFirePageSupported(ajaxRes);
 
       var data;
       try {
@@ -277,6 +304,7 @@ class DefaultExtension extends MProvider {
       }
       return pages;
     } catch (e) {
+      if (isMangaFirePageError(e)) throw e;
       return [];
     }
   }
@@ -312,9 +340,7 @@ class DefaultExtension extends MProvider {
   _parseMangaList(html) {
     // fetchv2 retourne aussi le HTML des reponses 403 : un interstitiel
     // n'est pas un catalogue vide et doit etre explique a l'utilisateur.
-    if (/\/cdn-cgi\/challenge-platform\/|cf-chl-|<title>\s*(?:just a moment|attention required)/i.test(html || '')) {
-      throw new Error("MangaFire : acces bloque par la verification du site ; ouvre la source dans le navigateur et reessaie.");
-    }
+    ensureMangaFirePageSupported(html);
     var list = [];
 
     // Parse manga units from filter page
