@@ -8,30 +8,30 @@
             "name": "Chireads",
             "lang": "fr",
             "space": "light_novel",
-            "version": 5,
+            "version": 6,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/chireads.js",
             "iconUrl": "https://chireads.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "note": "v4 (2026-09-04) : le repli de getChapterList parcourait la page entiere sans filtrer, donc la liste ramassait le menu du site (accueil, Traductions, Original, A Propos de Nous) comme des chapitres ; le premier element pointait sur la page d'accueil. Filtre sur la forme reelle /<rubrique>/<slug-serie>/<slug-chapitre>/. La date se lit desormais depuis /AAAA/MM/JJ/ (l'ancien motif AAAA-MM-JJ ne trouvait jamais rien). Mesure : 733 chapitres reels, 3/3 lisibles.",
-            "sha256": "4c8f252776a73fd4d19b165c6bdf5969f7212c40798ee269953aae6a2f0f4aba"
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie.",
+            "sha256": "13476540b572ea410af6084dde8022b8ac4a64090e3288d908983ba7d615190d"
         },
         {
             "id": "kisswood",
             "name": "KissWood",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/kisswood.js",
             "iconUrl": "https://kisswood.eu/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "4d15d68560bf4a0bbc66263c110f413778088f1ef73ca789d3525910937fcfaf",
-            "note": "v2 (2026-11-02) : Sommaire limité à l’article de l’œuvre ; les liens des commentaires et des autres romans sont exclus. Le chapitre 0 conserve son numéro et son ordre."
+            "sha256": "99ba54f7be2050181f625e1c6a749c5f39538fb5bb2eed8fbbb0eaccf5414f36",
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie."
         },
         {
             "id": "lightnovelpub",
@@ -135,8 +135,8 @@
             "iconUrl": "https://noveldeglace.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "37132dd963748df44361c094cbaee695547ace8d21f79a37efff1c5ebdb1ff1a",
-            "note": "2026-11-17 : genres et catégorie de fiche restaurés pour les classes composées du site et les liens imbriqués ; textes d’infobulle exclus. Formats simples préservés. Vérification Mac sur plusieurs œuvres/chapitres ; ne constitue pas un test Android."
+            "sha256": "f78464fa203f05a818084b03b2dbebe4c683935a6937b17130274f216922d2b9",
+            "note": "2026-11-17 : genres et catégorie de fiche restaurés pour les classes composées du site et les liens imbriqués ; textes d’infobulle exclus. Formats simples préservés. Vérification Mac sur plusieurs œuvres/chapitres ; ne constitue pas un test Android. Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie."
         },
         {
             "id": "novelfire",
@@ -187,15 +187,15 @@
             "name": "Novhell",
             "lang": "fr",
             "space": "light_novel",
-            "version": 4,
+            "version": 5,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/novhell.js",
             "iconUrl": "https://novhell.org/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "high",
-            "note": "v4 (2026-11-02) : Catalogue limité aux vraies fiches et sommaire limité au contenu de l’œuvre ; les romans des menus latéraux ne deviennent plus des chapitres.",
-            "sha256": "dec18783a96e775c2fe3b2c57c6fe8b11ecd8134520533d3570da2264d451a16"
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie.",
+            "sha256": "deb9d277a3f75fd8a221b632c9d83d023b2c5b7511ba2431ddd4c00d5f03d7e4"
         },
         {
             "id": "readnovelfull",
@@ -262,15 +262,15 @@
             "name": "WarriorLegendTrad",
             "lang": "fr",
             "space": "light_novel",
-            "version": 2,
+            "version": 3,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/warriorlegendtrad.js",
             "iconUrl": "https://warriorlegendtrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "6b6ff49c1548f49af6226cd69e1220b3aae841b04d9337ff63db1bd254f71520",
-            "note": "v2 (2026-09-04) : meme defaut que wuxialnscantrad. getContent fermait sur le premier </div>, celui de la barre de boutons, et rendait 303 caracteres de navigation. Extraction par comptage d'imbrication + retrait des encarts. Mesure : 36 chapitres, 3/3 lisibles."
+            "sha256": "defc8e33b20c1daa916f1eead8d669b35a7e2e3a841ee34ceb8fe1506cc0a6eb",
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie."
         },
         {
             "id": "worldnovel",
@@ -292,30 +292,30 @@
             "name": "WuxiaLnScantrad",
             "lang": "fr",
             "space": "light_novel",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/wuxialnscantrad.js",
             "iconUrl": "https://wuxialnscantrad.wordpress.com/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "fb5cde75efaabacf414b4c3b0898e09440b63d8fc2d52c449a712c021988b8c9",
-            "note": "v3 (2026-11-02) : Sommaire limité au contenu principal de l’œuvre ; les commentaires récents d’autres romans sont exclus."
+            "sha256": "5450c0947cce1d51b5d6c1d77fc7a8612dc989ee17a1425b48438dfe8341e90e",
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie."
         },
         {
             "id": "xiaowaz",
             "name": "Xiaowaz",
             "lang": "fr",
             "space": "light_novel",
-            "version": 3,
+            "version": 4,
             "mature": false,
             "cloudflare": false,
             "jsUrl": "src/novel/xiaowaz.js",
             "iconUrl": "https://xiaowaz.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "2ccfa43744eae9882d10700c84b5364430a8daf52558bd645ce0d2c1d3730015",
-            "note": "v3 (2026-11-02) : Sommaire limité au contenu principal de l’œuvre ; les commentaires récents d’autres romans sont exclus."
+            "sha256": "b4d42478dea80263c13c46597d24d3107ec317d14935d50633723780a72b7ea8",
+            "note": "2026-11-17 : Recherche FR/EN sans String.normalize optionnel de QuickJS : accents latins usuels et marques combinantes gérés localement, titres et identifiants conservés. Régression VM sans cette API vérifiée ; disponibilité réseau actuelle non garantie."
         },
         {
             "id": "anime_sama",

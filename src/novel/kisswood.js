@@ -93,6 +93,14 @@ async function enrichCovers(ext, list) {
   return list;
 }
 
+// Accent folding for Latin catalogue search; QuickJS normalize is optional.
+function normalizeLatinSearch(text) {
+  return text.toLowerCase().replace(/[\u0300-\u036f]/g, "")
+    .replace(/[àáâãäå]/g, "a").replace(/ç/g, "c").replace(/[èéêë]/g, "e")
+    .replace(/[ìíîï]/g, "i").replace(/ñ/g, "n").replace(/[òóôõö]/g, "o")
+    .replace(/[ùúûü]/g, "u").replace(/[ýÿ]/g, "y");
+}
+
 class DefaultExtension extends MProvider {
   get name() { return "KissWood"; }
   get lang() { return "fr"; }
@@ -122,12 +130,10 @@ class DefaultExtension extends MProvider {
       if (page > 1) return { list: [], hasNextPage: false };
 
       var popular = await this.getPopular(1);
-      var normalizedQuery = query.toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      var normalizedQuery = normalizeLatinSearch(query);
       var filtered = [];
       for (var i = 0; i < popular.list.length; i++) {
-        var normalizedTitle = popular.list[i].title.toLowerCase()
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        var normalizedTitle = normalizeLatinSearch(popular.list[i].title);
         if (normalizedTitle.indexOf(normalizedQuery) !== -1) {
           filtered.push(popular.list[i]);
         }
