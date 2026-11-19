@@ -120,7 +120,7 @@ class DefaultExtension extends MProvider {
   async getMangaDetail(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await this._fetchHtml(fullUrl, { "User-Agent": UA });
+      var res = await this._readWorkPage(fullUrl, "detail");
 
       // Title — entry-title or h1
       var titleMatch = res.match(/<h1[^>]*class="entry-title"[^>]*itemprop="name"[^>]*>(.*?)<\/h1>/s) ||
@@ -191,7 +191,7 @@ class DefaultExtension extends MProvider {
   async getChapterList(url) {
     try {
       var fullUrl = url.startsWith("http") ? url : BASE_URL + url;
-      var res = await this._fetchHtml(fullUrl, { "User-Agent": UA });
+      var res = await this._readWorkPage(fullUrl, "chapters");
 
       var chapters = [];
       // MangaReader: #chapterlist li with .chbox .eph-num a
@@ -300,6 +300,20 @@ class DefaultExtension extends MProvider {
       throw new Error("SushiScan : aucune page de lecture disponible pour ce chapitre.");
     }
     return pages;
+  }
+
+  async _readWorkPage(url, part) {
+    // Le runtime sérialise la fiche et le sommaire. Partager une seule fois
+    // une réponse récente évite un deuxième accès au même document HTML.
+    var previous = this._workPage;
+    this._workPage = null;
+    if (previous && previous.url === url && previous.part !== part &&
+        Date.now() - previous.receivedAt < 5000) {
+      return previous.html;
+    }
+    var html = await this._fetchHtml(url, { "User-Agent": UA });
+    this._workPage = { url: url, part: part, html: html, receivedAt: Date.now() };
+    return html;
   }
 
   async _fetchHtml(url, headers) {

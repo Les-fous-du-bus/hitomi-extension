@@ -209,3 +209,42 @@ test('le moteur sans String.normalize classe toujours les genres décodés NFC e
   genre='Asexual Content';
   assert.equal((await sandbox.extension.getMangaDetail('https://sushiscan.fr/catalogue/test/')).matureType,null);
 });
+
+for (const [first, second] of [
+  ['getMangaDetail', 'getChapterList'],
+  ['getChapterList', 'getMangaDetail'],
+]) {
+  test(`la fiche et le sommaire partagent la réponse (${first} en premier)`, async () => {
+    const url = 'https://sushiscan.fr/catalogue/test/';
+    const html = '<h1>Test</h1><li data-num="1"><a href="/test-chapitre-1/"><span class="chapternum">Chapitre 1</span></a></li>';
+    const outage = { status: 504, body: '<h1>504 Gateway Time-out</h1>' };
+    const { ext, appels } = chargerExtension(source, { [url]: [html, outage] });
+    const result = { [first]: await ext[first](url), [second]: await ext[second](url) };
+    assert.equal(result.getMangaDetail.title, 'Test');
+    assert.equal(result.getChapterList[0].number, 1);
+    assert.equal(appels.length, 1);
+
+    await assert.rejects(ext[first](url), /SushiScan.*504/);
+    assert.equal(appels.length, 2);
+  });
+}
+
+test('une relance de la même action SushiScan interroge de nouveau la source', async () => {
+  const url = 'https://sushiscan.fr/catalogue/test/';
+  const { ext, appels } = chargerExtension(source, { [url]: ['<h1>Avant</h1>', '<h1>Après</h1>'] });
+  assert.equal((await ext.getMangaDetail(url)).title, 'Avant');
+  assert.equal((await ext.getMangaDetail(url)).title, 'Après');
+  assert.equal(appels.length, 2);
+});
+
+test('une réponse SushiScan ne se partage jamais entre deux œuvres', async () => {
+  const first = 'https://sushiscan.fr/catalogue/first/';
+  const second = 'https://sushiscan.fr/catalogue/second/';
+  const { ext, appels } = chargerExtension(source, {
+    [first]: '<h1>Première œuvre</h1>',
+    [second]: '<li data-num="4"><a href="/second-chapitre-4/"><span class="chapternum">Chapitre 4</span></a></li>',
+  });
+  await ext.getMangaDetail(first);
+  assert.equal((await ext.getChapterList(second))[0].number, 4);
+  assert.equal(appels.length, 2);
+});
