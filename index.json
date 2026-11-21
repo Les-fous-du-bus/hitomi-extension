@@ -649,15 +649,15 @@
             "name": "SushiScan",
             "lang": "fr",
             "space": "manga",
-            "version": 6,
+            "version": 7,
             "mature": true,
             "cloudflare": true,
             "jsUrl": "src/manga/sushi_scan.js",
             "iconUrl": "https://sushiscan.fr/favicon.ico",
             "status": "active",
             "obsolescenceRisk": "medium",
-            "sha256": "b2c070965431956628c92f72593e5e1fc3a6bb211f32a1d1043accdf0b629454",
-            "note": "2026-11-17 : classement sexuel fondé sur genres précis, avec entités HTML et accents normalisés ; âge/mature sans catégorie précise restent inconnus, horreur/yaoi/yuri ne deviennent pas sexuels. Cartes sans métadonnées classées inconnues. Diagnostic 502/503/504 et Cloudflare conservé ; serveur SushiScan toujours en panne sur plusieurs chapitres, lecture non validée."
+            "sha256": "c6aca68eaa156cb73bca330072f28f6635f4707db387ced5b3483a42d8798d88",
+            "note": "2026-11-21 : la fiche et le sommaire partagent une réponse récente de la même œuvre. Sommaires vérifiés sur Android le 19 novembre sur Kingdom et Hunter × Hunter. La lecture reste indisponible lors des contrôles : HTTP 504 le 19 novembre, certificat HTTPS expiré le 21 novembre."
         },
         {
             "id": "tcbscans",
